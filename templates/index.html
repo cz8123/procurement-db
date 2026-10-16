@@ -1,0 +1,2631 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>采购数据库管理</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#ffffff; --border:#e3e6ea; --text:#1f2329; --muted:#8a9099;
+    --primary:#2f6fed; --primary-d:#245bd0; --dim:#0a8f6e; --fact:#c4741a;
+    --danger:#e0483b; --warn:#e8a33d; --ok:#0a8f6e; --hover:#eef3ff; --shadow:0 1px 3px rgba(0,0,0,.08);
+  }
+  *{box-sizing:border-box;font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-size:13px;}
+  #app{display:flex;flex-direction:column;height:100vh;}
+  header{background:var(--panel);border-bottom:1px solid var(--border);padding:10px 18px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow);z-index:5;}
+  header h1{font-size:16px;margin:0;font-weight:600;}
+  header .spacer{flex:1;}
+  header button{margin-left:8px;}
+  .btn{background:var(--primary);color:#fff;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:13px;}
+  .btn:hover{background:var(--primary-d);}
+  .btn:disabled{background:#b9c4d4;cursor:not-allowed;}
+  .btn.ghost{background:#eef0f3;color:var(--text);}
+  .btn.ghost:hover{background:#e2e5ea;}
+  .btn.danger{background:var(--danger);}
+  .btn.danger:hover{background:#c63a2e;}
+  .btn.sm{padding:4px 9px;font-size:12px;}
+  main{flex:1;display:flex;min-height:0;}
+  aside{width:240px;background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;padding:10px 0;flex-shrink:0;}
+  aside .grp{font-size:11px;color:var(--muted);padding:8px 16px 4px;letter-spacing:1px;}
+  .titem{display:flex;flex-direction:column;gap:1px;padding:7px 16px;cursor:pointer;border-left:3px solid transparent;}
+  .titem:hover{background:var(--hover);}
+  .titem.active{background:var(--hover);border-left-color:var(--primary);}
+  .tmain{display:flex;align-items:center;gap:7px;}
+  .tlabel{flex:1;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .tname{font-size:10.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.2px;}
+  .tbadge{font-size:10px;padding:1px 6px;border-radius:10px;color:#fff;flex-shrink:0;}
+  .tbadge.dim{background:var(--dim);}
+  .tbadge.fact{background:var(--fact);}
+  .trows{font-size:11px;color:var(--muted);flex-shrink:0;}
+  .tsearch{padding:0 12px 8px;}
+  .tsearch input{width:100%;box-sizing:border-box;padding:5px 9px;font-size:12px;border:1px solid var(--border);border-radius:6px;outline:none;}
+  .tsearch input:focus{border-color:var(--primary);}
+  .tnone{padding:16px;text-align:center;color:var(--muted);font-size:12px;}
+  section{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .toolbar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--border);flex-wrap:wrap;}
+  .toolbar .cur{font-weight:600;font-size:14px;}
+  .toolbar .cur .cursub{font-size:11.5px;color:var(--muted);font-weight:400;margin-left:7px;letter-spacing:.2px;}
+  .toolbar input[type=text]{padding:6px 10px;border:1px solid var(--border);border-radius:6px;width:200px;}
+  .toolbar select{padding:6px 8px;border:1px solid var(--border);border-radius:6px;}
+  .toolbar .spacer{flex:1;}
+  /* 筛选芯片条 */
+  .filterbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:7px 16px;background:#fbfcff;border-bottom:1px solid var(--border);}
+  .chipf{background:#e6f0ff;color:#245bd0;border-radius:14px;padding:3px 9px;font-size:12px;display:inline-flex;gap:6px;align-items:center;}
+  .chipf .x{cursor:pointer;font-weight:700;opacity:.75;}
+  .chipf .x:hover{opacity:1;}
+  .gridwrap{flex:1;overflow:auto;padding:0;
+    /* 强制常显、可明显拖动的滚动条：避免 Windows「自动隐藏滚动条」导致看起来像“拖动条没了” */
+    scrollbar-color:#c2c9d2 #eef0f3;scrollbar-width:thin;}
+  .gridwrap::-webkit-scrollbar{width:14px;height:14px;}
+  .gridwrap::-webkit-scrollbar-track{background:#eef0f3;border-radius:7px;}
+  .gridwrap::-webkit-scrollbar-thumb{background:#c2c9d2;border-radius:7px;border:3px solid #eef0f3;}
+  .gridwrap::-webkit-scrollbar-thumb:hover{background:#aab2bd;}
+  /* 数据表：列少时填满容器、列多时按内容自然展开 → 超出容器出现横向滚动条（#gridWrap overflow:auto） */
+  #grid > table{width:max-content;min-width:100%;}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;}
+  thead th{position:sticky;top:0;background:#f0f2f5;z-index:3;text-align:left;padding:8px 24px 8px 10px;border-bottom:2px solid var(--border);white-space:nowrap;user-select:none;}
+  thead th .th-name{cursor:pointer;}
+  thead th .arrow{color:var(--primary);font-size:10px;margin-left:3px;}
+  thead th .fn{position:absolute;right:7px;top:50%;transform:translateY(-50%);cursor:pointer;color:#c2c8d0;display:inline-flex;padding:2px;}
+  thead th .fn:hover{color:var(--primary);}
+  thead th .fn.on{color:var(--primary);}
+  tbody td{padding:7px 10px;border-bottom:1px solid #eef0f2;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  tbody tr:hover{background:#fafbfc;}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  tfoot td{position:sticky;bottom:0;background:#f7f9fc;border-top:2px solid var(--border);font-size:12px;padding:6px 10px;color:#3a4250;}
+  tfoot td.agg{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;}
+  tfoot td.agg-tag{font-size:11.5px;color:var(--muted);white-space:nowrap;}
+  .btn.on{background:var(--primary);border-color:var(--primary);color:#fff;}
+  .empty{padding:40px;text-align:center;color:var(--muted);}
+  .pager{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--panel);border-top:1px solid var(--border);}
+  .pager .spacer{flex:1;}
+  .pager button{padding:4px 10px;border:1px solid var(--border);background:#fff;border-radius:5px;cursor:pointer;}
+  .pager button:disabled{color:var(--muted);cursor:not-allowed;}
+  /* 模态框 */
+  .mask{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:flex-start;justify-content:center;z-index:50;padding-top:50px;overflow:auto;}
+  .mask.show{display:flex;}
+  .modal{background:#fff;border-radius:10px;width:680px;max-width:94vw;box-shadow:0 8px 30px rgba(0,0,0,.25);
+    display:flex;flex-direction:column;position:relative;max-height:92vh;
+    overflow:hidden;min-width:360px;min-height:240px;}
+  .modal.wide{width:840px;}
+  .modal-resize{position:absolute;right:0;bottom:0;width:20px;height:20px;cursor:nwse-resize;touch-action:none;
+    background:linear-gradient(135deg,transparent 0 55%,rgba(0,0,0,.22) 55% 65%,transparent 65% 78%,rgba(0,0,0,.22) 78% 88%,transparent 88%);}
+  .modal h3{margin:0;padding:14px 18px;border-bottom:1px solid var(--border);font-size:15px;display:flex;align-items:center;gap:10px;cursor:move;user-select:none;}
+  .modal h3 .x{margin-left:auto;cursor:pointer;color:var(--muted);font-weight:400;font-size:18px;}
+  .modal .body{padding:16px 18px;overflow:auto;flex:1 1 auto;}
+  .modal .foot{padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;align-items:center;flex:0 0 auto;}
+  .modal .foot .sp{margin-right:auto;font-size:12px;color:var(--muted);}
+  .field{margin-bottom:11px;}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+  .field input,.field textarea{width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-size:13px;}
+  .field input:disabled{background:#f2f3f5;color:var(--muted);}
+  .field.pk label::after{content:" (主键)";color:var(--primary);}
+  .hint{font-size:12px;color:var(--muted);margin:6px 0;}
+  .result{margin-top:12px;padding:10px;border-radius:6px;font-size:13px;display:none;white-space:pre-wrap;}
+  .result.ok{background:#e8f6ef;color:var(--ok);display:block;}
+  .result.err{background:#fdecea;color:var(--danger);display:block;}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#32383f;color:#fff;padding:10px 18px;border-radius:8px;opacity:0;transition:.25s;z-index:99;pointer-events:none;max-width:80vw;}
+  .toast.show{opacity:1;}
+  .deadmask{position:fixed;inset:0;background:rgba(20,24,28,.92);z-index:200;display:flex;align-items:center;justify-content:center;}
+  .deadcard{background:#1f2329;color:#e8eaed;border:1px solid #3a3f47;border-radius:14px;padding:34px 40px;text-align:center;max-width:440px;box-shadow:0 12px 40px rgba(0,0,0,.5);}
+  .deadico{font-size:46px;line-height:1;margin-bottom:14px;color:var(--danger);}
+  .deadt1{font-size:22px;font-weight:700;margin-bottom:10px;}
+  .deadt2{font-size:14px;color:#b6bcc4;margin-bottom:18px;}
+  .deadt3{font-size:12.5px;color:#9aa1aa;line-height:1.7;}
+  .deadt3 code{background:#2c3138;color:#7fd1b0;padding:1px 7px;border-radius:4px;font-family:Consolas,monospace;}
+
+  /* 浮动菜单（筛选 / 列显隐） */
+  .popmenu{position:absolute;z-index:80;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:10px;width:236px;display:none;}
+  .popmenu.show{display:block;}
+  .popmenu .pm-title{font-size:12px;font-weight:600;margin-bottom:7px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .popmenu select,.popmenu input{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:7px;font-size:12.5px;}
+  .popmenu .pm-actions{display:flex;justify-content:flex-end;gap:8px;}
+  .popmenu label{display:flex;align-items:center;gap:7px;font-size:12.5px;padding:4px 3px;cursor:pointer;border-radius:4px;}
+  .popmenu label:hover{background:var(--hover);}
+  .popmenu .pm-scroll{max-height:300px;overflow:auto;margin:-3px -3px 6px;}
+
+  /* 导入向导 / 数据质量 */
+  .chip{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:#eef0f3;color:#555;margin-right:6px;}
+  .chip.enc{background:#e6f0ff;color:#245bd0;}
+  .maprow{display:flex;align-items:center;gap:10px;padding:5px 8px;border-radius:5px;font-size:12.5px;}
+  .maprow.m{background:#eafaf3;}
+  .maprow.u{background:#f6f7f9;color:var(--muted);}
+  .maprow .arrow{color:var(--muted);}
+  .maprow .db{font-weight:600;color:var(--ok);}
+  .maprow .db.none{color:var(--muted);font-weight:400;}
+  .cards{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;}
+  .card{flex:1;min-width:120px;border:1px solid var(--border);border-radius:8px;padding:10px 12px;}
+  .card .n{font-size:22px;font-weight:700;}
+  .card .l{font-size:11px;color:var(--muted);margin-top:2px;}
+  .card.bad{border-color:#f3c2bc;background:#fdf3f1;}
+  .card.warn{border-color:#f4e0bd;background:#fdf8ee;}
+  .card.ok{border-color:#bfe6d6;background:#f1faf6;}
+  details summary{cursor:pointer;color:var(--primary);font-size:12px;margin:6px 0;}
+  .rel-row{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;}
+  .rel-row .path{font-size:13px;font-weight:600;}
+  .rel-row .path .dot{color:var(--muted);font-weight:400;margin:0 6px;}
+  .rel-row .meta{font-size:12px;color:var(--muted);margin:4px 0 6px;}
+  .bar{height:8px;border-radius:5px;background:#eef0f3;overflow:hidden;}
+  .bar > i{display:block;height:100%;}
+  .bar > i.ok{background:var(--ok);} .bar > i.warn{background:var(--warn);} .bar > i.bad{background:var(--danger);}
+  .tag{font-size:11px;padding:1px 7px;border-radius:10px;color:#fff;}
+  .tag.ok{background:var(--ok);} .tag.warn{background:var(--warn);} .tag.bad{background:var(--danger);} .tag.err{background:#999;}
+  /* 补录建议徽章（数据质量列表） */
+  .adv-line{display:flex;gap:6px;align-items:flex-start;margin:6px 0 2px;}
+  .adv{font-size:11px;padding:1px 7px;border-radius:4px;font-weight:600;white-space:nowrap;flex-shrink:0;}
+  .adv.recommend{background:#e6f6ea;color:#1a7f3c;}
+  .adv.optional{background:#fff3e0;color:#a15c00;}
+  .adv.not_needed{background:#eef0f3;color:#5b6470;}
+  .adv-why{font-size:11.5px;color:var(--muted);line-height:1.5;}
+  /* 缺失值弹窗：建议框 + 补录方式 */
+  .advbox{font-size:12px;line-height:1.6;border-radius:7px;padding:9px 11px;margin:6px 0 10px;background:#f6f8fb;border-left:3px solid var(--border);}
+  .advbox.recommend{background:#f2fbf4;border-left-color:#3aa563;}
+  .advbox.not_needed{background:#f7f8fa;border-left-color:#9aa3ae;}
+  .advbox.optional{background:#fffbf2;border-left-color:#e0a33a;}
+  .bfpanel{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:#fcfdff;}
+  .bf-head{font-size:12px;font-weight:600;margin-bottom:7px;color:#3a4250;}
+  .bf-form{margin:2px 0 8px 0;padding:9px 10px;background:#f8fafc;border-radius:6px;border:1px dashed var(--border);}
+  .bf-form input[type=text],.bf-form input:not([type]){width:100%;box-sizing:border-box;padding:5px 8px;font-size:12px;border:1px solid var(--border);border-radius:5px;margin-bottom:6px;}
+  .bf-form select{width:100%;box-sizing:border-box;font-size:12px;border:1px solid var(--border);border-radius:5px;padding:4px;}
+  .bf-form .frow{display:flex;gap:8px;align-items:center;margin-bottom:5px;}
+  .bf-form .frow label{width:150px;font-size:12px;color:#4a5460;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .bf-form .frow input{flex:1;margin:0;}
+  .rel-actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;}
+  /* 数据质量 独立页面 */
+  .q-page{padding:0 16px 24px;}
+  .q-page .toolbar{border:none!important;padding-left:0!important;padding-right:0!important;box-shadow:none;}
+  .q-page .q-sec{font-size:14px;font-weight:600;margin:20px 0 8px;padding-top:10px;border-top:1px solid var(--border);}
+  .q-page .toolbar .cur{font-size:15px;}
+  /* ---- Power BI 风格「新建/编辑关系」双面板 ---- */
+  .rel-editor{display:flex;gap:12px;align-items:stretch;margin:4px 0 12px;}
+  .rel-editor .re-panel{flex:1;min-width:0;border:1px solid var(--border);border-radius:9px;padding:9px 11px;background:#fafbfc;}
+  .rel-editor .re-panel.src{border-top:3px solid #cdd6f7;}
+  .rel-editor .re-panel.tgt{border-top:3px solid #bfe3cd;}
+  .rel-editor .re-ph{font-size:12px;font-weight:700;color:#5b6470;margin-bottom:7px;}
+  .rel-editor .re-mid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;flex-shrink:0;padding-top:14px;}
+  .rel-editor .re-arrow{font-size:20px;color:#3a5bd9;line-height:1;}
+  .rel-editor .re-card{max-width:132px;font-size:12px;}
+  /* ---- 模型视图（Power BI 风格：表框 + 字段列表 + 字段级关系连线 + 拖拽） ---- */
+  .mv-page{display:flex;flex-direction:column;height:100%;min-height:0;padding:8px 12px 6px;}
+  .mv-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 2px 8px;}
+  .mv-bar .cur{font-size:15px;font-weight:600;}
+  .mv-bar .hint{margin:0;}
+  .mv-bar input[type=text]{padding:5px 9px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;width:190px;outline:none;}
+  .mv-bar input[type=text]:focus{border-color:var(--primary);}
+  .mv-bar .spacer{flex:1;}
+  .mv-zoombox{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#fff;}
+  .mv-zoombox button{border:none;background:#fff;padding:5px 9px;cursor:pointer;font-size:13px;color:#3a4250;line-height:1;}
+  .mv-zoombox button:hover{background:#eef3ff;}
+  .mv-zoombox .zv{font-size:11.5px;color:var(--muted);min-width:42px;text-align:center;padding:5px 0;
+    border-left:1px solid var(--border);border-right:1px solid var(--border);}
+  .mv-scroll{position:relative;flex:1;min-height:300px;overflow:auto;border:1px solid var(--border);border-radius:10px;
+    background:#f7f9fb;background-image:radial-gradient(#dde3ea 1px,transparent 1px);background-size:16px 16px;
+    /* 强制常显、可明显拖动的滚动条：避免 Windows「自动隐藏滚动条」导致模型视图画布看起来像“横向拖动条没了” */
+    scrollbar-color:#9aa4b2 #e8ebef;scrollbar-width:thin;}
+  .mv-scroll::-webkit-scrollbar{width:16px;height:16px;}
+  .mv-scroll::-webkit-scrollbar-track{background:#e8ebef;border-radius:8px;}
+  .mv-scroll::-webkit-scrollbar-thumb{background:#9aa4b2;border-radius:8px;border:4px solid #e8ebef;}
+  .mv-scroll::-webkit-scrollbar-thumb:hover{background:#7c8696;}
+  .mv-holder{position:relative;}
+  .mv-stage{position:relative;transform-origin:0 0;}
+  .mv-svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none;}
+  /* 关系连线：默认弱化，鼠标移上去才整体高亮（两端 1/* 标签仅高亮时显示） */
+  .mv-svg .mv-edge{pointer-events:none;transition:stroke-width .12s ease,opacity .12s ease;}
+  .mv-svg .mv-drag-line{stroke:#3a5bd9;stroke-width:2;stroke-dasharray:6 4;fill:none;}
+  .mv-svg .mv-relg{transition:opacity .12s ease;}
+  /* 透明粗「命中带」：鼠标移到细线附近即可选中/高亮（细线本身 pointer-events:none） */
+  .mv-svg .mv-hit{stroke:transparent;fill:none;stroke-width:14;pointer-events:stroke;cursor:pointer;}
+  /* 徽章 / 端点标签不拦截鼠标，事件交给命中带 */
+  .mv-svg .mv-badge,.mv-svg .mv-ends{pointer-events:none;}
+  /* 线宽/透明度只由 .hot 类决定，避免重绘时机不同导致残留「假高亮」 */
+  .mv-svg .mv-edge{stroke-width:1.8;opacity:.92;}
+  .mv-svg .mv-relg.hot .mv-edge{stroke-width:3.2;opacity:1;}
+  .mv-svg .mv-relg .mv-ends{opacity:0;transition:opacity .12s ease;}
+  .mv-svg .mv-relg.hot .mv-ends{opacity:1;}
+  .mv-svg.focus .mv-relg:not(.hot){opacity:.10;}
+  .mv-svg.focus .mv-relg:not(.hot) .mv-badge,
+  .mv-svg.focus .mv-relg:not(.hot) .mv-ends{opacity:0;}
+  .mv-box{position:absolute;width:224px;border:1px solid #b9c3cf;border-radius:9px;background:#fff;
+    box-shadow:0 2px 8px rgba(20,40,80,.10);}
+  .mv-box.sel{box-shadow:0 0 0 2px #3a5bd9,0 6px 18px rgba(20,40,80,.22);z-index:9;}
+  .mv-box.faded{opacity:.30;}
+  .mv-box-h{display:flex;align-items:center;gap:6px;padding:6px 8px;font-size:12px;font-weight:700;color:#fff;
+    border-radius:8px 8px 0 0;cursor:grab;touch-action:none;}
+  .mv-box-h.fact{background:#3a5bd9;}
+  .mv-box-h.dim{background:#1a7f3c;}
+  .mv-box-h:active{cursor:grabbing;}
+  .mv-box-h .mv-nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .mv-box-h .mv-cnt{margin-left:auto;font-weight:400;font-size:10px;opacity:.92;white-space:nowrap;flex-shrink:0;}
+  /* 字段列表：字段多时卡片内部滚动（最高约 9 行 = 189px），卡片不再被拉得很长 */
+  .mv-fs{max-height:189px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+    border-radius:0 0 8px 8px;scrollbar-width:thin;}
+  .mv-fs::-webkit-scrollbar{width:8px;}
+  .mv-fs::-webkit-scrollbar-thumb{background:#c8d2dd;border-radius:4px;}
+  .mv-fs::-webkit-scrollbar-thumb:hover{background:#aeb9c6;}
+  .mv-f{position:relative;display:flex;align-items:center;gap:5px;padding:3px 8px;font-size:11.5px;
+    border-top:1px solid #eef1f5;}
+  .mv-f:hover{background:#f2f6ff;}
+  .mv-f .ic{width:13px;text-align:center;font-size:10.5px;flex-shrink:0;color:#9aa5b1;}
+  .mv-f .fn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#2b3542;}
+  .mv-f .ft{font-size:9.5px;color:#a7b0ba;flex-shrink:0;font-family:Consolas,monospace;}
+  .mv-f.ispk{background:#fbfdff;}
+  .mv-f.ispk .fn{font-weight:700;}
+  .mv-f.iskey .fn{color:#1f3fa8;}
+  .mv-f.hit{background:#fff3c4;}
+  .mv-f.hover-t,.mv-f.hl{background:#dbe4ff;box-shadow:inset 0 0 0 1.5px #3a5bd9;}
+  /* 折叠/展开：点击表头右侧 ▾ 收起字段列表，连线自动回退到表头锚点 */
+  .mv-box-h .mv-toggle{margin-left:6px;flex-shrink:0;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;
+    border-radius:4px;cursor:pointer;font-size:11px;line-height:1;opacity:.85;user-select:none;transition:transform .12s ease;}
+  .mv-box-h .mv-toggle:hover{background:rgba(255,255,255,.28);opacity:1;}
+  .mv-box.collapsed .mv-fs{display:none;}
+  .mv-box.collapsed .mv-toggle{transform:rotate(-90deg);}
+  /* 拖底边拉高：把手悬浮可见，折叠时隐藏 */
+  .mv-resize{position:absolute;left:0;right:0;bottom:0;height:9px;cursor:ns-resize;z-index:3;
+    display:flex;align-items:flex-end;justify-content:center;opacity:0;transition:opacity .12s ease;}
+  .mv-box:hover .mv-resize{opacity:.5;}
+  .mv-resize::after{content:"";width:26px;height:3px;border-radius:2px;background:#3a5bd9;margin-bottom:2px;}
+  .mv-resize:hover{opacity:1;}
+  .mv-box.collapsed .mv-resize{display:none;}
+  /* 端口内收：字段列表开启纵向滚动后会裁掉超出部分，故不再负偏移 */
+  .mv-f .port{position:absolute;top:50%;transform:translateY(-50%);width:9px;height:9px;border-radius:50%;
+    background:#fff;border:1.5px solid #93a0b0;cursor:crosshair;opacity:0;transition:opacity .1s;z-index:2;}
+  .mv-f .port.l{left:2px;} .mv-f .port.r{right:2px;}
+  .mv-f:hover .port{opacity:1;}
+  .mv-f .port:hover{border-color:#3a5bd9;background:#3a5bd9;}
+  .mv-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);padding:7px 4px 0;}
+  .mv-legend i{display:inline-block;width:20px;height:0;border-top-width:2px;border-top-style:solid;vertical-align:middle;margin-right:5px;}
+  .mv-pop{position:fixed;z-index:90;width:286px;background:#fff;border:1px solid var(--border);border-radius:9px;
+    box-shadow:0 10px 30px rgba(20,40,80,.24);padding:11px 13px;font-size:12px;}
+  .mv-pop h4{margin:0 0 7px;font-size:12.5px;display:flex;align-items:center;gap:6px;}
+  .mv-pop h4 .x{margin-left:auto;cursor:pointer;color:var(--muted);font-size:16px;line-height:1;}
+  .mv-pop .pv{background:#f6f8fb;border-radius:6px;padding:6px 8px;margin-bottom:7px;line-height:1.6;}
+  .mv-pop .pv code{font-family:Consolas,monospace;color:#1f3fa8;}
+  .mv-pop .row{display:flex;gap:6px;align-items:center;margin:5px 0;}
+  .mv-pop .row label{width:52px;color:var(--muted);flex-shrink:0;}
+  .mv-pop .row select{flex:1;min-width:0;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:5px;}
+  .mv-pop .acts{display:flex;gap:6px;margin-top:9px;justify-content:flex-end;}
+  .misslist{max-height:46vh;overflow:auto;border:1px solid var(--border);border-radius:6px;}
+  .misslist .item{padding:5px 10px;border-bottom:1px solid #f0f1f3;font-family:Consolas,monospace;font-size:12px;}
+  /* 逐条映射补录表 */
+  .mapwrap{border:1px solid var(--border);border-radius:6px;overflow:auto;max-height:40vh;}
+  .maptable{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .maptable th{position:sticky;top:0;background:#f5f7fa;text-align:left;padding:6px 9px;border-bottom:1px solid var(--border);font-weight:600;font-size:12px;white-space:nowrap;z-index:1;}
+  .maptable td{padding:5px 9px;border-bottom:1px solid #f0f1f3;vertical-align:middle;}
+  .maptable tr:last-child td{border-bottom:none;}
+  .maptable .mkey{font-family:Consolas,monospace;max-width:290px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .maptable .mcnt{color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;}
+  .maptable input.mtgt{width:100%;box-sizing:border-box;padding:5px 8px;border:1px solid var(--border);border-radius:5px;font-size:12px;}
+  .msug{display:inline-block;margin-top:4px;font-size:11px;color:#2b5fb0;background:#eef4fd;border:1px solid #d6e4fa;border-radius:4px;padding:1px 6px;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .msug:hover{background:#e2ecfb;}
+  .msug i{font-style:normal;margin-left:5px;color:#7c8794;font-size:10px;}
+  .msug i.high{color:#2f7d47;}
+  .mact{font-size:11px;padding:1px 6px;border-radius:4px;white-space:nowrap;display:inline-block;}
+  .mact.merge{background:#e8f4ea;color:#2f7d47;}
+  .mact.create{background:#eaf1fd;color:#2b5fb0;}
+  .mact.same{background:#f0f1f3;color:#6b7280;}
+  .mact.chain{background:#fdf3e2;color:#a9701a;}
+  /* 附带字段列（新建成员时写入，如 DepartmentEn=Admin/Aftersales） */
+  .maptable .mextra{vertical-align:top;}
+  .mextra .exrow{display:flex;align-items:center;gap:5px;margin-bottom:3px;}
+  .mextra .exrow:last-child{margin-bottom:0;}
+  .mextra .exrow label{font-size:10.5px;color:#7c8794;white-space:nowrap;flex-shrink:0;max-width:96px;overflow:hidden;text-overflow:ellipsis;}
+  .maptable input.mex{width:100%;box-sizing:border-box;padding:4px 7px;border:1px solid var(--border);border-radius:5px;font-size:12px;}
+  .mextra.off .exrow{opacity:.42;}
+  .mextra.off input.mex{background:#f7f8fa;}
+  .mextra .exhint{font-size:10px;color:var(--muted);margin-top:3px;}
+  .mapbatch{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .mapbatch .mb-lbl{font-size:12px;color:#3a4250;font-weight:600;}
+  .mapbatch #batchTgtInput{padding:4px 8px;border:1px solid var(--border);border-radius:5px;font-size:12px;width:190px;}
+  .mapbatch .mb-sel{font-size:12px;color:var(--muted);margin-left:auto;display:flex;align-items:center;gap:4px;}
+  .mapbatch .mb-sel select{font-size:12px;padding:3px 5px;border:1px solid var(--border);border-radius:5px;}
+  .bf-extra{margin-top:8px;}
+  .bf-extra summary{cursor:pointer;color:#3a4250;font-weight:600;font-size:12px;}
+  .bf-extra .bf-form{margin:7px 0 0;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>采购数据库管理</h1>
+    <span id="dbPath" style="color:var(--muted);font-size:12px;"></span>
+    <span class="spacer"></span>
+    <button class="btn ghost" onclick="showView('model')">模型视图</button>
+    <button class="btn ghost" onclick="showView('quality')">数据质量</button>
+    <button class="btn ghost" onclick="loadTables()">刷新表列表</button>
+    <button class="btn" onclick="openImport()">导入数据</button>
+    <button class="btn danger" onclick="shutdownServer()" title="停止本服务进程（需二次确认）">终止服务</button>
+  </header>
+  <main>
+    <aside>
+      <div class="grp">管理</div>
+      <div class="titem" id="navModel" onclick="showView('model')">
+        <div class="tmain"><span class="tlabel">模型视图</span><span class="tbadge fact">拖拽</span></div>
+        <span class="tname">字段级关系图 · 可视化建关系</span>
+      </div>
+      <div class="titem" id="navQuality" onclick="showView('quality')">
+        <div class="tmain"><span class="tlabel">数据质量</span><span class="tbadge fact">检查</span></div>
+        <span class="tname">健康度 · 规则 · 补录</span>
+      </div>
+      <div class="grp">数据表（点击切换）</div>
+      <div class="tsearch"><input type="text" id="tblSearch" placeholder="搜索表名…（中文/英文）" oninput="filterTables()"></div>
+      <div id="tableList"></div>
+    </aside>
+    <section>
+      <div class="toolbar" id="toolbar">
+        <span class="cur" id="curTable">请选择左侧数据表</span>
+        <input type="text" id="searchInput" placeholder="搜索全部字段…" onkeydown="if(event.key==='Enter')doSearch()">
+        <button class="btn ghost sm" onclick="doSearch()">搜索</button>
+        <select id="sizeSel" onchange="state.size=+this.value;state.page=1;loadRows()">
+          <option value="20">20/页</option>
+          <option value="50" selected>50/页</option>
+          <option value="100">100/页</option>
+          <option value="200">200/页</option>
+        </select>
+        <span class="spacer"></span>
+        <button class="btn ghost sm" id="colBtn" onclick="openColMenu(event)" disabled>列</button>
+        <button class="btn ghost sm" id="sumBtn" onclick="toggleSum()" disabled title="显示/隐藏金额列合计行">Σ 汇总</button>
+        <button class="btn ghost sm" id="exportBtn" onclick="exportView()" disabled>导出当前视图</button>
+        <button class="btn sm" id="addBtn" onclick="openEditor(null)" disabled>＋ 新增一行</button>
+      </div>
+      <div class="filterbar" id="filterBar" style="display:none;"></div>
+      <div class="gridwrap" id="gridWrap">
+        <div id="grid"><div class="empty">尚未选择数据表</div></div>
+      </div>
+      <div class="pager" id="pager" style="display:none;">
+        <button id="prevBtn" onclick="goPage(-1)">上一页</button>
+        <span id="pageInfo">—</span>
+        <button id="nextBtn" onclick="goPage(1)">下一页</button>
+        <span class="spacer"></span>
+        <span id="totalInfo"></span>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- 编辑/新增 模态框 -->
+<div class="mask" id="editMask">
+  <div class="modal">
+    <h3 id="editTitle">编辑行</h3>
+    <div class="body" id="editBody"></div>
+    <div class="foot">
+      <button class="btn ghost" onclick="closeMask('editMask')">取消</button>
+      <button class="btn" onclick="saveEditor()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 导入 模态框（两步：校验 → 确认） -->
+<div class="mask" id="importMask">
+  <div class="modal wide">
+    <h3>导入 CSV 数据
+      <span class="x" onclick="closeMask('importMask')">×</span>
+    </h3>
+    <div class="body">
+      <div class="field">
+        <label>目标数据表</label>
+        <select id="importTable" style="width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;"></select>
+      </div>
+      <div class="field">
+        <label>选择 CSV 文件（首行须为表头）</label>
+        <input type="file" id="importFile" accept=".csv,.txt">
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn ghost" onclick="startPreview()">① 校验文件</button>
+        <span id="previewHint" class="hint" style="align-self:center;"></span>
+      </div>
+      <div id="previewBox" style="display:none;margin-top:10px;">
+        <div id="previewMeta"></div>
+        <div class="hint">表头 ↔ 数据库列匹配（绿色=已匹配，灰色=无对应列、将被忽略）：</div>
+        <div id="previewMap" style="max-height:150px;overflow:auto;border:1px solid var(--border);border-radius:6px;"></div>
+        <div class="cards" id="previewCards"></div>
+        <details id="previewDetail">
+          <summary>查看问题明细样例</summary>
+          <div id="previewSamples"></div>
+        </details>
+      </div>
+      <div class="result" id="importResult"></div>
+    </div>
+    <div class="foot">
+      <span class="sp" id="importFootHint">提示：先「校验文件」预览匹配与问题，确认无误再导入。</span>
+      <button class="btn ghost" onclick="closeMask('importMask')">关闭</button>
+      <button class="btn" id="confirmImportBtn" onclick="confirmImport()" disabled>② 确认导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- 缺失维度值 模态框 -->
+<div class="mask" id="missingMask">
+  <div class="modal wide">
+    <h3 id="missingTitle">缺失维度值
+      <span class="x" onclick="closeMask('missingMask')">×</span>
+    </h3>
+    <div class="body">
+      <div id="missingMeta" class="hint"></div>
+      <div id="adviceBox" class="advbox"></div>
+
+      <!-- 逐条映射补录（仅当目标为维度表、且建议补录时显示） -->
+      <div id="backfillPanel" class="bfpanel">
+        <div class="bf-head">补录映射 · 逐条指定「多出来的值」归到哪个维度值</div>
+        <div class="hint" style="margin:0 0 7px;">
+          左列是<b>事实表里有、维度表里没有</b>的值。在右侧：<b>选一个已有的维度值</b>（下拉可直接选），
+          或<b>直接输入一个新值</b>（系统会新建该维度成员）。<b>留空</b> = 以原值新建同名成员。<br>
+          「附带字段」（如部门表的 <b>DepartmentEn</b> = Admin / Aftersales）只在<b>新建成员</b>时写入，
+          系统已按名称分类自动填好，可逐行改；若该行是「归到现有值」则不写入。
+        </div>
+        <div class="mapwrap">
+          <table class="maptable">
+            <thead id="mapHead"></thead>
+            <tbody id="mapRows"></tbody>
+          </table>
+        </div>
+        <div class="mapbatch">
+          <span class="mb-lbl">批量：</span>
+          <button class="btn ghost sm" onclick="mapBatchSuggest()">采纳全部建议</button>
+          <button class="btn ghost sm" onclick="mapBatchExtra()">重填分类建议</button>
+          <button class="btn ghost sm" onclick="mapBatchKeep()">全部原值新建</button>
+          <input type="text" id="batchTgtInput" list="dimPickList" placeholder="选/输入一个值…">
+          <button class="btn ghost sm" onclick="mapBatchAll()">全部归到该值</button>
+          <button class="btn ghost sm" onclick="mapClear()">清空</button>
+          <span class="mb-sel">其余未指定：
+            <select id="mapDefault">
+              <option value="keep">也各自新建同名成员</option>
+              <option value="skip">暂不处理</option>
+            </select>
+          </span>
+        </div>
+        <details class="bf-extra" ontoggle="if(this.open) renderExtraForm()">
+          <summary>新建成员时附带字段的批量默认值（可选，被逐行填写覆盖）</summary>
+          <div id="bfExtraForm" class="bf-form"></div>
+        </details>
+        <div id="exLists"></div>
+        <datalist id="dimPickList"></datalist>
+      </div>
+
+      <div class="misslist" id="missingList"></div>
+      <div class="pager" id="missingPager" style="padding:10px 0;border:none;">
+        <button id="mPrev" onclick="missPage(-1)">上一页</button>
+        <span id="mInfo">—</span>
+        <button id="mNext" onclick="missPage(1)">下一页</button>
+        <span class="spacer"></span>
+        <span id="mTotal"></span>
+      </div>
+    </div>
+    <div class="foot">
+      <button class="btn ghost" onclick="downloadMissing()">导出 CSV</button>
+      <button class="btn ghost" onclick="closeMask('missingMask')">关闭</button>
+      <button class="btn" id="backfillBtn" onclick="doBackfillMap()">执行补录映射</button>
+    </div>
+  </div>
+</div>
+
+<!-- 映射编辑器 模态框（Power BI 风格：左右两表面板 + 基数选择） -->
+<div class="mask" id="mapEditorMask">
+  <div class="modal">
+    <h3 id="mapEditorTitle">新建关系
+      <span class="x" onclick="closeMask('mapEditorMask')">×</span>
+    </h3>
+    <div class="body">
+      <div class="rel-editor">
+        <div class="re-panel src">
+          <div class="re-ph">① 基础表（通常为事实表）</div>
+          <div class="field"><label>表</label>
+            <select id="meSourceTable" onchange="meFillCols('source');mePreview()"></select></div>
+          <div class="field"><label>列（关联键）</label>
+            <select id="meSourceCol" onchange="mePreview()"></select></div>
+        </div>
+        <div class="re-mid">
+          <div class="re-arrow">▶</div>
+          <select id="meCardinality" class="re-card" onchange="mePreview()" title="基数：谁多谁少">
+            <option value="*:1">多 → 一（*:1）</option>
+            <option value="1:*">一 → 多（1:*）</option>
+            <option value="1:1">一对一（1:1）</option>
+          </select>
+        </div>
+        <div class="re-panel tgt">
+          <div class="re-ph">② 相关表（被关联的表）</div>
+          <div class="field"><label>表</label>
+            <select id="meTargetTable" onchange="meFillCols('target');mePreview()"></select></div>
+          <div class="field"><label>列（关联键）</label>
+            <select id="meTargetCol" onchange="mePreview()"></select></div>
+        </div>
+      </div>
+      <div class="hint" id="mePreview" style="margin:0 0 10px;"></div>
+      <div class="field"><label>类型</label>
+        <select id="meKind" onchange="mePreview()">
+          <option value="dim">维度映射（→ 维度表，可补录）</option>
+          <option value="fact">事实关联（→ 事实表）</option>
+          <option value="derived">派生键映射（规范化派生键）</option>
+        </select></div>
+      <div class="field"><label>备注</label>
+        <input type="text" id="meNote" placeholder="可选，说明此映射用途"></div>
+      <div class="field"><label style="display:inline-flex;align-items:center;gap:6px;">
+        <input type="checkbox" id="meEnabled" checked> 启用（取消后数据质量不再计入此关系）</label></div>
+      <div class="result" id="mapEditorResult"></div>
+    </div>
+    <div class="foot">
+      <button class="btn ghost" onclick="closeMask('mapEditorMask')">取消</button>
+      <button class="btn" id="mapEditorSave" onclick="saveMapping()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 质量规则编辑器 模态框（新增 / 编辑自定义质量规则） -->
+<div class="mask" id="ruleEditorMask">
+  <div class="modal">
+    <h3 id="ruleEditorTitle">新增质量规则
+      <span class="x" onclick="closeMask('ruleEditorMask')">×</span>
+    </h3>
+    <div class="body">
+      <div class="field"><label>目标表</label>
+        <select id="reTable" onchange="reFillCols()"></select></div>
+      <div class="field"><label>检查类型</label>
+        <select id="reType">
+          <option value="not_null">非空检查（该列不应为空）</option>
+          <option value="unique">唯一性检查（该列值不应重复）</option>
+        </select></div>
+      <div class="field"><label>检查列</label>
+        <select id="reCol"></select></div>
+      <div class="field"><label>严重级别</label>
+        <select id="reSeverity">
+          <option value="warn">警告</option>
+          <option value="bad">严重</option>
+        </select></div>
+      <div class="field"><label>备注</label>
+        <input type="text" id="reNote" placeholder="可选说明"></div>
+      <div class="field"><label style="display:inline-flex;align-items:center;gap:6px;">
+        <input type="checkbox" id="reEnabled" checked> 启用</label></div>
+      <div class="result" id="ruleEditorResult"></div>
+    </div>
+    <div class="foot">
+      <button class="btn ghost" onclick="closeMask('ruleEditorMask')">取消</button>
+      <button class="btn" onclick="saveRule()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 关系质量覆盖 模态框（忽略 / 建议等级 / 备注） -->
+<div class="mask" id="overrideEditorMask">
+  <div class="modal">
+    <h3>关系质量覆盖
+      <span class="x" onclick="closeMask('overrideEditorMask')">×</span>
+    </h3>
+    <div class="body">
+      <div id="ovMeta" class="hint"></div>
+      <div class="field"><label>建议等级覆盖</label>
+        <select id="ovAdvice">
+          <option value="">（不覆盖，按系统默认）</option>
+          <option value="recommend">建议补录</option>
+          <option value="optional">按需补录</option>
+          <option value="not_needed">无需补录</option>
+        </select></div>
+      <div class="field"><label style="display:inline-flex;align-items:center;gap:6px;">
+        <input type="checkbox" id="ovIgnored"> 忽略此关系（数据质量中不视为问题）</label></div>
+      <div class="field"><label>备注</label>
+        <textarea id="ovNote" rows="3" placeholder="记录此关系 / 覆盖的原因"></textarea></div>
+      <div class="result" id="overrideResult"></div>
+    </div>
+    <div class="foot">
+      <button class="btn ghost" onclick="closeMask('overrideEditorMask')">取消</button>
+      <button class="btn" onclick="saveOverride()">保存覆盖</button>
+    </div>
+  </div>
+</div>
+
+<!-- 浮动菜单 -->
+<div class="popmenu" id="filterMenu"></div>
+<div class="popmenu" id="colMenu"></div>
+
+<div class="toast" id="toast"></div>
+
+<div class="deadmask" id="deadMask" style="display:none;">
+  <div class="deadcard">
+    <div class="deadico">⏻</div>
+    <div class="deadt1">服务已停止</div>
+    <div class="deadt2">本管理页面已关闭，无法再响应请求。</div>
+    <div class="deadt3">如需继续使用，请重新启动：<br>
+      双击 <b>start-dbadmin.bat</b>，或在项目目录执行<br>
+      <code>python app.py</code>
+    </div>
+  </div>
+</div>
+
+<script>
+const FUNNEL = '<svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3h13l-5 6.2V14l-3-1.6V9.2z" fill="currentColor"/></svg>';
+const OP_LABEL = {contains:"包含",eq:"=",ne:"≠",startswith:"开头是",gt:">",gte:"≥",lt:"<",lte:"≤",empty:"为空",notempty:"不为空"};
+const NOVAL_OPS = {empty:1, notempty:1};
+
+let state = {table:null, page:1, size:50, search:"", sort:"", order:"asc",
+             columns:[], pk:null, data:[], coltype:{}, aggregates:{}, showSum:true,
+             filters:[], visibleCols:null, view:"table"};
+let imp = {preview:null, table:null};
+let qual = {rel:null, keys:[], items:[], total:0, rowsTotal:0, page:1, size:200, canBackfill:false,
+            map:{}, dimSet:new Set(), dimList:[],
+            extraCols:[], extraOpts:{}, extraMap:{}};
+
+async function api(path, opts){
+  const r = await fetch(path, opts);
+  let j = {};
+  try { j = await r.json(); } catch(e){}
+  if(!r.ok) throw new Error(j.error || j.message || ("HTTP "+r.status));
+  return j;
+}
+function esc(s){
+  return String(s==null?"":s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+function fmt(n){
+  if(n==null || n==="") return "";
+  const x = Number(n);
+  return isNaN(x) ? String(n) : x.toLocaleString(undefined,{maximumFractionDigits:2});
+}
+function toast(msg){
+  const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"),2400);
+}
+function showResult(id, ok, msg){
+  const el=document.getElementById(id); el.className="result "+(ok?"ok":"err"); el.textContent=msg;
+}
+function openMask(id){
+  const m = document.querySelector("#"+id+" .modal");
+  if(m){ m.style.position=""; m.style.left=""; m.style.top=""; m.style.right=""; m.style.bottom=""; m.style.margin="";
+         m.style.width=""; m.style.height=""; m.style.maxHeight=""; m.style.flex=""; }
+  document.getElementById(id).classList.add("show");
+}
+function closeMask(id){ document.getElementById(id).classList.remove("show"); }
+let gSuppressMaskClose = false;   // 拖动结束后抑制一次「点空白关闭」
+document.querySelectorAll(".mask").forEach(m=>m.addEventListener("click",e=>{
+  if(gSuppressMaskClose) return;
+  if(e.target===m) m.classList.remove("show");
+}));
+
+/* ============ 弹窗拖动 + 缩放 ============ */
+function initModalDrag(){
+  document.querySelectorAll(".modal").forEach(m=>{
+    const h = m.querySelector("h3");
+    if(h){
+      h.addEventListener("pointerdown", e=>{
+        if(e.target.classList.contains("x")) return;   // 点关闭按钮不触发拖动
+        if(e.button!==0) return;
+        e.preventDefault();
+        const r = m.getBoundingClientRect();
+        const sx = e.clientX, sy = e.clientY, ol = r.left, ot = r.top;
+        m.style.position = "fixed"; m.style.margin = "0";
+        m.style.left = ol + "px"; m.style.top = ot + "px";
+        m.style.right = "auto"; m.style.bottom = "auto";
+        document.body.style.userSelect = "none";
+        h.style.cursor = "grabbing";
+        try { h.setPointerCapture(e.pointerId); } catch(_){}  // 鼠标拖出窗口外也能继续捕获
+        const mm = ev=>{
+          let nl = ol + (ev.clientX - sx);
+          let nt = ot + (ev.clientY - sy);
+          // 允许拖到窗口外，但至少保留 30px 可见，避免整个弹窗丢失
+          nl = Math.max(-(r.width - 30),  Math.min(nl, window.innerWidth  - 30));
+          nt = Math.max(-(r.height - 30), Math.min(nt, window.innerHeight - 30));
+          m.style.left = nl + "px"; m.style.top = nt + "px";
+        };
+        const mu = ()=>{
+          h.removeEventListener("pointermove", mm);
+          h.removeEventListener("pointerup", mu);
+          try { h.releasePointerCapture(e.pointerId); } catch(_){}
+          document.body.style.userSelect = "";
+          h.style.cursor = "";
+          gSuppressMaskClose = true;                 // 释放后浏览器会派发一次 click，抑制其关闭
+          setTimeout(()=>{ gSuppressMaskClose = false; }, 0);
+        };
+        h.addEventListener("pointermove", mm);
+        h.addEventListener("pointerup", mu);
+      });
+    }
+    /* —— 自定义右下角缩放把手（带 Pointer Capture，可拖出窗口）—— */
+    let rh = m.querySelector(".modal-resize");
+    if(!rh){ rh = document.createElement("span"); rh.className = "modal-resize"; m.appendChild(rh); }
+    rh.addEventListener("pointerdown", e=>{
+      if(e.button!==0) return;
+      e.preventDefault(); e.stopPropagation();
+      const r = m.getBoundingClientRect();
+      const sx = e.clientX, sy = e.clientY, ow = r.width, oh = r.height;
+      try { rh.setPointerCapture(e.pointerId); } catch(_){}
+      const mm = ev=>{
+        let nw = Math.max(360, ow + (ev.clientX - sx));
+        let nh = Math.max(240, oh + (ev.clientY - sy));
+        m.style.width = nw + "px";
+        m.style.height = nh + "px";
+        m.style.maxHeight = "none";      // 解除初始 92vh 限制，允许拖大超出窗口
+        m.style.flex = "0 0 auto";
+      };
+      const mu = ()=>{
+        rh.removeEventListener("pointermove", mm);
+        rh.removeEventListener("pointerup", mu);
+        try { rh.releasePointerCapture(e.pointerId); } catch(_){}
+      };
+      rh.addEventListener("pointermove", mm);
+      rh.addEventListener("pointerup", mu);
+    });
+  });
+}
+initModalDrag();
+
+/* 点击空白关闭浮动菜单 */
+document.addEventListener("click", e=>{
+  if(!e.target.closest(".popmenu") && !e.target.closest(".fn") && !e.target.closest("#colBtn")){
+    document.getElementById("filterMenu").classList.remove("show");
+    document.getElementById("colMenu").classList.remove("show");
+  }
+});
+
+/* ============ 表列表（中文名 + 搜索） ============ */
+let TABLES = [];   // 缓存表元数据（含中文名 label）
+
+function tlabel(t){ const x = TABLES.find(v=>v.table===t); return x && x.label ? x.label : t; }
+
+async function loadTables(){
+  try{
+    TABLES = await api("/api/tables");
+    renderTableList();
+  }catch(e){ toast("加载表列表失败: "+e.message); }
+}
+
+function renderTableList(){
+  const box = document.getElementById("tableList");
+  const kw = (document.getElementById("tblSearch").value || "").trim().toLowerCase();
+  const list = TABLES.filter(t=>{
+    if(!kw) return true;
+    return [t.label, t.table, t.source, t.desc].some(v=>String(v||"").toLowerCase().includes(kw));
+  });
+  box.innerHTML = "";
+  if(!list.length){ box.innerHTML = '<div class="tnone">没有匹配的数据表</div>'; return; }
+  list.forEach(t=>{
+    const div = document.createElement("div");
+    div.className = "titem" + (state.table===t.table?" active":"");
+    const kindTxt = t.kind==="dim"?"维度":"事实";
+    div.title = `${t.label||t.table}（${t.table}）\n${t.desc||""}\n源文件：${t.source||"-"}`;
+    div.innerHTML =
+      `<div class="tmain">`+
+        `<span class="tlabel">${esc(t.label||t.table)}</span>`+
+        `<span class="tbadge ${t.kind}">${kindTxt}</span>`+
+        `<span class="trows">${t.rows==null?'-':t.rows.toLocaleString()}</span>`+
+      `</div>`+
+      `<span class="tname" title="${esc(t.table)}">${esc(t.table)}</span>`;
+    div.onclick = ()=>selectTable(t.table);
+    box.appendChild(div);
+  });
+}
+
+function filterTables(){ renderTableList(); }
+
+async function selectTable(t){
+  state.table = t; state.view = "table";
+  document.getElementById("navQuality").classList.remove("active");
+  document.getElementById("toolbar").style.display = "flex";
+  document.getElementById("filterBar").style.display = "none";
+  document.getElementById("pager").style.display = "flex";
+  state.page = 1; state.search = "";
+  state.filters = []; state.visibleCols = null; state.sort=""; state.order="asc"; state.showSum=true;
+  document.getElementById("searchInput").value = "";
+  await loadSchema();
+  await loadRows();
+  document.querySelectorAll(".titem").forEach(el=>{
+    el.classList.toggle("active", el.querySelector(".tname").title===t);
+  });
+  ["addBtn","colBtn","exportBtn"].forEach(id=>document.getElementById(id).disabled=false);
+  document.getElementById("pager").style.display = "flex";
+  document.getElementById("curTable").innerHTML =
+    esc(tlabel(t)) + `<span class="cursub">${esc(t)}</span>`;
+}
+
+async function loadSchema(){
+  const cols = await api(`/api/tables/${encodeURIComponent(state.table)}/schema`);
+  state.columns = cols.map(c=>c.name);
+  state.coltype = {};
+  cols.forEach(c=>state.coltype[c.name]=c.type);
+  const pkc = cols.find(c=>c.pk);
+  state.pk = pkc ? pkc.name : null;
+  state._schema = cols;
+}
+
+async function loadRows(){
+  if(!state.table) return;
+  const p = new URLSearchParams({page:state.page, size:state.size, search:state.search,
+                                sort:state.sort, order:state.order});
+  p.append("filters", JSON.stringify(state.filters));
+  try{
+    const d = await api(`/api/tables/${encodeURIComponent(state.table)}/rows?`+p);
+    state.data = d.rows; state.total = d.total; state.aggregates = d.aggregates || {};
+    updateSumBtn();
+    renderTable(d);
+  }catch(e){ toast("加载数据失败: "+e.message); }
+}
+
+/* ============ 底部合计行开关 ============ */
+function updateSumBtn(){
+  const btn = document.getElementById("sumBtn"); if(!btn) return;
+  const n = Object.keys(state.aggregates).length;
+  const ok = n > 0 && (state.total > 0);
+  btn.disabled = !ok;
+  btn.textContent = ok ? `Σ 汇总 (${n})` : "Σ 汇总";
+  btn.classList.toggle("on", ok && state.showSum);
+  btn.title = n === 0
+    ? "当前表没有金额（数值）列，无汇总"
+    : (state.total === 0 ? "当前筛选结果为空，无汇总"
+       : `该表有 ${n} 个金额列；点击${state.showSum ? "隐藏" : "显示"}表格最底部的合计行`);
+}
+function toggleSum(){
+  if(!Object.keys(state.aggregates).length){ toast("当前表没有金额（数值）列，无可汇总项"); return; }
+  if(!state.total){ toast("当前搜索结果为空，无可汇总数据"); return; }
+  state.showSum = !state.showSum;
+  updateSumBtn();
+  renderTable({columns: state.columns, rows: state.data, total: state.total});
+  toast(state.showSum ? "合计行已显示：表格最底部一行（对筛选后全部 " + state.total + " 行汇总）"
+                      : "合计行已隐藏");
+}
+
+function visibleCols(d){ return d.columns.filter(c=>!state.visibleCols || state.visibleCols.has(c)); }
+
+function renderTable(d){
+  const grid = document.getElementById("grid");
+  const cols = visibleCols(d);
+  if(!d.rows.length){
+    grid.innerHTML = `<div class="empty">无匹配数据${(state.search||state.filters.length)?"（可能被搜索或筛选条件排除）":""}</div>`;
+    updatePager(d.total); renderChips(); return;
+  }
+  let html = "<table><thead><tr>";
+  cols.forEach(c=>{
+    const arrow = state.sort===c ? `<span class="arrow">${state.order==='asc'?'▲':'▼'}</span>` : "";
+    const on = state.filters.some(f=>f.col===c) ? "on" : "";
+    html += `<th><span class="th-name" data-sort="${esc(c)}">${esc(c)}${arrow}</span>`+
+            `<span class="fn ${on}" data-filt="${esc(c)}" title="筛选该列">${FUNNEL}</span></th>`;
+  });
+  html += "<th>操作</th></tr></thead><tbody>";
+  d.rows.forEach((row,idx)=>{
+    html += "<tr>";
+    cols.forEach(c=>{
+      const v = row[c];
+      const cls = state.coltype[c]==="REAL" ? " class='num'" : "";
+      const disp = (v==null?"":v);
+      html += `<td${cls} title="${esc(disp)}">${esc(disp)}</td>`;
+    });
+    html += `<td><button class="btn ghost sm act-edit" data-i="${idx}">编辑</button> `+
+            `<button class="btn danger sm act-del" data-i="${idx}">删除</button></td>`;
+    html += "</tr>";
+  });
+  html += "</tbody>";
+  if(state.showSum && Object.keys(state.aggregates).length){
+    html += "<tfoot><tr>";
+    cols.forEach(c=>{
+      const a = state.aggregates[c];
+      if(a && (a.sum!=null || a.count)){
+        html += `<td class="agg" title="求和 ${fmt(a.sum)} ｜ 均值 ${fmt(a.avg)} ｜ 最小 ${fmt(a.min)} ｜ 最大 ${fmt(a.max)} ｜ 非空计数 ${a.count}">Σ ${fmt(a.sum)}</td>`;
+      } else html += "<td></td>";
+    });
+    html += `<td class="agg-tag" title="对当前搜索结果/筛选条件下的全部行汇总">合计·全 ${state.total} 行</td></tr></tfoot>`;
+  }
+  html += "</table>";
+  grid.innerHTML = html;
+  grid.querySelectorAll(".th-name").forEach(el=>el.onclick=()=>sortBy(el.dataset.sort));
+  grid.querySelectorAll(".fn").forEach(el=>el.onclick=(e)=>{e.stopPropagation();openFilter(el.dataset.filt,e);});
+  grid.querySelectorAll(".act-edit").forEach(el=>el.onclick=()=>openEditor(state.data[+el.dataset.i]));
+  grid.querySelectorAll(".act-del").forEach(el=>el.onclick=()=>delRow(state.data[+el.dataset.i][state.pk]));
+  updatePager(d.total);
+  renderChips();
+}
+
+function updatePager(total){
+  const pages = Math.max(1, Math.ceil(total / state.size));
+  document.getElementById("pageInfo").textContent = `第 ${state.page} / ${pages} 页`;
+  document.getElementById("totalInfo").textContent = `共 ${total.toLocaleString()} 条`;
+  document.getElementById("prevBtn").disabled = state.page<=1;
+  document.getElementById("nextBtn").disabled = state.page>=pages;
+}
+function sortBy(col){
+  if(state.sort===col){ state.order = state.order==="asc"?"desc":"asc"; }
+  else { state.sort = col; state.order = "asc"; }
+  loadRows();
+}
+function doSearch(){
+  state.search = document.getElementById("searchInput").value.trim();
+  state.page = 1; loadRows();
+}
+function goPage(d){
+  state.page += d; if(state.page<1) state.page=1; loadRows();
+}
+
+/* ============ 表头筛选 ============ */
+function filterOperators(isNum){
+  return isNum
+    ? [["","选择条件…"],["eq","等于"],["ne","不等于"],["gt","大于"],["gte","大于等于"],["lt","小于"],["lte","小于等于"],["empty","为空"],["notempty","不为空"]]
+    : [["","选择条件…"],["contains","包含"],["eq","等于"],["ne","不等于"],["startswith","开头是"],["empty","为空"],["notempty","不为空"]];
+}
+function openFilter(col, ev){
+  const menu = document.getElementById("filterMenu");
+  document.getElementById("colMenu").classList.remove("show");
+  const isNum = state.coltype[col]==="REAL";
+  const cur = state.filters.find(f=>f.col===col) || {op:"", val:""};
+  menu.dataset.col = col;
+  menu.innerHTML =
+    `<div class="pm-title" title="${esc(col)}">筛选：${esc(col)}</div>`+
+    `<select id="pmOp" onchange="pmOpChange()">`+
+      filterOperators(isNum).map(o=>`<option value="${o[0]}" ${cur.op===o[0]?"selected":""}>${o[1]}</option>`).join("")+
+    `</select>`+
+    `<input id="pmVal" type="${isNum?'number':'text'}" placeholder="输入值…" value="${esc(cur.val==null?"":cur.val)}" `+
+      `style="display:${cur.op&&!NOVAL_OPS[cur.op]?"":"none"}" onkeydown="if(event.key==='Enter')applyColFilter()">`+
+    `<div class="pm-actions">`+
+      `<button class="btn ghost sm" onclick="clearColFilter()">清除</button>`+
+      `<button class="btn sm" onclick="applyColFilter()">应用</button>`+
+    `</div>`;
+  menu.classList.add("show");
+  const r = ev.target.getBoundingClientRect();
+  menu.style.left = Math.max(8, Math.min(window.innerWidth-250, r.left-190)) + "px";
+  menu.style.top = (r.bottom + window.scrollY + 4) + "px";
+  const opSel = document.getElementById("pmOp");
+  if(!cur.op) setTimeout(()=>opSel.focus(),0);
+  else if(cur.op && !NOVAL_OPS[cur.op]) setTimeout(()=>document.getElementById("pmVal").focus(),0);
+}
+function pmOpChange(){
+  const op = document.getElementById("pmOp").value;
+  document.getElementById("pmVal").style.display = (op && !NOVAL_OPS[op]) ? "" : "none";
+}
+function applyColFilter(){
+  const menu = document.getElementById("filterMenu");
+  const col = menu.dataset.col;
+  const op = document.getElementById("pmOp").value;
+  const val = document.getElementById("pmVal").value;
+  state.filters = state.filters.filter(f=>f.col!==col);
+  if(op){
+    if(!NOVAL_OPS[op] && val===""){ toast("请输入筛选值"); return; }
+    state.filters.push({col, op, val});
+  }
+  menu.classList.remove("show");
+  state.page = 1; loadRows();
+}
+function clearColFilter(){
+  const col = document.getElementById("filterMenu").dataset.col;
+  state.filters = state.filters.filter(f=>f.col!==col);
+  document.getElementById("filterMenu").classList.remove("show");
+  state.page = 1; loadRows();
+}
+function removeFilter(col){
+  state.filters = state.filters.filter(f=>f.col!==col);
+  state.page = 1; loadRows();
+}
+function clearAllFilters(){
+  state.filters = []; state.page = 1; loadRows();
+}
+function renderChips(){
+  const bar = document.getElementById("filterBar");
+  if(!state.filters.length){ bar.style.display="none"; bar.innerHTML=""; return; }
+  bar.style.display = "flex";
+  bar.innerHTML = `<span class="hint" style="margin:0;">已筛选：</span>`+
+    state.filters.map(f=>{
+      const v = NOVAL_OPS[f.op] ? "" : ` “${esc(f.val)}”`;
+      return `<span class="chipf">${esc(f.col)} ${OP_LABEL[f.op]||f.op}${v}`+
+             `<span class="x" onclick="removeFilter('${esc(f.col)}')">×</span></span>`;
+    }).join("")+
+    `<button class="btn ghost sm" onclick="clearAllFilters()">清除全部</button>`;
+}
+
+/* ============ 列显示/隐藏 ============ */
+function openColMenu(ev){
+  const menu = document.getElementById("colMenu");
+  document.getElementById("filterMenu").classList.remove("show");
+  const all = state.columns;
+  const vis = state.visibleCols;
+  menu.dataset.tbl = state.table;
+  menu.innerHTML =
+    `<div class="pm-title">显示列（${vis?vis.size:all.length}/${all.length}）</div>`+
+    `<div class="pm-scroll">`+
+      all.map(c=>{
+        const on = !vis || vis.has(c);
+        return `<label><input type="checkbox" data-col="${esc(c)}" ${on?"checked":""} onchange="toggleCol(this)"> ${esc(c)}</label>`;
+      }).join("")+
+    `</div>`+
+    `<div class="pm-actions">`+
+      `<button class="btn ghost sm" onclick="resetCols()">全选</button>`+
+      `<button class="btn sm" onclick="document.getElementById('colMenu').classList.remove('show')">完成</button>`+
+    `</div>`;
+  menu.classList.add("show");
+  const r = ev.target.getBoundingClientRect();
+  menu.style.left = Math.max(8, Math.min(window.innerWidth-250, r.left-140)) + "px";
+  menu.style.top = (r.bottom + window.scrollY + 4) + "px";
+}
+function toggleCol(cb){
+  if(!state.visibleCols) state.visibleCols = new Set(state.columns);
+  if(cb.checked) state.visibleCols.add(cb.dataset.col);
+  else state.visibleCols.delete(cb.dataset.col);
+  if(state.visibleCols.size === state.columns.length) state.visibleCols = null;
+  loadRows();
+}
+function resetCols(){ state.visibleCols = null; loadRows(); document.getElementById("colMenu").classList.remove("show"); }
+
+/* ============ 导出当前视图 ============ */
+function exportView(){
+  if(!state.table){ toast("请先选择数据表"); return; }
+  const p = new URLSearchParams({search:state.search, sort:state.sort, order:state.order});
+  p.append("filters", JSON.stringify(state.filters));
+  if(state.visibleCols) p.append("cols", [...state.visibleCols].join(","));
+  window.location = `/api/tables/${encodeURIComponent(state.table)}/export?`+p;
+  toast("正在导出当前视图…");
+}
+
+/* ============ 编辑 / 新增 ============ */
+function openEditor(row){
+  const schema = state._schema || [];
+  document.getElementById("editTitle").textContent =
+    (row ? "编辑行" : "新增一行") + (state.table ? " · " + tlabel(state.table) : "");
+  const body = document.getElementById("editBody");
+  body.innerHTML = "";
+  schema.forEach(c=>{
+    const isPk = c.name===state.pk;
+    const val = row ? (row[c.name]==null?"":row[c.name]) : "";
+    const num = c.type==="REAL";
+    const f = document.createElement("div");
+    f.className = "field" + (isPk?" pk":"");
+    f.innerHTML = `<label>${esc(c.name)}</label>`+
+      (num
+        ? `<input type="number" step="any" data-col="${esc(c.name)}" value="${esc(val)}" ${isPk&&row?'disabled':''}>`
+        : `<input type="text" data-col="${esc(c.name)}" value="${esc(val)}" ${isPk&&row?'disabled':''}>`);
+    body.appendChild(f);
+  });
+  state._editing = row;
+  openMask("editMask");
+}
+async function saveEditor(){
+  const inputs = document.querySelectorAll("#editBody input[data-col]");
+  const payload = {};
+  inputs.forEach(inp=>{ if(!inp.disabled) payload[inp.dataset.col] = inp.value; });
+  const editing = state._editing;
+  try{
+    if(editing){
+      const pkv = editing[state.pk];
+      await api(`/api/tables/${encodeURIComponent(state.table)}/rows/${encodeURIComponent(pkv==null?"":pkv)}`,
+        {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
+      toast("已保存修改");
+    }else{
+      await api(`/api/tables/${encodeURIComponent(state.table)}/rows`,
+        {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
+      toast("已新增一行");
+    }
+    closeMask("editMask");
+    await Promise.all([loadRows(), loadTables()]);
+  }catch(e){ toast("保存失败: "+e.message); }
+}
+async function delRow(pkv){
+  if(!confirm("确定删除该行？此操作不可撤销。")) return;
+  try{
+    await api(`/api/tables/${encodeURIComponent(state.table)}/rows/${encodeURIComponent(pkv==null?"":pkv)}`, {method:"DELETE"});
+    toast("已删除");
+    await Promise.all([loadRows(), loadTables()]);
+  }catch(e){ toast("删除失败: "+e.message); }
+}
+
+/* ============ 导入向导 ============ */
+async function openImport(){
+  const tables = await api("/api/tables");
+  const sel = document.getElementById("importTable");
+  sel.innerHTML = tables.map(t=>
+    `<option value="${esc(t.table)}">${esc(t.label||t.table)}（${esc(t.table)}） · ${t.rows==null?'-':t.rows.toLocaleString()} 行</option>`
+  ).join("");
+  if(state.table) sel.value = state.table;
+  document.getElementById("importFile").value = "";
+  document.getElementById("importResult").style.display = "none";
+  document.getElementById("previewBox").style.display = "none";
+  document.getElementById("confirmImportBtn").disabled = true;
+  document.getElementById("previewHint").textContent = "";
+  openMask("importMask");
+}
+async function startPreview(){
+  const table = document.getElementById("importTable").value;
+  const file = document.getElementById("importFile").files[0];
+  if(!file){ toast("请先选择 CSV 文件"); return; }
+  imp.table = table;
+  const fd = new FormData(); fd.append("table", table); fd.append("file", file);
+  document.getElementById("previewHint").textContent = "校验中…";
+  try{
+    const rep = await api("/api/import-preview", {method:"POST", body:fd});
+    imp.preview = rep; renderPreview(rep);
+  }catch(e){
+    document.getElementById("previewHint").textContent = "";
+    showResult("importResult", false, "校验失败: "+e.message);
+  }
+}
+function renderPreview(rep){
+  document.getElementById("previewBox").style.display = "block";
+  document.getElementById("previewHint").textContent = "";
+  document.getElementById("previewMeta").innerHTML =
+    `<span class="chip enc">编码 ${esc(rep.encoding||'?')}</span>`+
+    `<span class="chip">分隔符 ${esc(rep.delimiter||',')}</span>`+
+    `<span class="chip">主键列 ${esc(rep.pk||'-')}</span>`+
+    (rep.extra_cols&&rep.extra_cols.length?`<span class="chip">自动派生列 ${rep.extra_cols.length} 个</span>`:``);
+  document.getElementById("previewMap").innerHTML = rep.header_mapping.map(m=>
+    `<div class="maprow ${m.matched?'m':'u'}">`+
+    `<span>${esc(m.csv)}</span><span class="arrow">→</span>`+
+    `<span class="db ${m.matched?'':'none'}">${m.matched?esc(m.db):'（无对应列·忽略）'}</span></div>`).join("");
+  const c = rep.counts || {};
+  const canImport = rep.can_import && c.valid>0;
+  const cards = [
+    {l:"文件总行(有效)", n:c.total||0, cls:""},
+    {l:"可导入行", n:c.valid||0, cls: c.valid>0?"ok":""},
+    {l:"主键为空忽略", n:c.blank_pk||0, cls: c.blank_pk?"bad":""},
+    {l:"列数不符", n:c.col_mismatch||0, cls: c.col_mismatch?"warn":""},
+    {l:"金额解析异常", n:c.amount_warn||0, cls: c.amount_warn?"warn":""},
+    {l:"文件内重复主键", n:c.dup_in_file||0, cls: c.dup_in_file?"warn":""},
+  ];
+  document.getElementById("previewCards").innerHTML = cards.map(x=>
+    `<div class="card ${x.cls}"><div class="n">${x.n}</div><div class="l">${x.l}</div></div>`).join("");
+  const iss = rep.issues || {};
+  let samp = "";
+  if(rep.missing_pk_col) samp += `<div class="result err" style="display:block;">缺少主键列「${esc(rep.pk)}」，无法导入。</div>`;
+  if(iss.blank_pk_samples&&iss.blank_pk_samples.length)
+    samp += `<div>主键为空：第 ${iss.blank_pk_samples.map(x=>'#'+x.line).join('、')} 行等</div>`;
+  if(iss.col_mismatch_samples&&iss.col_mismatch_samples.length)
+    samp += `<div>列数不符：第 ${iss.col_mismatch_samples.map(x=>'#'+x.line+'('+x.cols+'≠'+x.expected+')').join('、')} 行等</div>`;
+  if(iss.amount_fail&&iss.amount_fail.length)
+    samp += `<div>金额解析异常样例：</div>`+
+      iss.amount_fail.slice(0,8).map(x=>`<div style="font-family:monospace;padding-left:10px;">第${x.line}行 [${esc(x.col)}] = "${esc(x.value)}"</div>`).join("");
+  if(iss.dup_in_file&&iss.dup_in_file.length)
+    samp += `<div>文件内重复主键：如 ${iss.dup_in_file.slice(0,5).map(esc).join('、')} …（仅首条导入）</div>`;
+  document.getElementById("previewSamples").innerHTML = samp || `<div style="color:var(--ok)">未发现问题，可放心导入。</div>`;
+  document.getElementById("confirmImportBtn").disabled = !canImport;
+  document.getElementById("importFootHint").textContent = canImport
+    ? "校验通过：仅追加新数据、跳过主键重复行。"
+    : (rep.missing_pk_col ? "缺少主键列，无法导入，请检查文件表头。" : "无有效可导入行。");
+}
+async function confirmImport(){
+  if(!imp.table) return;
+  const file = document.getElementById("importFile").files[0];
+  if(!file){ toast("请先选择 CSV 文件"); return; }
+  const fd = new FormData(); fd.append("table", imp.table); fd.append("file", file);
+  document.getElementById("confirmImportBtn").disabled = true;
+  try{
+    const r = await api("/api/import", {method:"POST", body:fd});
+    let msg = `共处理 ${r.total} 行。\n新增 ${r.inserted} 行，跳过重复 ${r.skipped} 行。`;
+    if(r.skipped_blank_pk) msg += `\n主键为空忽略 ${r.skipped_blank_pk} 行。`;
+    if(r.error_rows) msg += `\n列数不符跳过 ${r.error_rows} 行。`;
+    if(r.amount_warn) msg += `\n金额解析异常 ${r.amount_warn} 行（已置空）。`;
+    if(r.dup_in_file) msg += `\n文件内重复主键 ${r.dup_in_file} 行（仅首条计入）。`;
+    showResult("importResult", true, msg);
+    await Promise.all([loadTables(), loadQualitySilent()]);
+    if(imp.table===state.table) loadRows();
+  }catch(e){ showResult("importResult", false, "导入失败: "+e.message); }
+  finally{ document.getElementById("confirmImportBtn").disabled = false; }
+}
+
+/* ============ 终止服务 ============ */
+async function shutdownServer(){
+  if(!confirm("确定要终止本服务吗？\n\n点击后页面将停止响应，需要重新通过 start-dbadmin.bat 或 python app.py 启动。\n此操作仅关闭服务，不会改动数据库。")) return;
+  try{
+    const d = await api("/api/shutdown", {method:"POST"});
+    toast(d.message || "服务正在关闭…");
+  }catch(e){
+    // 即使接口未正常返回，服务也很可能已在关闭过程中
+  }
+  // 稍等响应发出后，显示「已停止」遮罩（后续请求必然失败）
+  setTimeout(()=>{
+    const dm = document.getElementById("deadMask");
+    if(dm) dm.style.display = "flex";
+  }, 700);
+}
+
+async function openQuality(){ openMask("qualityMask"); if(!TABLES.length) await loadTables(); loadQuality(); }
+const ADV_TXT = {recommend:"建议补录", optional:"按需补录", not_needed:"无需补录"};
+const ADV_ORDER = {recommend:0, optional:1, not_needed:2};
+
+async function loadQuality(){
+  try{
+    const d = await api("/api/data-quality");
+    const rels = d.relationships || [];
+    const bad = rels.filter(r=>r.status==="bad").length;
+    const warn = rels.filter(r=>r.status==="warn").length;
+    const rec = rels.filter(r=>r.advice==="recommend" && r.orphan>0).length;
+    document.getElementById("qualitySummary").innerHTML =
+      `共 ${d.table_count} 张表 / ${d.total_rows.toLocaleString()} 行数据；`+
+      `关系 ${rels.length} 条，其中 <b style="color:var(--danger)">${bad}</b> 条存在较高维度缺失，`+
+      `<b style="color:var(--warn)">${warn}</b> 条轻微缺失；`+
+      `<b style="color:#1a7f3c">${rec}</b> 条<b>建议补录</b>（其余为按需或无需补录）。`;
+    // 建议补录的排前面，同组按孤儿数降序
+    _relSorted = [...rels].sort((a,b)=>{
+      const oa = ADV_ORDER[a.advice] ?? 3, ob = ADV_ORDER[b.advice] ?? 3;
+      if(oa !== ob) return oa - ob;
+      return (b.orphan||0) - (a.orphan||0);
+    });
+    const box = document.getElementById("qualityList");
+    box.innerHTML = "";
+    _relSorted.forEach((r, i)=>{
+      const pct = Math.min(100, r.rate||0);
+      const tagTxt = r.status==="ok"?"完整":(r.status==="warn"?"轻微缺失":(r.status==="err"?"错误":"缺失 "+r.orphan));
+      const adv = r.advice || "not_needed";
+      const div = document.createElement("div");
+      div.className = "rel-row";
+      div.innerHTML =
+        `<div class="path" title="${esc(r.fact)}.${esc(r.fact_col)} → ${esc(r.dim)}.${esc(r.dim_col)}">`+
+        `${esc(tlabel(r.fact))}<span class="dot">${esc(r.fact_col)}</span>→`+
+        `<span class="dot">${esc(r.dim_col)}</span>${esc(tlabel(r.dim))}</div>`+
+        `<div class="meta">有值 ${r.total.toLocaleString()} 行 ｜ 孤儿(未匹配维度) ${r.orphan.toLocaleString()} 行 ｜ 孤儿率 ${r.rate}%</div>`+
+        `<div class="bar"><i class="${r.status}" style="width:${pct}%"></i></div>`+
+        `<div class="adv-line"><span class="adv ${adv}">${ADV_TXT[adv]||adv}</span>`+
+          `<span class="adv-why">${esc(r.advice_reason||"")}</span></div>`+
+        `<div class="rel-actions">`+
+          `<span class="tag ${r.status}">${tagTxt}</span>`+
+          (r.orphan>0
+            ? `<button class="btn ghost sm" onclick="openMissing(${i})">${r.target_is_dim?"补录缺失值":"查看缺失值"}(${r.orphan})</button>`
+            : `<span class="hint" style="margin:0;">无缺失，关系完整。</span>`)+
+        `</div>`;
+      box.appendChild(div);
+    });
+  }catch(e){ toast("加载数据质量失败: "+e.message); }
+}
+async function loadQualitySilent(){ try{ await api("/api/data-quality"); }catch(e){} }
+
+let _relSorted = [];
+function openMissing(i){
+  const r = _relSorted[i];
+  if(!r) return;
+  qual.rel = r; qual.page = 1; qual.canBackfill = !!r.target_is_dim && r.advice !== "not_needed";
+  document.getElementById("missingTitle").innerHTML =
+    `缺失维度值 · ${esc(tlabel(r.fact))}.${esc(r.fact_col)} → ${esc(tlabel(r.dim))}`;
+  document.getElementById("missingMeta").textContent =
+    `事实表「${tlabel(r.fact)}（${r.fact}）」里多出来 ${r.orphan} 行「${r.fact_col}」，`+
+    `涉及若干个在维度表「${tlabel(r.dim)}（${r.dim}）」中找不到对应的值。`;
+
+  // 建议说明框
+  const adv = r.advice || "not_needed";
+  const ab = document.getElementById("adviceBox");
+  ab.className = "advbox " + adv;
+  ab.innerHTML = `<b>${ADV_TXT[adv]||""}</b>：${esc(r.advice_reason||"")}`;
+
+  // 是否允许补录
+  const panel = document.getElementById("backfillPanel");
+  const btn = document.getElementById("backfillBtn");
+  qual.map = {}; qual.dimSet = new Set(); qual.dimList = []; qual.items = [];
+  qual.extraCols = []; qual.extraOpts = {}; qual.extraMap = {};
+  if(qual.canBackfill){
+    panel.style.display = "";
+    btn.style.display = "";
+    btn.className = "btn";
+    btn.textContent = "执行补录映射";
+    document.getElementById("mapDefault").value = "keep";
+    document.getElementById("batchTgtInput").value = "";
+    const ef = document.getElementById("bfExtraForm");
+    ef.dataset.built = ""; ef.innerHTML = "";
+    loadDimOptions();
+  }else{
+    panel.style.display = "none";
+    btn.style.display = "none";
+  }
+  openMask("missingMask");
+  loadMissing();
+}
+async function loadMissing(){
+  const r = qual.rel; if(!r) return;
+  try{
+    const d = await api(`/api/missing-keys?fact=${encodeURIComponent(r.fact)}&fact_col=${encodeURIComponent(r.fact_col)}`+
+      `&dim=${encodeURIComponent(r.dim)}&dim_col=${encodeURIComponent(r.dim_col)}&page=${qual.page}&size=${qual.size}`);
+    qual.keys = d.keys; qual.items = d.items || []; qual.total = d.total;
+    qual.rowsTotal = d.rows_total || 0;
+    qual.extraCols = d.extra_cols || [];
+    qual.extraOpts = d.extra_options || {};
+    // 首次出现的缺失值：用系统推荐的分类值预填（用户已改过的保留，不覆盖）
+    (qual.items||[]).forEach(it=>{
+      if(!it.extra) return;
+      if(qual.extraMap[it.key] === undefined) qual.extraMap[it.key] = Object.assign({}, it.extra);
+    });
+    renderExtraLists();
+    const plain = document.getElementById("missingList");
+    if(qual.canBackfill){
+      plain.style.display = "none";
+      renderMapRows();
+    }else{
+      plain.style.display = "";
+      plain.innerHTML = d.keys.length
+        ? d.keys.map(k=>`<div class="item">${esc(k)}</div>`).join("")
+        : `<div class="empty">无缺失值</div>`;
+    }
+    const pages = Math.max(1, Math.ceil(d.total/qual.size));
+    document.getElementById("mInfo").textContent = `第 ${qual.page} / ${pages} 页`;
+    document.getElementById("mTotal").textContent =
+      `共 ${d.total.toLocaleString()} 个缺失值 / ${qual.rowsTotal.toLocaleString()} 行`;
+    document.getElementById("mPrev").disabled = qual.page<=1;
+    document.getElementById("mNext").disabled = qual.page>=pages;
+  }catch(e){ toast("加载缺失值失败: "+e.message); }
+}
+function missPage(d){ qual.page+=d; if(qual.page<1)qual.page=1; loadMissing(); }
+function downloadMissing(){
+  const r = qual.rel; if(!r) return;
+  const csv = `${r.fact}.${r.fact_col}\n` + qual.keys.join("\n");
+  const blob = new Blob(["﻿"+csv], {type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${r.dim}_缺失_${r.fact_col}.csv`;
+  a.click();
+  toast("已导出当前页缺失值 CSV");
+}
+/* ============ 补录映射：逐条指定归到哪个维度值 ============ */
+const EX_MAX_INLINE = 3;   // 附带字段多于 3 个时只走「批量默认值」，避免表格过宽
+function exId(c){ return "exl_" + String(c).replace(/[^0-9A-Za-z]/g, "_"); }
+function exInlineCols(){ return (qual.extraCols || []).slice(0, EX_MAX_INLINE); }
+
+/** 附带字段的可选值 datalist（如 DepartmentEn: Admin / Aftersales …） */
+function renderExtraLists(){
+  const box = document.getElementById("exLists"); if(!box) return;
+  box.innerHTML = exInlineCols().map(c=>{
+    const opts = (qual.extraOpts || {})[c] || [];
+    return `<datalist id="${exId(c)}">` +
+      opts.map(v=>`<option value="${esc(v)}"></option>`).join("") + `</datalist>`;
+  }).join("");
+}
+
+/** 一行中「附带字段」那一格（仅新建成员时写入） */
+function extraCell(it, i){
+  const cols = exInlineCols();
+  if(!cols.length) return "";
+  const cur = qual.extraMap[it.key] || {};
+  const body = cols.map(c=>
+    `<div class="exrow"><label title="${esc(c)}">${esc(c)}</label>`+
+    `<input class="mex" list="${exId(c)}" data-i="${i}" data-fld="${esc(c)}" `+
+    `value="${esc(cur[c]||"")}" placeholder="留空=不填" oninput="onExtraInput(this)"></div>`
+  ).join("");
+  return `<td class="mextra" id="mextra-${i}">${body}<div class="exhint" id="exhint-${i}"></div></td>`;
+}
+
+function renderMapRows(){
+  const tb = document.getElementById("mapRows");
+  const th = document.getElementById("mapHead");
+  const items = qual.items || [];
+  const cols = exInlineCols();
+  const width = cols.length ? [26,8,30,22,14] : [34,11,39,16];
+  const heads = ["缺失值（多余）","涉及行数","归到 → 目标维度值"]
+    .concat(cols.length ? ["附带字段（仅新建时写入）"] : [])
+    .concat(["将执行"]);
+  if(th) th.innerHTML = "<tr>" + heads.map((h,k)=>
+    `<th style="width:${width[k]}%">${esc(h)}</th>`).join("") + "</tr>";
+  if(!items.length){
+    tb.innerHTML = `<tr><td colspan="${heads.length}" style="color:var(--muted);padding:10px;">已无缺失值，该关系完整。</td></tr>`;
+    return;
+  }
+  tb.innerHTML = items.map((it,i)=>{
+    const sg = it.suggest;
+    const sug = sg
+      ? `<span class="msug" onclick="applySuggest(${i})" title="系统按名称相似度推荐：点击即填入「${esc(sg.value)}」">`+
+        `建议 → ${esc(sg.value)}<i class="${sg.confidence}">${sg.confidence==="high"?"高":"中"}</i></span>`
+      : "";
+    return `<tr>
+       <td class="mkey" title="${esc(it.key)}">${esc(it.key)}</td>
+       <td class="mcnt">${it.rows.toLocaleString()}</td>
+       <td><input class="mtgt" list="dimPickList" data-i="${i}" value="${esc(qual.map[it.key]||"")}"
+             placeholder="选现有值，或输入新值（留空=原值新建）" oninput="onMapInput(this)">${sug}</td>
+       ${extraCell(it,i)}
+       <td><span class="mact" id="mact-${i}"></span></td>
+     </tr>`;
+  }).join("");
+  items.forEach((it,i)=>updateActBadge(i));
+}
+function onExtraInput(el){
+  const i = Number(el.dataset.i);
+  const it = (qual.items||[])[i]; if(!it) return;
+  const m = qual.extraMap[it.key] || (qual.extraMap[it.key] = {});
+  m[el.dataset.fld] = el.value.trim();   // 留空串 = 明确不填，避免被系统建议重新覆盖
+  updateActBadge(i);
+}
+/** 「重填分类建议」：把系统推荐值重新套回本页（覆盖手工修改） */
+function mapBatchExtra(){
+  let n = 0;
+  (qual.items||[]).forEach(it=>{
+    if(!it.extra) return;
+    qual.extraMap[it.key] = Object.assign({}, it.extra); n++;
+  });
+  renderMapRows();
+  toast(n ? `已按分类重填 ${n} 行的附带字段` : "本页没有可用的分类建议");
+}
+function mapInput(i){ return document.querySelector(`#mapRows input[data-i="${i}"]`); }
+function onMapInput(el){
+  const i = Number(el.dataset.i);
+  const it = (qual.items||[])[i]; if(!it) return;
+  const v = el.value.trim();
+  if(v) qual.map[it.key] = v; else delete qual.map[it.key];
+  (qual.items||[]).forEach((x, j)=>{ if(x.key === v) updateActBadge(j); });  // 目标若是别人，联动刷新
+  updateActBadge(i);
+}
+/** 实时提示这一行"将执行什么"，并同步「附带字段」是否会被写入 */
+function updateActBadge(i){
+  const it = (qual.items||[])[i]; const sp = document.getElementById("mact-"+i);
+  if(!it || !sp) return;
+  const el = mapInput(i);
+  const v = (el ? el.value : "").trim();
+  const cell = document.getElementById("mextra-"+i);
+  const hint = document.getElementById("exhint-"+i);
+  let writeEx = true;
+  if(!v || v === it.key){
+    sp.className = "mact same"; sp.textContent = "新建同名成员";
+    sp.title = "以原值在维度表新建成员，事实表不改写";
+  }else{
+    const chained = qual.map[v] !== undefined && qual.map[v] !== v;
+    if(chained){
+      sp.className = "mact chain"; sp.textContent = "随该值一起归并";
+      sp.title = `目标「${v}」本身也是缺失值，且已指定归并到别处，系统会自动跟随到最终值`;
+    }else if(qual.dimSet.has(v)){
+      sp.className = "mact merge"; sp.textContent = "归到现有（改事实表）";
+      sp.title = `「${v}」在维度表中已存在 → 把事实表里「${it.key}」改写为它（不新建成员）`;
+      writeEx = false;
+    }else{
+      sp.className = "mact create"; sp.textContent = "新建成员（改事实表）";
+      sp.title = `「${v}」不存在 → 新建该维度成员，并把事实表里「${it.key}」改写为它`;
+    }
+  }
+  if(cell){
+    cell.classList.toggle("off", !writeEx);
+    if(hint){
+      const vals = exInlineCols()
+        .map(c=>{ const x = ((qual.extraMap[it.key]||{})[c]||"").trim(); return x ? `${c}=${x}` : ""; })
+        .filter(Boolean);
+      hint.textContent = writeEx ? (vals.length ? "将写入 " + vals.join(" / ") : "未填分类")
+                                 : "不写入（归到现有值）";
+    }
+  }
+}
+/** 采纳某行的系统建议 */
+function applySuggest(i){
+  const it = (qual.items||[])[i]; if(!it || !it.suggest) return;
+  const el = mapInput(i); if(!el) return;
+  el.value = it.suggest.value;
+  qual.map[it.key] = it.suggest.value;
+  (qual.items||[]).forEach((x,j)=>updateActBadge(j));
+}
+/** 一次性采纳全部建议（只填有建议的行，其余不动） */
+function mapBatchSuggest(){
+  let n = 0;
+  (qual.items||[]).forEach((it,i)=>{
+    if(!it.suggest) return;
+    const el = mapInput(i); if(!el) return;
+    el.value = it.suggest.value; qual.map[it.key] = it.suggest.value; n++;
+  });
+  (qual.items||[]).forEach((it,i)=>updateActBadge(i));
+  toast(n ? `已采纳 ${n} 条建议（仍可逐行修改）` : "本页没有可用的相似建议");
+}
+function mapBatchKeep(){
+  (qual.items||[]).forEach((it,i)=>{ const el=mapInput(i); if(el) el.value=""; delete qual.map[it.key]; updateActBadge(i); });
+  toast("已全部设为「原值新建同名成员」");
+}
+function mapBatchAll(){
+  const v = (document.getElementById("batchTgtInput").value || "").trim();
+  if(!v){ toast("请先选择或输入一个目标值"); return; }
+  (qual.items||[]).forEach((it,i)=>{ const el=mapInput(i); if(el) el.value=v; qual.map[it.key]=v; });
+  (qual.items||[]).forEach((it,i)=>updateActBadge(i));
+  toast(`已把本页全部缺失值指向「${v}」`);
+}
+function mapClear(){
+  (qual.items||[]).forEach((it,i)=>{ const el=mapInput(i); if(el) el.value=""; delete qual.map[it.key]; updateActBadge(i); });
+}
+function mapStats(){
+  let merge=0, create=0, same=0;
+  (qual.items||[]).forEach(it=>{
+    const v = (qual.map[it.key]||"").trim();
+    if(!v || v === it.key) same++;
+    else if(qual.dimSet.has(v)) merge++;
+    else create++;
+  });
+  return {merge, create, same};
+}
+
+/** 新建成员附带字段的「批量默认值」（可选；会被逐行填写覆盖） */
+async function renderExtraForm(){
+  const r = qual.rel; if(!r) return;
+  const box = document.getElementById("bfExtraForm");
+  const sig = r.dim + "|" + r.dim_col;
+  if(box.dataset.built === sig) return;      // 已构建过，不覆盖用户已填内容
+  box.innerHTML = '<div class="hint" style="margin:0;">正在加载字段…</div>';
+  try{
+    const sch = await api(`/api/tables/${encodeURIComponent(r.dim)}/schema`);
+    const inline = exInlineCols();
+    const fields = sch.filter(c=>!c.pk && c.name !== r.dim_col
+                              && c.name.toLowerCase() !== "id"
+                              && inline.indexOf(c.name) < 0);
+    box.dataset.built = sig;
+    if(!fields.length){
+      box.innerHTML = `<div class="hint" style="margin:0;">` +
+        (inline.length
+          ? `除已在表格里逐行填写的 ${inline.map(esc).join("、")} 外，该维度表没有其它字段。`
+          : `该维度表没有其它字段，无需填写。`) + `</div>`;
+      return;
+    }
+    box.innerHTML =
+      `<div class="hint" style="margin:0 0 7px;">下列字段会<b>套用到本次全部新建成员</b>（逐行填写优先、留空则为空）：</div>`+
+      fields.map(c=>
+        `<div class="frow"><label title="${esc(c.name)}">${esc(c.name)}</label>`+
+        `<input type="text" data-fld="${esc(c.name)}" placeholder="${c.type==="REAL"?"数字":"文本"}"></div>`
+      ).join("");
+  }catch(e){ box.innerHTML = `<div class="hint">加载字段失败：${esc(e.message)}</div>`; }
+}
+
+/** 加载维度表现有值 → 填 datalist（供"选现有值"），并用于判断每行"将执行"的动作 */
+async function loadDimOptions(){
+  const r = qual.rel; if(!r) return;
+  try{
+    const d = await api(`/api/dim-options?dim=${encodeURIComponent(r.dim)}`+
+      `&dim_col=${encodeURIComponent(r.dim_col)}&limit=300`);
+    qual.dimList = d.options || [];
+    qual.dimSet = new Set(qual.dimList);
+    document.getElementById("dimPickList").innerHTML =
+      qual.dimList.map(v=>`<option value="${esc(v)}"></option>`).join("");
+    (qual.items||[]).forEach((it,i)=>updateActBadge(i));
+  }catch(e){ /* 下拉不可用不影响手工输入新值 */ }
+}
+
+async function doBackfillMap(){
+  const r = qual.rel; if(!r) return;
+  const items = qual.items || [];
+  if(!items.length){ toast("当前没有可补录的缺失值"); return; }
+
+  const st = mapStats();
+  const def = document.getElementById("mapDefault").value;   // keep=其余各自新建同名 / skip=暂不处理
+  const notShown = Math.max(0, (qual.total||0) - items.length);
+
+  const extra = {};
+  document.querySelectorAll("#bfExtraForm input[data-fld]").forEach(el=>{
+    if(el.value.trim() !== "") extra[el.dataset.fld] = el.value.trim();
+  });
+  const mappings = items
+    .map(it=>{
+      const v = (qual.map[it.key]||"").trim();
+      const ex = {};
+      (qual.extraCols||[]).forEach(c=>{
+        const x = ((qual.extraMap[it.key]||{})[c]||"").trim();
+        if(x) ex[c] = x;
+      });
+      const hasEx = Object.keys(ex).length > 0;
+      // 未指定目标：沿用兜底策略；但「也各自新建」时把分类一并带上
+      if(!v && !(hasEx && def === "keep")) return null;
+      const m = {key: it.key, target: v};
+      if(hasEx) m.extra = ex;
+      return m;
+    })
+    .filter(Boolean);
+  const withEx = mappings.filter(m=>m.extra).length;
+
+  let tip =
+    `本页 ${items.length} 个缺失值将这样处理：\n`+
+    `  · 归到现有维度值：${st.merge} 个（改写事实表）\n`+
+    `  · 新建维度成员（新值）：${st.create} 个\n`+
+    `  · 以原值新建同名成员：${st.same} 个\n`;
+  if(withEx) tip += `  · 其中 ${withEx} 行会附带写入 `+
+    `${qual.extraCols.map(esc).join("、")}（如 DepartmentEn=Admin/Aftersales）\n`;
+  if(notShown) tip += `  · 本页未显示的其它 ${notShown} 个：按「${def === "keep" ? "也各自新建同名成员" : "暂不处理"}」\n`;
+  const touched = st.merge + st.create;
+  if(touched) tip += `\n⚠️ 其中 ${touched} 个会改写事实表「${tlabel(r.fact)}」的「${r.fact_col}」列，不可撤销；建议先备份 procurement.db。\n`;
+  if(!mappings.length && def !== "keep") tip += `\n（没有指定任何映射，将不做改动。确认继续？）\n`;
+  tip += `\n确认执行？`;
+  if(!confirm(tip)) return;
+
+  const btn = document.getElementById("backfillBtn");
+  btn.disabled = true;
+  try{
+    const d = await api("/api/backfill-map", {method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({fact:r.fact, fact_col:r.fact_col, dim:r.dim, dim_col:r.dim_col,
+                           mappings, default_action:def, extra})});
+    toast(d.message || "补录完成");
+    qual.map = {}; qual.extraMap = {};
+    await loadDimOptions();
+    await loadTables();
+    // 回到当前所在页面刷新（模型视图 / 质量页 / 表浏览）
+    if(state.view === "model") renderModelPage();
+    else if(state.view === "quality") renderQualityPage();
+    await loadMissing();
+  }catch(e){ toast("补录失败: "+e.message); }
+  finally{ btn.disabled = false; }
+}
+
+/* ============ 视图切换：表浏览 / 模型视图 / 数据质量 ============ */
+function showView(v){
+  if(v === "mappings") v = "model";   // 「映射关系」页已并入「模型视图」
+  state.view = v;
+  try{ history.replaceState(null, "", v==="table" ? location.pathname : "#"+v); }catch(e){}
+  const tb = document.getElementById("toolbar");
+  const fb = document.getElementById("filterBar");
+  const pg = document.getElementById("pager");
+  const wrap = document.getElementById("gridWrap");
+  const isTable = (v === "table");
+  tb.style.display = isTable ? "flex" : "none";
+  fb.style.display = "none";
+  pg.style.display = isTable ? "flex" : "none";
+  document.getElementById("navModel").classList.toggle("active", v === "model");
+  document.getElementById("navQuality").classList.toggle("active", v === "quality");
+  document.querySelectorAll("#tableList .titem").forEach(el => el.classList.remove("active"));
+  // 模型视图要占满可用高度（画布自身滚动），其余视图沿用外层滚动
+  const isModel = (v === "model");
+  const grid = document.getElementById("grid");
+  if(isModel){
+    wrap.style.overflow = "hidden";
+    wrap.style.display = "flex";
+    wrap.style.flexDirection = "column";
+    grid.style.height = "100%";
+  }else{
+    wrap.style.overflow = "auto";
+    wrap.style.display = "";
+    wrap.style.flexDirection = "";
+    grid.style.height = "";
+  }
+  mvCloseRelPop();
+  if(v === "model"){ renderModelPage(); }
+  else if(v === "quality"){ renderQualityPage(); }
+  else {
+    if(state.table){ loadRows(); }
+    else { grid.innerHTML = '<div class="empty">尚未选择数据表</div>'; }
+  }
+}
+
+/* ============ 关系定义（模型视图 / 数据质量页共用） ============ */
+let MAP_TABLES = [];   // 表+列下拉缓存
+window._mapList = [];  // 当前关系定义缓存（由模型视图加载后填充，供编辑器 / 补录入口查找）
+
+/* ---------- 关系基数辅助（模型视图 / 编辑器共用） ---------- */
+function cardSym(c){ return (c==="1:*") ? "1:*" : (c==="1:1" ? "1:1" : "*:1"); }
+function cardTxt(c){ return c==="1:1" ? "一对一" : (c==="1:*" ? "一对多" : "多对一"); }
+function relCard(r){ return r.cardinality || (r.kind==="fact" ? "1:1" : "*:1"); }
+
+function openMissingFromList(mid){
+  const r = (window._mapList||[]).find(x=>x.id===mid);
+  if(!r) return;
+  _relSorted = [{
+    fact:r.source_table, fact_col:r.source_col, dim:r.target_table, dim_col:r.target_col,
+    orphan:r.orphan||0, target_is_dim:!!r.target_is_dim,
+    advice:r.advice||"not_needed", advice_reason:r.advice_reason||""
+  }];
+  openMissing(0);
+}
+function meFillCols(which){
+  const tSel = which==="source" ? document.getElementById("meSourceTable") : document.getElementById("meTargetTable");
+  const cSel = which==="source" ? document.getElementById("meSourceCol") : document.getElementById("meTargetCol");
+  const t = tSel.value;
+  const cols = (MAP_TABLES.find(x=>x.table===t)||{}).columns || [];
+  cSel.innerHTML = cols.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  if(which==="target"){
+    document.getElementById("meKind").value = t.startsWith("dim_") ? "dim" : "fact";
+    if(window._editingMap==null){
+      document.getElementById("meCardinality").value = t.startsWith("dim_") ? "*:1" : "1:1";
+    }
+  }
+}
+function mePreview(){
+  const el = document.getElementById("mePreview");
+  if(!el) return;
+  const st = document.getElementById("meSourceTable");
+  const tt = document.getElementById("meTargetTable");
+  const sc = document.getElementById("meSourceCol");
+  const tc = document.getElementById("meTargetCol");
+  const c = cardSym(document.getElementById("meCardinality").value);
+  el.innerHTML = `关系预览：<b>${esc(tlabel(st.value))}</b>.<code>${esc(sc.value||"…")}</code>`
+    + ` <b>${c}</b> <b>${esc(tlabel(tt.value))}</b>.<code>${esc(tc.value||"…")}</code>`;
+}
+async function openMappingEditor(mid, prefill){
+  if(!MAP_TABLES.length){ try{ MAP_TABLES = (await api("/api/mapping-tables")).tables || []; }catch(e){} }
+  const st = document.getElementById("meSourceTable");
+  const tt = document.getElementById("meTargetTable");
+  const opts = MAP_TABLES.map(t=>`<option value="${esc(t.table)}">${esc(t.label||t.table)}（${esc(t.table)}）</option>`).join("");
+  st.innerHTML = opts; tt.innerHTML = opts;
+  document.getElementById("mapEditorResult").style.display="none";
+  if(mid){
+    const r = (window._mapList||[]).find(x=>x.id===mid);
+    if(!r){ toast("未找到该关系"); return; }
+    document.getElementById("mapEditorTitle").textContent = "编辑关系 #"+mid;
+    st.value = r.source_table; meFillCols("source"); document.getElementById("meSourceCol").value = r.source_col;
+    tt.value = r.target_table; meFillCols("target"); document.getElementById("meTargetCol").value = r.target_col;
+    document.getElementById("meKind").value = r.kind;
+    document.getElementById("meCardinality").value = relCard(r);
+    document.getElementById("meNote").value = r.note||"";
+    document.getElementById("meEnabled").checked = !!r.enabled;
+    window._editingMap = mid;
+  }else{
+    document.getElementById("mapEditorTitle").textContent = prefill ? "新建关系（拖拽发起）" : "新建关系";
+    document.getElementById("meNote").value = "";
+    document.getElementById("meEnabled").checked = true;
+    if(prefill){
+      // 拖拽连线带过来的源/目标表与列，直接预填
+      if(prefill.source_table) st.value = prefill.source_table;
+      meFillCols("source");
+      if(prefill.source_col) document.getElementById("meSourceCol").value = prefill.source_col;
+      if(prefill.target_table) tt.value = prefill.target_table;
+      meFillCols("target");
+      if(prefill.target_col) document.getElementById("meTargetCol").value = prefill.target_col;
+      document.getElementById("meKind").value = (prefill.target_table||"").startsWith("dim_") ? "dim" : "fact";
+    }else{
+      meFillCols("source"); meFillCols("target");
+      document.getElementById("meKind").value = "dim";
+      document.getElementById("meCardinality").value = "*:1";
+    }
+    window._editingMap = null;
+  }
+  mePreview();
+  openMask("mapEditorMask");
+}
+async function saveMapping(){
+  const mid = window._editingMap;
+  const payload = {
+    source_table: document.getElementById("meSourceTable").value,
+    source_col: document.getElementById("meSourceCol").value,
+    target_table: document.getElementById("meTargetTable").value,
+    target_col: document.getElementById("meTargetCol").value,
+    kind: document.getElementById("meKind").value,
+    cardinality: document.getElementById("meCardinality").value,
+    note: document.getElementById("meNote").value.trim(),
+    enabled: document.getElementById("meEnabled").checked ? 1 : 0,
+  };
+  try{
+    if(mid){
+      await api(`/api/mappings/${mid}`, {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
+      toast("已保存关系修改");
+    }else{
+      const d = await api("/api/mappings", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
+      toast("已新建关系 #"+d.id);
+    }
+    closeMask("mapEditorMask");
+    refreshMapViews();
+  }catch(e){ showResult("mapEditorResult", false, "保存失败："+e.message); }
+}
+async function deleteMapping(mid){
+  if(!confirm("确定删除该映射配置吗？\n此操作不可撤销；已删除的关系将不再出现在数据质量检查中。")) return;
+  try{
+    await api(`/api/mappings/${mid}`, {method:"DELETE"});
+    toast("已删除映射");
+    refreshMapViews();
+  }catch(e){ toast("删除失败："+e.message); }
+}
+
+/* ============ 模型视图（Power BI 风格：表框 + 全部字段 + 字段级关系连线 + 拖拽） ============ */
+const MV_BOX_W = 224, MV_HEAD_H = 29, MV_ROW_H = 21, MV_COL_GAP = 78, MV_ROW_GAP = 26, MV_PAD = 26;
+const MV_LIST_MAX_H = 189;   // 字段列表最高约 9 行，超出则卡片内滚动（与 CSS .mv-fs max-height 保持一致）
+window._mv = { tables:[], rels:[], pos:{}, scale:1, selTable:null, selRel:null, q:"", popXY:null, popAway:null,
+               hoverRel:null, hoverField:null, hoverFieldKey:null, fidx:{} };
+let _mvSaveTimer = null;
+let _mvResizeBound = false;
+
+function mvListH(t){ return Math.min((t.col_count||0) * MV_ROW_H, MV_LIST_MAX_H); }
+function mvBoxH(t){ return MV_HEAD_H + mvListH(t) + 2; }
+
+async function renderModelPage(){
+  const grid = document.getElementById("grid");
+  grid.innerHTML = `
+    <div class="mv-page">
+      <div class="mv-bar">
+        <span class="cur">模型视图</span>
+        <span class="hint">拖动表头移动表位置 · 从字段两侧圆点拖到另一张表的字段即可新建关系 · <b>鼠标移到连线或字段上会高亮关联字段</b> · 点击连线可编辑</span>
+        <span class="spacer"></span>
+        <input type="text" id="mvSearch" placeholder="高亮字段 / 表名…" oninput="mvSearch(this.value)">
+        <span class="mv-zoombox">
+          <button onclick="mvZoom(-0.1)" title="缩小">−</button>
+          <span class="zv" id="mvZoomVal">100%</span>
+          <button onclick="mvZoom(0.1)" title="放大">＋</button>
+          <button onclick="mvFit()" title="缩放以适应窗口">适应</button>
+        </span>
+        <button class="btn ghost sm" onclick="mvAutoLayout(false);mvRenderAndDraw();mvPersist(true)">自动布局</button>
+        <button class="btn ghost sm" onclick="mvResetLayout()">重置位置</button>
+        <button class="btn ghost sm" onclick="renderModelPage()">刷新</button>
+        <button class="btn sm" onclick="openMappingEditor(null)">＋ 新建关系</button>
+      </div>
+      <div class="mv-scroll" id="mvScroll">
+        <div class="mv-holder" id="mvHolder">
+          <div class="mv-stage" id="mvStage">
+            <svg class="mv-svg" id="mvSvg"></svg>
+            <div id="mvBoxes"></div>
+          </div>
+        </div>
+      </div>
+      <div class="mv-legend">
+        <span><i style="border-top-color:#1a7f3c"></i>完整</span>
+        <span><i style="border-top-color:#e0a100"></i>轻微缺失</span>
+        <span><i style="border-top-color:#d23b3b"></i>严重缺失</span>
+        <span><i style="border-top-color:#b6bec7;border-top-style:dashed"></i>禁用 / 忽略</span>
+        <span>徽章如 *:1＝多对一；连线两端 1 / * 在悬停时显示</span>
+        <span>🔑 主键　🔗 参与关系的字段　＃ 金额列　字段多时卡片内可滚动</span>
+      </div>
+    </div>`;
+  try{
+    const d = await api("/api/model-view");
+    const mv = window._mv;
+    mv.tables = d.tables || [];
+    mv.rels = d.relationships || [];
+    window._mapList = mv.rels;   // 供关系编辑器 / 补录入口按 id 查找
+    mv.selTable = null; mv.selRel = null; mv.pos = {}; mv.heights = {};
+    mv.hoverRel = null; mv.hoverField = null; mv.hoverFieldKey = null; mv.fidx = {};
+    (mv.tables||[]).forEach(t=>{
+      const p = (d.layout||{})[t.table];
+      if(p && isFinite(p.x) && isFinite(p.y)) mv.pos[t.table] = {x:+p.x, y:+p.y};
+      if(p && isFinite(p.height)) mv.heights[t.table] = +p.height;
+    });
+    mvAutoLayout(true);          // 只给「从未拖过」的表分配位置，保留已保存布局
+    mvRenderAndDraw();
+    mvBindStage();
+    const q = document.getElementById("mvSearch");
+    if(q && mv.q){ q.value = mv.q; mvSearch(mv.q); }
+  }catch(e){
+    grid.innerHTML = '<div class="empty">加载模型视图失败：'+esc(e.message)+'</div>';
+  }
+}
+
+function mvRenderAndDraw(){ mvRenderBoxes(); mvSizeStage(); mvDrawEdges(); }
+
+function mvAutoLayout(fillMissing){
+  const mv = window._mv;
+  const dims  = mv.tables.filter(t=>t.kind==="dim").slice().sort((a,b)=> a.table < b.table ? -1 : 1);
+  const facts = mv.tables.filter(t=>t.kind==="fact").slice().sort((a,b)=> a.table < b.table ? -1 : 1);
+  const place = (arr, x)=>{
+    let y = MV_PAD;
+    arr.forEach(t=>{
+      if(!fillMissing || !mv.pos[t.table]) mv.pos[t.table] = {x, y};
+      y += mvBoxH(t) + MV_ROW_GAP;
+    });
+  };
+  place(dims, MV_PAD);                              // 维度表一列靠左
+  place(facts, MV_PAD + MV_BOX_W + MV_COL_GAP);     // 事实表一列靠右
+}
+
+async function mvResetLayout(){
+  window._mv.pos = {};
+  window._mv.heights = {};
+  mvAutoLayout(false);
+  mvRenderAndDraw();
+  try{
+    await api("/api/model-layout", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({reset:true, positions: window._mv.pos, heights: {}})});
+    toast("已重置为自动布局（维度表在左、事实表在右）");
+  }catch(e){ toast("重置失败："+e.message); }
+}
+
+function mvRenderBoxes(){
+  const mv = window._mv;
+  const host = document.getElementById("mvBoxes");
+  if(!host) return;
+  // 统计每个字段参与的关系（用于 🔗 标记与悬浮提示）
+  const role = {};
+  const add = (t, c, r, dir)=>{
+    role[t] = role[t] || {};
+    role[t][c] = role[t][c] || [];
+    role[t][c].push({dir, rel:r});
+  };
+  mv.rels.forEach(r=>{ add(r.source_table, r.source_col, r, "src"); add(r.target_table, r.target_col, r, "tgt"); });
+
+  host.innerHTML = mv.tables.map(t=>{
+    const p = mv.pos[t.table] || {x: MV_PAD, y: MV_PAD};
+    const rows = (t.columns||[]).map(c=>{
+      const rs = (role[t.table]||{})[c.name] || [];
+      const cls = "mv-f" + (c.pk ? " ispk" : "") + (rs.length ? " iskey" : "");
+      const ic  = c.pk ? "🔑" : (rs.length ? "🔗" : (c.amount ? "＃" : ""));
+      const why = rs.map(x=> x.dir==="src"
+        ? "→ " + tlabel(x.rel.target_table) + "." + x.rel.target_col
+        : "← " + tlabel(x.rel.source_table) + "." + x.rel.source_col).join("；");
+      const tip = (c.pk ? "主键" : "字段") + " · " + c.type + (why ? " · 关系：" + why : "");
+      return `<div class="${cls}" data-tbl="${esc(t.table)}" data-col="${esc(c.name)}" title="${esc(tip)}">`
+        + `<span class="port l"></span><span class="ic">${ic}</span>`
+        + `<span class="fn">${esc(c.name)}</span><span class="ft">${esc(c.type)}</span>`
+        + `<span class="port r"></span></div>`;
+    }).join("");
+    return `<div class="mv-box" data-tbl="${esc(t.table)}" style="left:${p.x}px;top:${p.y}px;">`
+      + `<div class="mv-box-h ${t.kind}" title="${esc(t.table)} · ${esc(t.desc||"")}">`
+      + `<span class="mv-nm">${esc(t.label||t.table)}</span>`
+      + `<span class="mv-cnt">${t.col_count} 字段 · ${(t.row_count||0).toLocaleString()} 行</span>`
+      + `<span class="mv-toggle" title="折叠 / 展开字段列表">▾</span>`
+      + `</div><div class="mv-fs">${rows}</div>`
+      + `<span class="mv-resize" title="拖动调整卡片高度"></span></div>`;
+  }).join("");
+  // 建字段行索引（tbl\u0001col → 行元素），供悬浮高亮快速定位
+  mv.fidx = {};
+  host.querySelectorAll(".mv-f").forEach(el=>{
+    mv.fidx[el.getAttribute("data-tbl") + "\u0001" + el.getAttribute("data-col")] = el;
+  });
+  // 恢复已保存的卡片高度（用户拖底边调整后持久化的值）
+  host.querySelectorAll(".mv-box").forEach(b=>{
+    const t = b.getAttribute("data-tbl");
+    if(window._mv.heights && window._mv.heights[t]) mvApplyHeight(b, window._mv.heights[t]);
+  });
+}
+
+function mvSizeStage(){
+  const stage = document.getElementById("mvStage");
+  if(!stage) return;
+  let mx = 0, my = 0;
+  stage.querySelectorAll(".mv-box").forEach(b=>{
+    const x = parseFloat(b.style.left) || 0, y = parseFloat(b.style.top) || 0;
+    mx = Math.max(mx, x + b.offsetWidth);
+    my = Math.max(my, y + b.offsetHeight);
+  });
+  stage.style.width  = Math.max(mx + 70, 340) + "px";
+  stage.style.height = Math.max(my + 70, 260) + "px";
+  mvSyncHolder();
+}
+
+// transform 不影响布局尺寸：把外层 holder 撑到「缩放后」的大小，保证放大后仍能滚动到全部内容
+function mvSyncHolder(){
+  const stage = document.getElementById("mvStage"), holder = document.getElementById("mvHolder");
+  if(!stage || !holder) return;
+  const z = window._mv.scale || 1;
+  holder.style.width  = Math.round(stage.offsetWidth  * z) + "px";
+  holder.style.height = Math.round(stage.offsetHeight * z) + "px";
+}
+
+// 相对 root 的「未缩放」坐标：用 getBoundingClientRect，自动兼容
+// ① stage 的 CSS transform 缩放 ② 卡片内字段列表的滚动 ③ 外层画布滚动
+function mvRectIn(el, root){
+  const a = el.getBoundingClientRect(), b = root.getBoundingClientRect();
+  const z = window._mv.scale || 1;
+  return {x:(a.left - b.left)/z, y:(a.top - b.top)/z, w:a.width/z, h:a.height/z};
+}
+
+function mvDrawEdges(){
+  const mv = window._mv;
+  const svg = document.getElementById("mvSvg");
+  const stage = document.getElementById("mvStage");
+  if(!svg || !stage) return;
+  const W = stage.offsetWidth, H = stage.offsetHeight;
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+
+  // 建索引查字段行，避免中文/特殊字符列名拼进 CSS 选择器
+  const idx = mv.fidx && Object.keys(mv.fidx).length ? mv.fidx : (()=>{
+    const m = {};
+    stage.querySelectorAll(".mv-f").forEach(el=>{
+      m[el.getAttribute("data-tbl") + "\u0001" + el.getAttribute("data-col")] = el;
+    });
+    return m;
+  })();
+
+  // 每张表「字段列表可视区」的矩形，本次绘制只算一次
+  const listR = {};
+  const listRect = t=>{
+    if(!listR[t]){
+      const box = stage.querySelector(`#mvBoxes .mv-box[data-tbl="${t}"]`);
+      const list = box ? box.querySelector(".mv-fs") : null;
+      listR[t] = list ? mvRectIn(list, stage) : null;
+    }
+    return listR[t];
+  };
+
+  let out = "";
+  mv.rels.forEach(r=>{
+    const a = idx[r.source_table + "\u0001" + r.source_col];
+    const b = idx[r.target_table + "\u0001" + r.target_col];
+    if(!a || !b) return;
+    // 折叠态：字段列表被收起（display:none），字段行不可见；端点改取表头锚点，且不按列表滚动夹取
+    const aBox = a.closest(".mv-box"), bBox = b.closest(".mv-box");
+    const aCol = aBox && aBox.classList.contains("collapsed");
+    const bCol = bBox && bBox.classList.contains("collapsed");
+    const aEl = aCol ? aBox.querySelector(".mv-box-h") : a;
+    const bEl = bCol ? bBox.querySelector(".mv-box-h") : b;
+    const ra = mvRectIn(aEl, stage), rb = mvRectIn(bEl, stage);
+    // 卡片内列表滚动后，行会跑到可见区外 —— 把接线端点夹在列表可视范围内，避免乱线
+    const la = aCol ? null : listRect(r.source_table);
+    const lb = bCol ? null : listRect(r.target_table);
+    const ay = la ? Math.max(la.y + 2, Math.min(la.y + la.h - 2, ra.y + ra.h/2)) : ra.y + ra.h/2;
+    const by = lb ? Math.max(lb.y + 2, Math.min(lb.y + lb.h - 2, rb.y + rb.h/2)) : rb.y + rb.h/2;
+    const leftFirst = (ra.x + ra.w/2) <= (rb.x + rb.w/2);
+    const A = {x: ra.x + (leftFirst ? ra.w : 0), y: ay};
+    const B = {x: rb.x + (leftFirst ? 0 : rb.w), y: by};
+    const dx = Math.max(46, Math.abs(B.x - A.x) * 0.40);
+    const c1 = {x: A.x + (leftFirst ? dx : -dx), y: A.y};
+    const c2 = {x: B.x + (leftFirst ? -dx : dx), y: B.y};
+    const card = relCard(r);
+    const parts = String(card).split(":");
+    const ss = parts[0] || "*", ts = parts[1] || "1";
+    const off = !r.enabled || r.ignored;
+    const stroke = off ? "#b6bec7"
+      : (r.status==="bad" ? "#d23b3b" : r.status==="warn" ? "#e0a100" : r.status==="err" ? "#aab2bb" : "#1a7f3c");
+    const dash = off ? ' stroke-dasharray="7 5"' : '';
+    const sel = (mv.selRel === r.id);
+    const hot = sel || (mv.hoverRel === r.id);
+    out += `<g class="mv-relg${sel?" seld":""}${hot?" hot":""}" data-rel="${r.id}">`;
+    out += `<path class="mv-edge" data-rel="${r.id}"`
+        +  ` d="M ${A.x} ${A.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${B.x} ${B.y}"`
+        +  ` fill="none" stroke="${stroke}" stroke-width="${hot?3.2:1.8}"${dash} opacity="${hot?1:0.9}"/>`;
+    // 三次贝塞尔 t=0.5 处的真实中点（放基数徽章）
+    const mx = (A.x + 3*c1.x + 3*c2.x + B.x)/8, my = (A.y + 3*c1.y + 3*c2.y + B.y)/8;
+    out += `<g class="mv-badge">`
+        +  `<rect x="${mx-17}" y="${my-9}" width="34" height="18" rx="9" fill="#fff" stroke="${stroke}"/>`
+        +  `<text x="${mx}" y="${my+4}" font-size="10.5" text-anchor="middle" font-weight="700" fill="${stroke}">${esc(card)}</text>`
+        +  `</g>`;
+    // 两端的 1 / * 只在悬停/选中该连线时显示（默认隐藏，减少画面杂乱）
+    out += `<g class="mv-ends">`
+        +  `<text x="${A.x + (leftFirst?7:-7)}" y="${A.y-7}" font-size="11.5" font-weight="700" fill="${stroke}"`
+        +  ` text-anchor="${leftFirst?"start":"end"}">${esc(ss)}</text>`
+        +  `<text x="${B.x + (leftFirst?-7:7)}" y="${B.y-7}" font-size="11.5" font-weight="700" fill="${stroke}"`
+        +  ` text-anchor="${leftFirst?"end":"start"}">${esc(ts)}</text></g>`;
+    // 透明粗「命中带」放最上层：负责 hover / click 命中（细线 .mv-edge 已设 pointer-events:none）
+    out += `<path class="mv-hit" data-rel="${r.id}" d="M ${A.x} ${A.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${B.x} ${B.y}"/>`;
+    out += `</g>`;
+  });
+  svg.innerHTML = out;
+  svg.querySelectorAll(".mv-relg").forEach(g=>{
+    const id = +g.getAttribute("data-rel");
+    const p = g.querySelector(".mv-hit");
+    if(!p) return;
+    p.addEventListener("mouseenter", ()=>{ window._mv.hoverRel = id; mvApplyFocus(); });
+    p.addEventListener("mouseleave", ()=>{
+      if(window._mv.hoverRel === id){ window._mv.hoverRel = null; mvApplyFocus(); }
+    });
+    p.addEventListener("click", ev=>{
+      ev.stopPropagation();
+      mvSelectRel(id);
+      mvOpenRelPop(id, ev);
+    });
+  });
+}
+
+/* 悬浮高亮：把「相关连线 + 两端字段」提亮，其余连线淡出 */
+function mvApplyFocus(){
+  const mv = window._mv;
+  const svg = document.getElementById("mvSvg");
+  if(!svg) return;
+  svg.classList.remove("focus");
+  svg.querySelectorAll(".mv-relg.hot").forEach(g=>g.classList.remove("hot"));
+  const prev = document.querySelectorAll("#mvBoxes .mv-f.hl");
+  for(let i = 0; i < prev.length; i++) prev[i].classList.remove("hl");
+
+  const rels = mv.rels || [];
+  const ids = [], pairs = [];
+  const pushRel = r=>{
+    if(!r || ids.indexOf(r.id) >= 0) return;
+    ids.push(r.id);
+    pairs.push([r.source_table, r.source_col], [r.target_table, r.target_col]);
+  };
+  if(mv.hoverRel != null){
+    pushRel(rels.find(r=>r.id === mv.hoverRel));
+  }else if(mv.hoverField){
+    const ht = mv.hoverField.t, hc = mv.hoverField.c;
+    rels.forEach(r=>{
+      if((r.source_table===ht && r.source_col===hc) || (r.target_table===ht && r.target_col===hc)) pushRel(r);
+    });
+    pairs.push([ht, hc]);
+  }else if(mv.selRel != null){
+    pushRel(rels.find(r=>r.id === mv.selRel));
+  }
+  if(!ids.length) return;                       // 没有可聚焦的关系：全部保持原样
+
+  svg.classList.add("focus");
+  svg.querySelectorAll(".mv-relg").forEach(g=>{
+    if(ids.indexOf(+g.getAttribute("data-rel")) >= 0) g.classList.add("hot");
+  });
+  const fidx = mv.fidx || {};
+  pairs.forEach(p=>{ const el = fidx[p[0] + "\u0001" + p[1]]; if(el) el.classList.add("hl"); });
+  // 关键：高亮字段可能在字段列表可视区外 —— 自动滚入，避免「高亮了却看不到对应字段」
+  // - 不滚动「当前鼠标所在字段」所在的卡片：否则卡片会在指针下跳动、把正在悬停的字段推出可视区
+  // - 同一卡片内若有多个高亮字段，整列表只滚一次（滚到最靠上的那个），避免互相把对方推出
+  const skip = (mv.hoverField) ? fidx[mv.hoverField.t + "\u0001" + mv.hoverField.c] : null;
+  const skipList = skip ? skip.closest(".mv-fs") : null;
+  const byList = new Map();
+  pairs.forEach(p=>{
+    const el = fidx[p[0] + "\u0001" + p[1]];
+    if(!el || el === skip) return;                 // 正在悬停的字段：不滚
+    const lst = el.closest(".mv-fs");
+    if(!lst || lst === skipList) return;           // 悬停字段所在卡片：不滚
+    if(!byList.has(lst)) byList.set(lst, []);
+    byList.get(lst).push(el);
+  });
+  byList.forEach((els, lst)=>{
+    if(lst.scrollHeight <= lst.clientHeight + 1) return;
+    let minTop = Infinity;
+    els.forEach(el=>{ const tp = el.offsetTop - lst.offsetTop; if(tp < minTop) minTop = tp; });
+    if(minTop < lst.scrollTop + 1 || minTop + 21 > lst.scrollTop + lst.clientHeight)
+      lst.scrollTop = Math.max(0, minTop - 21);
+  });
+}
+
+function mvClearFocus(){
+  const mv = window._mv;
+  mv.hoverRel = null; mv.hoverField = null; mv.hoverFieldKey = null;
+  mvApplyFocus();
+}
+
+function mvEventPoint(ev, root){
+  const r = root.getBoundingClientRect();
+  const z = window._mv.scale || 1;
+  return {x: (ev.clientX - r.left)/z, y: (ev.clientY - r.top)/z};
+}
+
+function mvBindStage(){
+  const stage = document.getElementById("mvStage");
+  const scroll = document.getElementById("mvScroll");
+  if(!stage || !scroll || stage._mvBound) return;
+  stage._mvBound = true;
+  stage.addEventListener("pointerdown", e=>{
+    const box = e.target.closest(".mv-box");
+    if(!box) return;
+    if(e.target.closest(".port")){ mvStartConnect(e.target.closest(".port"), e); return; }
+    if(e.target.closest(".mv-resize")){ mvStartResize(box, e); return; }   // 拖底边拉高
+    if(e.target.closest(".mv-toggle")) return;                 // 折叠按钮：不触发拖拽
+    if(e.target.closest(".mv-box-h")){ mvStartDrag(box, e); return; }
+  });
+  stage.addEventListener("click", e=>{
+    const box = e.target.closest(".mv-box");
+    if(!box) return;
+    if(e.target.closest(".mv-resize")) return;                // 拖把手：不触发选中
+    if(e.target.closest(".mv-toggle")){ mvToggleCollapse(box); return; }   // 折叠 / 展开
+    if(!e.target.closest(".port")) mvSelectTable(box.getAttribute("data-tbl"));
+  });
+  // 悬浮字段行：高亮它参与的连线 + 对端字段
+  stage.addEventListener("mouseover", e=>{
+    const mv = window._mv;
+    const f = e.target.closest ? e.target.closest(".mv-f") : null;
+    if(!f){ if(mv.hoverField){ mv.hoverField = null; mv.hoverFieldKey = null; mvApplyFocus(); } return; }
+    const key = f.getAttribute("data-tbl") + "\u0001" + f.getAttribute("data-col");
+    if(mv.hoverFieldKey === key) return;
+    mv.hoverFieldKey = key;
+    mv.hoverField = {t: f.getAttribute("data-tbl"), c: f.getAttribute("data-col")};
+    mvApplyFocus();
+  });
+  stage.addEventListener("mouseleave", ()=> mvClearFocus());
+  // 卡片内字段列表滚动后重画连线（scroll 事件不冒泡，用捕获阶段接住）
+  const boxes = document.getElementById("mvBoxes");
+  if(boxes){
+    let raf = 0;
+    boxes.addEventListener("scroll", ()=>{
+      if(raf) return;
+      raf = requestAnimationFrame(()=>{ raf = 0; mvDrawEdges(); });
+    }, true);
+  }
+  scroll.addEventListener("click", e=>{
+    if(e.target.closest && e.target.closest(".mv-box")) return;
+    mvSelectTable(null); mvSelectRel(null); mvCloseRelPop();
+  });
+  // 窗口尺寸变化后重绘连线；只绑一次，避免每次刷新页面重复叠加监听
+  if(!_mvResizeBound){
+    _mvResizeBound = true;
+    window.addEventListener("resize", ()=>{ if(state.view === "model") mvDrawEdges(); });
+  }
+}
+
+function mvStartDrag(box, e){
+  e.preventDefault();
+  const tbl = box.getAttribute("data-tbl");
+  const z = window._mv.scale || 1;
+  const sx = e.clientX, sy = e.clientY;
+  const ox = parseFloat(box.style.left) || 0, oy = parseFloat(box.style.top) || 0;
+  let nx = ox, ny = oy, moved = false;
+  box.classList.add("sel");
+  const move = ev=>{
+    nx = Math.max(4, ox + (ev.clientX - sx)/z);
+    ny = Math.max(4, oy + (ev.clientY - sy)/z);
+    if(Math.abs(nx-ox) > 1 || Math.abs(ny-oy) > 1) moved = true;
+    box.style.left = nx + "px"; box.style.top = ny + "px";
+    mvSizeStage(); mvDrawEdges();
+  };
+  const up = ()=>{
+    document.removeEventListener("pointermove", move);
+    document.removeEventListener("pointerup", up);
+    if(moved){
+      window._mv.pos[tbl] = {x: nx, y: ny};
+      mvPersist(true);                 // 位置写入 map_layout
+    }
+  };
+  document.addEventListener("pointermove", move);
+  document.addEventListener("pointerup", up);
+}
+
+function mvStartConnect(port, e){
+  e.preventDefault(); e.stopPropagation();
+  const row = port.closest(".mv-f");
+  const stage = document.getElementById("mvStage");
+  const svg = document.getElementById("mvSvg");
+  if(!row || !stage || !svg) return;
+  const srcTbl = row.getAttribute("data-tbl"), srcCol = row.getAttribute("data-col");
+  const rp = mvRectIn(port, stage);
+  const origin = {x: rp.x + rp.w/2, y: rp.y + rp.h/2};
+  const NS = "http://www.w3.org/2000/svg";
+  const line = document.createElementNS(NS, "line");
+  line.setAttribute("class", "mv-drag-line");
+  line.setAttribute("x1", origin.x); line.setAttribute("y1", origin.y);
+  line.setAttribute("x2", origin.x); line.setAttribute("y2", origin.y);
+  svg.appendChild(line);
+  const move = ev=>{
+    const p = mvEventPoint(ev, stage);
+    line.setAttribute("x2", p.x); line.setAttribute("y2", p.y);
+    document.querySelectorAll(".mv-f.hover-t").forEach(x=>x.classList.remove("hover-t"));
+    const el = document.elementFromPoint(ev.clientX, ev.clientY);
+    const t = el && el.closest ? el.closest(".mv-f") : null;
+    if(t && t !== row) t.classList.add("hover-t");
+  };
+  const up = ev=>{
+    document.removeEventListener("pointermove", move);
+    document.removeEventListener("pointerup", up);
+    document.querySelectorAll(".mv-f.hover-t").forEach(x=>x.classList.remove("hover-t"));
+    if(line.parentNode) svg.removeChild(line);
+    const el = document.elementFromPoint(ev.clientX, ev.clientY);
+    const tgt = el && el.closest ? el.closest(".mv-f") : null;
+    if(!tgt) return;
+    const tTbl = tgt.getAttribute("data-tbl"), tCol = tgt.getAttribute("data-col");
+    if(tTbl === srcTbl && tCol === srcCol) return;
+    const dup = (window._mv.rels||[]).find(r=>r.source_table===srcTbl && r.source_col===srcCol
+                                            && r.target_table===tTbl && r.target_col===tCol);
+    if(dup && !confirm("该关系已存在（#" + dup.id + "）：\n" + tlabel(srcTbl) + "." + srcCol
+                     + " → " + tlabel(tTbl) + "." + tCol + "\n仍要再建一条吗？")) return;
+    openMappingEditor(null, {source_table:srcTbl, source_col:srcCol,
+                            target_table:tTbl, target_col:tCol});
+  };
+  document.addEventListener("pointermove", move);
+  document.addEventListener("pointerup", up);
+}
+
+// 把卡片高度设为 h（px）：锁定总高，字段列表填充剩余空间并内部滚动
+function mvApplyHeight(box, h){
+  h = Math.round(h);
+  if(!h || h < 40) return;
+  const head = box.querySelector(".mv-box-h");
+  const fs   = box.querySelector(".mv-fs");
+  if(!head || !fs) return;
+  const headH = head.offsetHeight || MV_HEAD_H;
+  box.style.height = h + "px";
+  fs.style.maxHeight = "none";
+  fs.style.height = Math.max(20, h - headH) + "px";
+  box.classList.add("resized");
+}
+// 折叠/展开某张表的字段列表（点击表头右侧 ▾）；折叠后字段不可见，需重绘连线回退到表头锚点
+function mvToggleCollapse(box){
+  box.classList.toggle("collapsed");
+  if(box.classList.contains("collapsed")){
+    // 折叠时高度交回自动（仅留表头），避免变成空长卡片
+    box.style.height = "";
+    const fs = box.querySelector(".mv-fs");
+    if(fs){ fs.style.height = ""; fs.style.maxHeight = ""; }
+  } else {
+    const tbl = box.getAttribute("data-tbl");
+    const h = (window._mv.heights||{})[tbl];
+    if(h) mvApplyHeight(box, h);          // 还原到上次拖好的高度
+  }
+  mvSizeStage();
+  mvDrawEdges();
+}
+// 拖卡片底边把手调整高度（与折叠按钮并存：折叠=收起整张表，拖底边=手动调高度）
+function mvStartResize(box, e){
+  e.preventDefault();
+  const z = window._mv.scale || 1;
+  const head = box.querySelector(".mv-box-h");
+  const fs   = box.querySelector(".mv-fs");
+  const headH = head ? (head.offsetHeight || MV_HEAD_H) : MV_HEAD_H;
+  const startH = box.offsetHeight;
+  const startY = e.clientY;
+  box.style.height = startH + "px";        // 锁定当前总高
+  if(fs) fs.style.maxHeight = "none";
+  let newH = startH, moved = false;
+  box.classList.add("sel");
+  const MIN = headH + 26, MAX = 760;
+  const move = ev=>{
+    const dy = (ev.clientY - startY)/z;
+    newH = Math.max(MIN, Math.min(MAX, startH + dy));
+    if(Math.abs(newH - startH) > 1) moved = true;
+    box.style.height = newH + "px";
+    if(fs) fs.style.height = Math.max(20, newH - headH) + "px";
+    mvSizeStage(); mvDrawEdges();
+  };
+  const up = ()=>{
+    document.removeEventListener("pointermove", move);
+    document.removeEventListener("pointerup", up);
+    if(moved){
+      const tbl = box.getAttribute("data-tbl");
+      window._mv.heights = window._mv.heights || {};
+      window._mv.heights[tbl] = Math.round(newH);
+      box.classList.add("resized");
+      mvPersist(true);                      // 高度写入 map_layout.height
+    }
+  };
+  document.addEventListener("pointermove", move);
+  document.addEventListener("pointerup", up);
+}
+// 点击表：只给它加选中光环，不虚化其它表（按需求）
+function mvSelectTable(tbl){
+  const mv = window._mv;
+  mv.selTable = tbl;
+  document.querySelectorAll("#mvBoxes .mv-box").forEach(b=>{
+    b.classList.toggle("sel", !!tbl && b.getAttribute("data-tbl") === tbl);
+  });
+}
+function mvSelectRel(id){ window._mv.selRel = id; mvDrawEdges(); mvApplyFocus(); }
+
+function mvOpenRelPop(id, ev){
+  mvCloseRelPop(true);          // 只关旧弹卡，保留当前选中连线的高亮
+  const r = (window._mv.rels||[]).find(x=>x.id===id);
+  if(!r) return;
+  window._mv.popXY = {x: ev.clientX, y: ev.clientY};
+  const stTxt = {ok:"完整", warn:"轻微缺失", bad:"严重缺失", err:"错误"}[r.status] || r.status;
+  const stCol = {ok:"#1a7f3c", warn:"#a9701a", bad:"#c0392b", err:"#8a9099"}[r.status] || "#8a9099";
+  const pop = document.createElement("div");
+  pop.className = "mv-pop"; pop.id = "mvPop";
+  pop.innerHTML =
+    `<h4>关系 #${r.id}<span class="x" onclick="mvCloseRelPop()">×</span></h4>`
+    + `<div class="pv"><b>${esc(tlabel(r.source_table))}</b>.<code>${esc(r.source_col)}</code>`
+    +   ` <b>${esc(relCard(r))}</b> <b>${esc(tlabel(r.target_table))}</b>.<code>${esc(r.target_col)}</code><br>`
+    +   `状态：<span style="color:${stCol}">${stTxt}</span>　有值 ${(r.total||0).toLocaleString()}`
+    +   ` ｜ 孤儿 ${(r.orphan||0).toLocaleString()} ｜ 孤儿率 ${r.rate}%`
+    +   (r.note ? `<br>备注：${esc(r.note)}` : "")
+    + `</div>`
+    + `<div class="row"><label>基数</label><select onchange="mvPutRel(${id},{cardinality:this.value})">`
+    +   ["*:1","1:*","1:1"].map(c=>`<option value="${c}"${relCard(r)===c?" selected":""}>${c}（${cardTxt(c)}）</option>`).join("")
+    + `</select></div>`
+    + `<div class="row"><label>启用</label><input type="checkbox" ${r.enabled?"checked":""}`
+    +   ` onchange="mvPutRel(${id},{enabled:this.checked?1:0})">`
+    +   `<label style="width:auto;margin-left:14px;">忽略</label><input type="checkbox" ${r.ignored?"checked":""}`
+    +   ` onchange="mvPutRel(${id},{ignored:this.checked?1:0})"></div>`
+    + `<div class="acts">`
+    +   ((r.orphan>0) ? `<button class="btn ghost sm" onclick="mvCloseRelPop();openMissingFromList(${id})">`
+                      + `${r.target_is_dim?"补录缺失值":"查看缺失值"}(${r.orphan})</button>` : "")
+    +   `<button class="btn ghost sm" onclick="mvCloseRelPop();openMappingEditor(${id})">编辑…</button>`
+    +   `<button class="btn danger sm" onclick="mvCloseRelPop();deleteMapping(${id})">删除</button>`
+    + `</div>`;
+  document.body.appendChild(pop);
+  const w = pop.offsetWidth, h = pop.offsetHeight;
+  let x = ev.clientX + 12, y = ev.clientY + 8;
+  if(x + w > window.innerWidth - 10) x = Math.max(10, window.innerWidth - w - 10);
+  if(y + h > window.innerHeight - 10) y = Math.max(10, window.innerHeight - h - 10);
+  pop.style.left = x + "px"; pop.style.top = y + "px";
+  window._mv.popAway = e2=>{
+    if(e2.target.closest && (e2.target.closest("#mvPop") || e2.target.closest(".mv-edge") || e2.target.closest(".mv-hit"))) return;
+    mvCloseRelPop();
+  };
+  setTimeout(()=>{ document.addEventListener("pointerdown", window._mv.popAway); }, 0);
+}
+
+function mvCloseRelPop(keepSel){
+  const el = document.getElementById("mvPop");
+  if(el) el.remove();
+  if(window._mv.popAway){ document.removeEventListener("pointerdown", window._mv.popAway); window._mv.popAway = null; }
+  if(!keepSel && window._mv.selRel != null){ window._mv.selRel = null; mvDrawEdges(); mvApplyFocus(); }
+}
+
+async function mvPutRel(id, patch){
+  try{
+    await api(`/api/mappings/${id}`, {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(patch)});
+    const d = await api("/api/model-view");
+    window._mv.rels = d.relationships || [];
+    mvDrawEdges();
+    mvApplyFocus();
+    const xy = window._mv.popXY;
+    if(document.getElementById("mvPop") && xy) mvOpenRelPop(id, {clientX: xy.x, clientY: xy.y});
+    toast("已更新关系");
+  }catch(e){ toast("更新失败："+e.message); }
+}
+
+function mvSearch(q){
+  const kw = (q || "").trim().toLowerCase();
+  window._mv.q = kw;
+  document.querySelectorAll("#mvBoxes .mv-box").forEach(box=>{
+    const tbl = box.getAttribute("data-tbl");
+    const t = (window._mv.tables||[]).find(x=>x.table===tbl) || {};
+    const tblHit = !!kw && ((t.label||"").toLowerCase().includes(kw) || tbl.toLowerCase().includes(kw));
+    let colHit = false;
+    box.querySelectorAll(".mv-f").forEach(f=>{
+      const hit = !!kw && (tblHit || String(f.getAttribute("data-col")||"").toLowerCase().includes(kw));
+      f.classList.toggle("hit", hit);
+      if(hit) colHit = true;
+    });
+    box.classList.toggle("faded", !!kw && !tblHit && !colHit);
+    // 命中的字段若在卡片滚动区之外，自动滚到可见位置
+    const hits = box.querySelectorAll(".mv-f.hit");
+    if(hits.length){
+      const list = hits[0].parentElement;
+      if(list && list.scrollHeight > list.clientHeight + 1){
+        const top = hits[0].offsetTop - list.offsetTop;
+        if(top < list.scrollTop + 1 || top + 21 > list.scrollTop + list.clientHeight)
+          list.scrollTop = Math.max(0, top - 21);
+      }
+    }
+  });
+}
+
+function applyMvScale(){
+  const stage = document.getElementById("mvStage");
+  if(stage) stage.style.transform = `scale(${window._mv.scale})`;
+  mvSyncHolder();
+  const v = document.getElementById("mvZoomVal");
+  if(v) v.textContent = Math.round(window._mv.scale * 100) + "%";
+}
+function mvZoom(d){
+  const mv = window._mv;
+  mv.scale = Math.max(0.35, Math.min(1.6, Math.round((mv.scale + d) * 100) / 100));
+  applyMvScale();
+}
+function mvFit(){
+  const mv = window._mv;
+  const sc = document.getElementById("mvScroll"), st = document.getElementById("mvStage");
+  if(!sc || !st || !st.offsetWidth) return;
+  mv.scale = Math.max(0.35, Math.min(1, Math.min((sc.clientWidth - 24) / st.offsetWidth,
+                                                 (sc.clientHeight - 24) / st.offsetHeight)));
+  applyMvScale();
+}
+function mvPersist(notify){
+  clearTimeout(_mvSaveTimer);
+  _mvSaveTimer = setTimeout(async ()=>{
+    try{
+      await api("/api/model-layout", {method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({positions: window._mv.pos, heights: window._mv.heights || {}})});
+      if(notify) toast("布局已保存");
+    }catch(e){ if(notify) toast("布局保存失败："+e.message); }
+  }, 300);
+}
+// 关系定义变更后，刷新当前所在视图（模型视图 / 数据质量页）
+function refreshMapViews(){
+  if(state.view === "model") renderModelPage();
+  else if(state.view === "quality") renderQualityPage();
+}
+
+/* ============ 数据质量页（关系覆盖 + 自定义规则） ============ */
+window._qRels = [];
+
+async function renderQualityPage(){
+  const grid = document.getElementById("grid");
+  grid.innerHTML =
+    `<div class="q-page">
+       <div class="toolbar">
+         <span class="cur">数据质量 · 健康度与规则</span>
+         <span class="spacer"></span>
+         <button class="btn ghost sm" onclick="renderQualityPage()">刷新</button>
+       </div>
+       <div id="qSummary" class="hint"></div>
+       <h3 class="q-sec">一、关系健康度（映射完整性）</h3>
+       <div id="qRelList"></div>
+       <h3 class="q-sec">二、自定义质量规则
+         <button class="btn sm" style="margin-left:10px;" onclick="openRuleEditor(null)">＋ 新增规则</button>
+         <button class="btn ghost sm" onclick="runRuleEval()">运行检查</button>
+       </h3>
+       <div id="qRuleList"></div>
+     </div>`;
+  try{
+    const dq = await api("/api/data-quality");
+    const rels = dq.relationships || [];
+    window._qRels = rels;
+    const bad = rels.filter(r=>r.status==="bad").length;
+    const warn = rels.filter(r=>r.status==="warn").length;
+    const rec = rels.filter(r=>r.advice==="recommend" && r.orphan>0).length;
+    const ig = rels.filter(r=>r.ignored).length;
+    document.getElementById("qSummary").innerHTML =
+      `共 ${dq.table_count} 张表 / ${dq.total_rows.toLocaleString()} 行；关系 ${rels.length} 条`
+      + `（<b style="color:var(--danger)">${bad}</b> 条严重缺失，<b style="color:var(--warn)">${warn}</b> 条轻微缺失，`
+      + `<b style="color:#1a7f3c">${rec}</b> 条建议补录，<b>${ig}</b> 条已忽略）。`;
+    const box = document.getElementById("qRelList");
+    box.innerHTML = rels.map((r,i)=>{
+      const pct = Math.min(100, r.rate||0);
+      const tagTxt = r.status==="ok"?"完整":(r.status==="warn"?"轻微缺失":(r.status==="err"?"错误":"缺失 "+r.orphan));
+      const adv = r.advice||"not_needed";
+      const act = (r.orphan>0)
+        ? `<button class="btn ghost sm" onclick="openMissingFromQ(${i})">${r.target_is_dim?"补录缺失值":"查看缺失值"}(${r.orphan})</button>`
+        : `<span class="hint" style="margin:0;">无缺失</span>`;
+      const ov = r.ignored ? ' <span class="adv not_needed">已忽略</span>'
+        : (r.advice_override?` <span class="adv optional">覆盖:${ADV_TXT[r.advice_override]||r.advice_override}</span>`:'');
+      return `<div class="rel-row">
+        <div class="path" title="${esc(r.fact)}.${esc(r.fact_col)} → ${esc(r.dim)}.${esc(r.dim_col)}">`
+        + `${esc(tlabel(r.fact))}<span class="dot">${esc(r.fact_col)}</span>→<span class="dot">${esc(r.dim_col)}</span>${esc(tlabel(r.dim))}${ov}</div>`
+        + `<div class="meta">有值 ${r.total.toLocaleString()} 行 ｜ 孤儿 ${r.orphan.toLocaleString()} 行 ｜ 孤儿率 ${r.rate}%</div>`
+        + `<div class="bar"><i class="${r.status}" style="width:${pct}%"></i></div>`
+        + `<div class="adv-line"><span class="adv ${adv}">${ADV_TXT[adv]||adv}</span><span class="adv-why">${esc(r.advice_reason||"")}</span></div>`
+        + (r.note?`<div class="adv-why">备注：${esc(r.note)}</div>`:``)
+        + `<div class="rel-actions"><span class="tag ${r.status}">${tagTxt}</span>${act}`
+        + `<button class="btn ghost sm" onclick="openOverrideEditor(${r.mid})">质量覆盖</button></div>
+      </div>`;
+    }).join("");
+    await renderRuleList();
+  }catch(e){ grid.innerHTML = '<div class="empty">加载数据质量失败：'+esc(e.message)+'</div>'; }
+}
+function openMissingFromQ(i){
+  _relSorted = [ window._qRels[i] ];
+  openMissing(0);
+}
+async function openOverrideEditor(mid){
+  const r = (window._qRels||[]).find(x=>x.mid===mid);
+  if(!r) return;
+  window._ovMid = mid;
+  document.getElementById("ovMeta").textContent =
+    `为关系「${tlabel(r.fact)}.${r.fact_col} → ${tlabel(r.dim)}.${r.dim_col}」设置质量覆盖。`;
+  document.getElementById("ovAdvice").value = r.advice_override || "";
+  document.getElementById("ovIgnored").checked = !!r.ignored;
+  document.getElementById("ovNote").value = r.note || "";
+  document.getElementById("overrideResult").style.display="none";
+  openMask("overrideEditorMask");
+}
+async function saveOverride(){
+  const payload = {
+    advice_override: document.getElementById("ovAdvice").value || null,
+    ignored: document.getElementById("ovIgnored").checked ? 1 : 0,
+    note: document.getElementById("ovNote").value.trim(),
+  };
+  try{
+    await api(`/api/mappings/${window._ovMid}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    toast("已保存质量覆盖");
+    closeMask("overrideEditorMask");
+    renderQualityPage();
+  }catch(e){ showResult("overrideResult",false,"保存失败："+e.message); }
+}
+
+/* ============ 自定义质量规则 CRUD ============ */
+let RULE_TABLES = [];
+async function renderRuleList(){
+  const box = document.getElementById("qRuleList");
+  if(!box) return;
+  try{
+    const [rl, ev] = await Promise.all([api("/api/quality-rules"), api("/api/quality-rules/evaluate")]);
+    const evMap = {}; (ev.results||[]).forEach(r=>evMap[r.id]=r);
+    if(!RULE_TABLES.length){ try{ RULE_TABLES = (await api("/api/mapping-tables")).tables||[]; }catch(e){} }
+    if(!rl.rules.length){
+      box.innerHTML = '<div class="empty">还没有自定义质量规则。点击「＋ 新增规则」添加（如某列不可为空 / 不可重复）。</div>';
+      return;
+    }
+    box.innerHTML = rl.rules.map(r=>{
+      const e = evMap[r.id] || {};
+      const pass = e.passed;
+      const stateTxt = pass===true ? '<span class="tag ok">通过</span>'
+        : pass===false ? `<span class="tag bad">未通过</span>`
+        : '<span class="tag err">未运行</span>';
+      const sev = r.severity==="bad"?'<span class="tag bad">严重</span>':'<span class="tag warn">警告</span>';
+      const ctTxt = r.check_type==="not_null"?"非空检查":(r.check_type==="unique"?"唯一性检查":"");
+      return `<div class="rel-row">
+        <div class="path">${esc(tlabel(r.target_table))}<span class="dot">${esc(r.check_col||"")}</span> · ${ctTxt} ${sev} ${r.enabled?"":'<span class="adv not_needed">已禁用</span>'}</div>
+        <div class="meta">${esc(r.note||"")||"—"} ｜ ${stateTxt} ${e.detail?("｜ "+esc(e.detail)):""}</div>
+        <div class="rel-actions">
+          <button class="btn ghost sm" onclick="openRuleEditor(${r.id})">编辑</button>
+          <button class="btn danger sm" onclick="deleteRule(${r.id})">删除</button>
+        </div>
+      </div>`;
+    }).join("");
+  }catch(e){ box.innerHTML = '<div class="empty">加载规则失败：'+esc(e.message)+'</div>'; }
+}
+async function runRuleEval(){
+  try{ await api("/api/quality-rules/evaluate"); toast("已运行质量规则检查"); await renderRuleList(); }
+  catch(e){ toast("运行失败："+e.message); }
+}
+function reFillCols(){
+  const t = document.getElementById("reTable").value;
+  const cols = (RULE_TABLES.find(x=>x.table===t)||{}).columns||[];
+  document.getElementById("reCol").innerHTML = cols.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
+}
+async function openRuleEditor(rid){
+  if(!RULE_TABLES.length){ try{ RULE_TABLES=(await api("/api/mapping-tables")).tables||[]; }catch(e){} }
+  const sel = document.getElementById("reTable");
+  sel.innerHTML = RULE_TABLES.map(t=>`<option value="${esc(t.table)}">${esc(t.label||t.table)}（${esc(t.table)}）</option>`).join("");
+  document.getElementById("ruleEditorResult").style.display="none";
+  if(rid){
+    const rl = await api("/api/quality-rules");
+    const r = rl.rules.find(x=>x.id===rid);
+    if(!r){ toast("未找到该规则"); return; }
+    document.getElementById("ruleEditorTitle").textContent = "编辑质量规则 #"+rid;
+    sel.value = r.target_table; reFillCols(); document.getElementById("reCol").value = r.check_col;
+    document.getElementById("reType").value = r.check_type;
+    document.getElementById("reSeverity").value = r.severity;
+    document.getElementById("reNote").value = r.note||"";
+    document.getElementById("reEnabled").checked = !!r.enabled;
+    window._editingRule = rid;
+  }else{
+    document.getElementById("ruleEditorTitle").textContent = "新增质量规则";
+    reFillCols();
+    document.getElementById("reType").value = "not_null";
+    document.getElementById("reSeverity").value = "warn";
+    document.getElementById("reNote").value = "";
+    document.getElementById("reEnabled").checked = true;
+    window._editingRule = null;
+  }
+  openMask("ruleEditorMask");
+}
+async function saveRule(){
+  const rid = window._editingRule;
+  const payload = {
+    target_table: document.getElementById("reTable").value,
+    check_type: document.getElementById("reType").value,
+    check_col: document.getElementById("reCol").value,
+    severity: document.getElementById("reSeverity").value,
+    note: document.getElementById("reNote").value.trim(),
+    enabled: document.getElementById("reEnabled").checked?1:0,
+  };
+  try{
+    if(rid){ await api(`/api/quality-rules/${rid}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); toast("已保存规则修改"); }
+    else { const d=await api("/api/quality-rules",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); toast("已新增规则 #"+d.id); }
+    closeMask("ruleEditorMask");
+    await renderRuleList();
+  }catch(e){ showResult("ruleEditorResult",false,"保存失败："+e.message); }
+}
+async function deleteRule(rid){
+  if(!confirm("确定删除该质量规则吗？")) return;
+  try{ await api(`/api/quality-rules/${rid}`,{method:"DELETE"}); toast("已删除规则"); await renderRuleList(); }
+  catch(e){ toast("删除失败："+e.message); }
+}
+
+/* ============ 初始化 ============ */
+document.getElementById("dbPath").textContent = "SQLite · procurement.db";
+(async () => {
+  try{ await loadTables(); }catch(e){}
+  const h = (location.hash || "").replace("#", "");
+  if(h === "model" || h === "mappings" || h === "quality"){ showView(h); }
+})();
+</script>
+</body>
+</html>
