@@ -1,7 +1,8 @@
-# ===== 数据库与大文件（113MB+，超过 GitHub 100MB 限制，不入库）=====
+# ===== 数据库与大文件（超过 GitHub 100MB 限制，不入库）=====
 procurement.db
 backups/
 *.db
+*.xlsx
 
 # ===== Python =====
 __pycache__/

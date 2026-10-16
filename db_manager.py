@@ -3,9 +3,10 @@
 采购数据库管理脚本 (SQLite)
 =================================
 用途：
-  1) 把当前目录下 15 张 CSV 导入本地 SQLite 数据库 procurement.db
-  2) 每张 CSV 对应一张表，维度/主数据表与事实表之间通过业务键建立外键映射
-  3) 数据更新遵循「新数据追加、重复数据跳过」原则（基于主键 INSERT OR IGNORE）
+  1) 把数据导入本地 SQLite 数据库 procurement.db（15 张表）
+  2) 事实表（6 张）优先从 KUBE采购数据导出.xlsx 的工作表读取；维度表（9 张）读 CSV
+  3) 每张表对应一个数据源，维度/主数据表与事实表之间通过业务键建立外键映射
+  4) 数据更新遵循「新数据追加、重复数据跳过」原则（基于主键 INSERT OR IGNORE）
 
 用法：
   python db_manager.py build     # 首次建库并全量导入
@@ -14,6 +15,8 @@
   python db_manager.py tables    # 列出所有表与字段
 
 说明：
+  - 事实表数据源为 xlsx（KUBE采购数据导出.xlsx，需 pip install openpyxl）；
+    找不到 xlsx/工作表时自动回退到同名 CSV；维度表仍读 CSV
   - CSV 编码自动探测 (utf-8-sig / utf-8 / gbk / gb18030)
   - 表名使用中文原名（与源文件一致），便于 Power BI 直接识别
   - 金额类字段自动解析为 REAL（去除 ¥、逗号），便于分析
@@ -68,6 +71,37 @@ LOAD_ORDER = [
     "Purchase Requisition and Purchase Order (PRPO) Form-采购申请和采购订单（PRPO）表格_搜索提交_20260924144802.csv",
     "Purchase Order-采购订单（仅供查看与下载）_搜索提交_20260924150323.csv",
 ]
+
+# ---------------------------------------------------------------------------
+# Excel 源配置：KUBE采购数据导出.xlsx 一张工作簿容纳 6 张事实表
+#   维度表（9 张）不在导出范围内，仍读 CSV；事实表优先读 xlsx，找不到才回退 CSV
+#   XLSX_SHEET_OF_TABLE: 表名 -> xlsx 工作表名
+# ---------------------------------------------------------------------------
+XLSX_SHEET_OF_TABLE = {
+    "fct_supplier": "供应商列表",
+    "fct_preapproval": "集采项目前置审批",
+    "fct_framework_agreement": "框架协议",
+    "fct_bom": "物料清单",
+    "fct_po": "采购订单PO",
+    "fct_prpo": "采购申请和采购订单PRPO",
+}
+
+# 新导出把个别列名改了写法，映射回库中现有列名（否则插入时报"列不存在"）
+HEADER_ALIASES = {
+    "总采购订单总额（人民币）": "总采购订单总额（人民币)",
+    "这是一项与数字技术（DT）相关的采购吗？": "这是一项与数字技术（\"DT\"）相关的采购吗？",
+}
+
+# 新导出中与维度表值存在个别文字差异的已知变体 -> 维度表标准值
+#   结构: {表名: {列名: {变体: 标准值}}}；在导入时逐行归一化，避免产生孤儿
+VALUE_ALIASES = {
+    "fct_prpo": {
+        "支出类型": {
+            "Operational Expenditure-OPEX - 营运开支及授权申请":
+                "Operational Expenditure-OPEX - 营运开支及授权申请表",
+        },
+    },
+}
 
 # ---------------------------------------------------------------------------
 # 历史命名迁移：把旧表名升级到当前命名（幂等，仅供已有库升级用）
@@ -128,11 +162,35 @@ def extract_cn(s):
     return s
 
 
+# dim_procurement_method.ProcurementMethod 的英文方法代码（新 xlsx 导出直接使用）
+METHOD_EN = (
+    "Exempted from Single Source Justification",
+    "Micro Purchase",
+    "Quotation Purchase",
+    "Single Source Purchases",
+    "Tender Purchase",
+    "Variation Order",
+)
+
+
 def map_method(v):
-    """PRPO 中文采购方法描述 -> 维度表英文方法代码。"""
+    """PRPO 采购方法 -> 维度表英文方法代码。
+
+    兼容两种源格式：
+      - 新 xlsx 导出：直接给英文方法名（与维度表 ProcurementMethod 一致，原样通过）
+      - 旧 CSV 导出：中文描述，按关键字归类
+    """
     if not v:
         return None
-    v = str(v)
+    v = str(v).strip()
+    if not v:
+        return None
+    if v in METHOD_EN:
+        return v
+    low = v.lower()
+    for name in METHOD_EN:
+        if low.startswith(name.lower()):
+            return name
     if "小额采购" in v:
         return "Micro Purchase"
     if "报价采购" in v:
@@ -256,6 +314,124 @@ def dedupe_headers(raw_header):
     return colnames
 
 
+def apply_header_aliases(raw_header):
+    """把新导出中改了写法的列名映射回库中现有列名。"""
+    return [HEADER_ALIASES.get(h, h) for h in raw_header]
+
+
+# ---------------------------------------------------------------------------
+# 数据源抽象：xlsx 工作表（新导出，优先）/ CSV 文件（旧格式，回退）
+#   两者都提供 header() 与 rows() 两个接口，导入逻辑与格式解耦
+# ---------------------------------------------------------------------------
+class CsvSource:
+    """CSV 文件数据源（每表一个文件的历史格式）。"""
+
+    def __init__(self, path):
+        self.path = path
+        self.enc, self.delim = get_csv_meta(path)
+
+    def header(self):
+        with open(self.path, "r", encoding=self.enc, newline="", errors="replace") as fh:
+            return next(csv.reader(fh, delimiter=self.delim))
+
+    def rows(self):
+        with open(self.path, "r", encoding=self.enc, newline="", errors="replace") as fh:
+            reader = csv.reader(fh, delimiter=self.delim)
+            next(reader)  # 跳过表头
+            for r in reader:
+                yield r
+
+    def close(self):
+        pass
+
+
+class XlsxSource:
+    """Excel 工作簿数据源（KUBE采购数据导出.xlsx，一张工作表一张事实表）。
+
+    依赖 openpyxl（pip install openpyxl）；read_only 模式流式读取，内存友好。
+    单元格可能是 str/int/float/datetime/bool，由 load_table 统一归一化。
+    """
+
+    def __init__(self, path, sheet):
+        self.path = path
+        self.sheet = sheet
+        self.desc = ""
+        self._wb = None
+
+    def _open(self):
+        if self._wb is None:
+            try:
+                import openpyxl
+            except ImportError:
+                raise SystemExit("读取 xlsx 需要 openpyxl，请先执行: pip install openpyxl")
+            self._wb = openpyxl.load_workbook(self.path, read_only=True, data_only=True)
+        return self._wb
+
+    def header(self):
+        ws = self._open()[self.sheet]
+        for row in ws.iter_rows(values_only=True):
+            return ["" if h is None else str(h).strip() for h in row]
+        return []
+
+    def rows(self):
+        ws = self._open()[self.sheet]
+        it = ws.iter_rows(values_only=True)
+        next(it, None)  # 跳过表头
+        for row in it:
+            if row is None:
+                continue
+            if all(v is None or (isinstance(v, str) and not v.strip()) for v in row):
+                continue  # 跳过空行
+            yield ["" if v is None else v for v in row]
+
+    def close(self):
+        if self._wb is not None:
+            try:
+                self._wb.close()
+            finally:
+                self._wb = None
+
+
+def find_xlsx():
+    """在项目目录查找 xlsx 导出文件（排除 ~$ 临时文件）；多个时取最新修改的。"""
+    import glob
+    here = os.path.dirname(os.path.abspath(__file__))
+    cands = [p for p in glob.glob(os.path.join(here, "*.xlsx"))
+             if not os.path.basename(p).startswith("~$")]
+    if not cands:
+        return None
+    cands.sort(key=os.path.getmtime, reverse=True)
+    return cands[0]
+
+
+def open_source(filename):
+    """解析数据源：优先 xlsx 工作表，其次 CSV 文件。
+
+    返回 (source, desc)；两者都没有时返回 (None, None)。
+    """
+    table = FILE_MAP[filename][0]
+    sheet = XLSX_SHEET_OF_TABLE.get(table)
+    if sheet:
+        xlsx = find_xlsx()
+        if xlsx:
+            src = XlsxSource(xlsx, sheet)
+            try:
+                if src.header():
+                    src.desc = f"xlsx[{sheet}]"
+                    return src, src.desc
+            except KeyError:
+                print(f"  提示：{os.path.basename(xlsx)} 中无工作表[{sheet}]，回退 CSV")
+            except Exception as e:  # noqa: BLE001
+                print(f"  提示：读取 xlsx[{sheet}] 失败（{e}），回退 CSV")
+            src.close()
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+    if os.path.exists(path):
+        src = CsvSource(path)
+        src.desc = "csv"
+        return src, "csv"
+    return None, None
+
+
 # ---------------------------------------------------------------------------
 # 元数据表：映射配置 / 自定义质量规则（非 CSV 来源，供 Web 管理页 CRUD）
 # ---------------------------------------------------------------------------
@@ -373,15 +549,16 @@ def get_fks(con):
 # ---------------------------------------------------------------------------
 # 建表
 # ---------------------------------------------------------------------------
-def create_table(con, filename):
+def create_table(con, filename, source):
     table, pk_header, kind = FILE_MAP[filename]
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
-    enc, delim = get_csv_meta(path)
-    with open(path, "r", encoding=enc, newline="", errors="replace") as fh:
-        raw_header = next(csv.reader(fh, delimiter=delim))
+    raw_header = apply_header_aliases(source.header())
     csv_colnames = dedupe_headers(raw_header)
     amount_idx = {i for i, h in enumerate(raw_header) if is_amount_header(h)}
 
+    if pk_header not in raw_header:
+        raise SystemExit(
+            f"[{table}] 数据源表头中找不到主键列 {pk_header!r}"
+            f"（表头前几项: {raw_header[:8]}）")
     pk_idx = raw_header.index(pk_header)
     pk_col = csv_colnames[pk_idx]
 
@@ -421,50 +598,72 @@ def create_table(con, filename):
 # ---------------------------------------------------------------------------
 # 导入单表
 # ---------------------------------------------------------------------------
-def load_table(con, filename, meta, verbose=True):
+def load_table(con, filename, meta, source, verbose=True):
     table = meta["table"]
-    colnames = meta["colnames"]          # CSV 列 + 派生列
-    csv_colnames = meta["csv_colnames"]
+    colnames = meta["colnames"]          # 数据源列 + 派生列
     amount_idx = meta["amount_idx"]
     raw_header = meta["raw_header"]
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
-    enc, delim = get_csv_meta(path)
 
-    placeholders = ",".join("?" * len(colnames))
-    col_list = ",".join(qid(c) for c in colnames)
+    # 只插入目标表中真实存在的列：更新场景下表结构可能比数据源旧
+    # （缺列 -> 新行该列为 NULL；多列 -> 跳过并提示，由用户决定是否 ALTER TABLE）
+    table_cols = [r[1] for r in con.execute(f"PRAGMA table_info({qid(table)})").fetchall()]
+    keep = [i for i, c in enumerate(colnames) if c in table_cols]
+    dropped = [c for i, c in enumerate(colnames) if c not in table_cols]
+    if dropped and verbose:
+        print(f"  [{table}] 数据源中以下列在表里不存在，已跳过: {dropped}")
+    insert_cols = [colnames[i] for i in keep]
+    placeholders = ",".join("?" * len(insert_cols))
+    col_list = ",".join(qid(c) for c in insert_cols)
     insert_sql = f"INSERT OR IGNORE INTO {qid(table)} ({col_list}) VALUES ({placeholders})"
 
+    aliases = VALUE_ALIASES.get(table, {})
+    n_src = len(raw_header)
     rows = []
-    n_csv = len(csv_colnames)
-    with open(path, "r", encoding=enc, newline="", errors="replace") as fh:
-        reader = csv.reader(fh, delimiter=delim)
-        next(reader)  # skip header
-        for r in reader:
-            if len(r) < n_csv:
-                r = r + [None] * (n_csv - len(r))
-            elif len(r) > n_csv:
-                r = r[:n_csv]
-            values = []
-            for i, v in enumerate(r):
-                if v is None:
-                    values.append(None)
-                elif str(v).strip() == "":
+    for r in source.rows():
+        r = list(r)
+        if len(r) < n_src:
+            r = r + [None] * (n_src - len(r))
+        elif len(r) > n_src:
+            r = r[:n_src]
+        raw_dict = dict(zip(raw_header, r))
+        # 已知文本变体归一化到维度表标准值（如新导出少了"表"字的支出类型）
+        for col, amap in aliases.items():
+            if col in raw_dict:
+                v = raw_dict[col]
+                if v is not None and str(v).strip() in amap:
+                    r[raw_header.index(col)] = amap[str(v).strip()]
+        extras = compute_extras(table, raw_dict)
+        full = r + extras
+        values = []
+        for i in keep:
+            v = full[i]
+            if v is None:
+                values.append(None)
+            elif isinstance(v, str):
+                s = v.strip()
+                if s == "":
                     values.append(None)
                 elif i in amount_idx:
                     values.append(parse_amount(v))
                 else:
                     values.append(v)
-            raw_dict = dict(zip(raw_header, r))
-            extras = compute_extras(table, raw_dict)
-            rows.append(tuple(values + extras))
+            elif isinstance(v, bool):  # Excel 布尔单元格
+                values.append("TRUE" if v else "FALSE")
+            elif i in amount_idx:
+                values.append(parse_amount(v))
+            else:  # int/float/datetime 等统一转文本，与 CSV 导入行为一致
+                values.append(str(v))
+        rows.append(tuple(values))
 
     before = con.total_changes
-    con.executemany(insert_sql, rows)
+    if rows:
+        con.executemany(insert_sql, rows)
     after = con.total_changes
     inserted = after - before
     skipped = len(rows) - inserted
     if verbose:
-        print(f"  [{table}] 文件行数={len(rows):>7}  新增={inserted:>7}  跳过(重复)={skipped:>7}")
+        desc = getattr(source, "desc", "") or "csv"
+        print(f"  [{table}] <- {desc}  数据行数={len(rows):>7}  新增={inserted:>7}  跳过(重复)={skipped:>7}")
     return len(rows), inserted, skipped
 
 
@@ -478,24 +677,44 @@ def create_indexes(con):
 # ---------------------------------------------------------------------------
 # 命令
 # ---------------------------------------------------------------------------
+def run_import(con):
+    """按 LOAD_ORDER 导入所有有数据源的表（建表如需要 + 逐行插入）。
+
+    返回 (missing, stats)：
+      missing: 无数据源（CSV/xlsx 均未找到）的文件名列表
+      stats:  [(table, desc, rows, inserted, skipped), ...]
+    """
+    missing, stats = [], []
+    for fn in LOAD_ORDER:
+        table = FILE_MAP[fn][0]
+        source, desc = open_source(fn)
+        if source is None:
+            missing.append(fn)
+            continue
+        try:
+            meta = create_table(con, fn, source)
+            n, ins, skip = load_table(con, fn, meta, source)
+            stats.append((table, desc, n, ins, skip))
+        finally:
+            source.close()
+    return missing, stats
+
+
 def cmd_build():
     print(f"目标数据库: {DB_PATH}")
     con = sqlite3.connect(DB_PATH)
     con.execute("PRAGMA foreign_keys=OFF;")
     ensure_meta_tables(con)   # 先建元数据表并播种映射配置，供后续建表引用
-    # 先建全部表
-    metas = {}
-    for fn in LOAD_ORDER:
-        metas[fn] = create_table(con, fn)
+    missing, stats = run_import(con)
     con.commit()
-    print("建表完成，开始导入（维度表 -> 事实表）...")
-    total_new = 0
-    for fn in LOAD_ORDER:
-        _, ins, _ = load_table(con, fn, metas[fn])
-        total_new += ins
+    if missing:
+        print("警告：以下表没有数据源（CSV / xlsx 均未找到），未建表：")
+        for fn in missing:
+            print(f"  - {FILE_MAP[fn][0]}（期望 CSV: {fn}）")
     create_indexes(con)
     con.commit()
     con.close()
+    total_new = sum(s[3] for s in stats)
     print(f"完成。共新增 {total_new} 行。数据库文件: {DB_PATH}\n")
     cmd_verify()
 
@@ -508,24 +727,15 @@ def cmd_update():
     con = sqlite3.connect(DB_PATH)
     con.execute("PRAGMA foreign_keys=OFF;")
     ensure_meta_tables(con)   # 确保元数据表存在（不覆盖用户已编辑的映射）
-    # 确保表结构存在（如新增 CSV 后补表）
-    metas = {}
-    for fn in LOAD_ORDER:
-        if not os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), fn)):
-            continue
-        metas[fn] = create_table(con, fn)
-    con.commit()
-    total_new = 0
-    total_skip = 0
-    for fn in LOAD_ORDER:
-        if fn not in metas:
-            continue
-        _, ins, skip = load_table(con, fn, metas[fn])
-        total_new += ins
-        total_skip += skip
+    missing, stats = run_import(con)
     create_indexes(con)
     con.commit()
     con.close()
+    if missing:
+        names = "、".join(FILE_MAP[fn][0] for fn in missing)
+        print(f"提示：{len(missing)} 张表无数据源已跳过（{names}）")
+    total_new = sum(s[3] for s in stats)
+    total_skip = sum(s[4] for s in stats)
     print(f"完成。本次新增 {total_new} 行，跳过重复 {total_skip} 行。\n")
     cmd_verify()
 
