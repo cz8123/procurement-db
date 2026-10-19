@@ -398,7 +398,7 @@
 <!-- 导入 模态框（两步：校验 → 确认） -->
 <div class="mask" id="importMask">
   <div class="modal wide">
-    <h3>导入 CSV 数据
+    <h3>导入数据（CSV / Excel）
       <span class="x" onclick="closeMask('importMask')">×</span>
     </h3>
     <div class="body">
@@ -407,8 +407,9 @@
         <select id="importTable" style="width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;"></select>
       </div>
       <div class="field">
-        <label>选择 CSV 文件（首行须为表头）</label>
-        <input type="file" id="importFile" accept=".csv,.txt">
+        <label>选择 CSV 或 Excel 文件（首行须为表头）</label>
+        <input type="file" id="importFile" accept=".csv,.txt,.xlsx,.xlsm">
+        <div class="hint" style="margin-top:4px;">上传 Excel（.xlsx）时自动读取该表对应的工作表（如选「采购订单PO」→ 工作表「采购订单PO」）；Excel 仅含 6 张事实表，维度表请用 CSV。</div>
       </div>
       <div style="display:flex;gap:10px;">
         <button class="btn ghost" onclick="startPreview()">① 校验文件</button>
@@ -1115,7 +1116,7 @@ async function openImport(){
 async function startPreview(){
   const table = document.getElementById("importTable").value;
   const file = document.getElementById("importFile").files[0];
-  if(!file){ toast("请先选择 CSV 文件"); return; }
+  if(!file){ toast("请先选择文件"); return; }
   imp.table = table;
   const fd = new FormData(); fd.append("table", table); fd.append("file", file);
   document.getElementById("previewHint").textContent = "校验中…";
@@ -1131,8 +1132,10 @@ function renderPreview(rep){
   document.getElementById("previewBox").style.display = "block";
   document.getElementById("previewHint").textContent = "";
   document.getElementById("previewMeta").innerHTML =
-    `<span class="chip enc">编码 ${esc(rep.encoding||'?')}</span>`+
-    `<span class="chip">分隔符 ${esc(rep.delimiter||',')}</span>`+
+    (rep.source==="xlsx"
+      ? `<span class="chip enc">Excel 工作表「${esc(rep.sheet||'?')}」</span>`
+      : `<span class="chip enc">编码 ${esc(rep.encoding||'?')}</span>`)+
+    (rep.source==="xlsx" ? `` : `<span class="chip">分隔符 ${esc(rep.delimiter||',')}</span>`)+
     `<span class="chip">主键列 ${esc(rep.pk||'-')}</span>`+
     (rep.extra_cols&&rep.extra_cols.length?`<span class="chip">自动派生列 ${rep.extra_cols.length} 个</span>`:``);
   document.getElementById("previewMap").innerHTML = rep.header_mapping.map(m=>
@@ -1172,7 +1175,7 @@ function renderPreview(rep){
 async function confirmImport(){
   if(!imp.table) return;
   const file = document.getElementById("importFile").files[0];
-  if(!file){ toast("请先选择 CSV 文件"); return; }
+  if(!file){ toast("请先选择文件"); return; }
   const fd = new FormData(); fd.append("table", imp.table); fd.append("file", file);
   document.getElementById("confirmImportBtn").disabled = true;
   try{

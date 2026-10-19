@@ -571,8 +571,31 @@ def api_delete(table, pk):
 
 
 # ---------------------------------------------------------------------------
-# CSV 导入（追加新数据 / 跳过重复主键，复用 db_manager 逻辑）
+# CSV / Excel 导入（追加新数据 / 跳过重复主键，复用 db_manager 逻辑）
 # ---------------------------------------------------------------------------
+def _build_import_report(table, f):
+    """解析上传文件为校验报告：xlsx 落临时文件按工作表读，CSV 按编码探测读。"""
+    data = f.stream.read()
+    if (f.filename or "").lower().endswith((".xlsx", ".xlsm")):
+        import tempfile
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+                tmp.write(data)
+                tmp_path = tmp.name
+            return _analyze_import_xlsx(table, tmp_path)
+        finally:
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+    text, enc = _decode(data)
+    rep = _analyze_import(table, text)
+    rep["encoding"] = enc
+    return rep
+
+
 @app.route("/api/import", methods=["POST"])
 def api_import():
     table = request.form.get("table")
@@ -581,10 +604,8 @@ def api_import():
         return jsonify({"ok": False, "error": "未知目标表"}), 400
     if not f or not f.filename:
         return jsonify({"ok": False, "error": "未收到文件"}), 400
-    data = f.stream.read()
-    text, enc = _decode(data)
     try:
-        rep = _analyze_import(table, text)
+        rep = _build_import_report(table, f)
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     if rep["missing_pk_col"]:
@@ -611,7 +632,7 @@ def api_import():
     c = rep["counts"]
     skipped = c["valid"] - inserted
     return jsonify({
-        "ok": True, "encoding": enc, "total": c["total"], "valid": c["valid"],
+        "ok": True, "encoding": rep.get("encoding"), "total": c["total"], "valid": c["valid"],
         "inserted": inserted, "skipped": skipped,
         "skipped_blank_pk": c["blank_pk"], "error_rows": c["col_mismatch"],
         "amount_warn": c["amount_warn"], "dup_in_file": c["dup_in_file"],
@@ -626,14 +647,11 @@ def api_import_preview():
         return jsonify({"ok": False, "error": "未知目标表"}), 400
     if not f or not f.filename:
         return jsonify({"ok": False, "error": "未收到文件"}), 400
-    data = f.stream.read()
-    text, enc = _decode(data)
     try:
-        rep = _analyze_import(table, text)
+        rep = _build_import_report(table, f)
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     rep.pop("valid_rows", None)  # 预览不返回大数据
-    rep["encoding"] = enc
     return jsonify({"ok": True, **rep})
 
 
@@ -1464,23 +1482,59 @@ def _normalize_col(name):
 
 def _analyze_import(table, text):
     """解析 CSV 并返回校验报告（不写入数据库），供导入前预览与写入两步复用。"""
+    sample = text[:8192]
+    try:
+        delim = csv.Sniffer().sniff(sample, delimiters=[",", ";", "\t", "|"]).delimiter
+    except Exception:
+        delim = ","
+    reader = csv.reader(io.StringIO(text), delimiter=delim)
+    raw_header = next(reader)
+    return _analyze_rows(table, raw_header, reader, delim, kind="csv")
+
+
+def _analyze_import_xlsx(table, path):
+    """解析 Excel 工作表并返回校验报告（与 CSV 导入共用同一套校验/写入逻辑）。
+
+    读哪个工作表由 XLSX_SHEET_OF_TABLE 决定：上传时选哪个表，就取该表对应的工作表。
+    """
+    try:
+        import openpyxl  # noqa: F401
+    except ImportError:
+        raise ValueError("服务端缺少 openpyxl，无法读取 Excel（请在 venv 中 pip install openpyxl）")
+    sheet = db.XLSX_SHEET_OF_TABLE.get(table)
+    if not sheet:
+        raise ValueError(f"「{table}」不在 Excel 导出范围内（Excel 只含 6 张事实表；维度表请传 CSV）")
+    src = db.XlsxSource(path, sheet)
+    try:
+        raw_header = src.header()
+        if not raw_header:
+            raise ValueError(f"Excel 中找不到工作表「{sheet}」，请确认上传的是 KUBE 采购数据导出文件")
+        return _analyze_rows(table, raw_header, src.rows(), None, kind="xlsx", sheet=sheet)
+    except KeyError:
+        raise ValueError(f"Excel 中找不到工作表「{sheet}」，请确认上传的是 KUBE 采购数据导出文件")
+    finally:
+        src.close()
+
+
+def _analyze_rows(table, raw_header, rows, delim, kind="csv", sheet=None):
+    """CSV/xlsx 共用的导入校验：表头匹配、主键检查、金额解析、派生列、行归一化。
+
+    raw_header/rows 来自 csv.reader 或 db.XlsxSource；单元格可能是字符串（CSV）
+    或 str/int/float/datetime/bool（Excel），统一归一化后再校验。
+    """
     con = get_con()
     try:
-        sample = text[:8192]
-        try:
-            delim = csv.Sniffer().sniff(sample, delimiters=[",", ";", "\t", "|"]).delimiter
-        except Exception:
-            delim = ","
-        reader = csv.reader(io.StringIO(text), delimiter=delim)
-        raw_header = next(reader)
+        raw_header = db.apply_header_aliases([("" if h is None else str(h)).strip() for h in raw_header])
         csv_colnames = db.dedupe_headers(raw_header)
         amount_idx = {i for i, h in enumerate(raw_header) if db.is_amount_header(h)}
+        n_src = len(csv_colnames)
 
         db_cols = [r["name"] for r in con.execute(f"PRAGMA table_info({db.qid(table)})").fetchall()]
         extra_cols = [c for c, _ in db.EXTRA.get(table, [])]
         pk = get_pk(table, con)
+        aliases = db.VALUE_ALIASES.get(table, {})
 
-        # CSV 表头 ↔ 数据库列匹配
+        # 表头 ↔ 数据库列匹配
         norm_db = {_normalize_col(c): c for c in db_cols}
         header_mapping = []
         matched_db = set()
@@ -1506,25 +1560,57 @@ def _analyze_import(table, text):
                   "amount_warn": 0, "dup_in_file": 0}
         valid_rows = []
 
-        for ridx, r in enumerate(reader, start=2):  # 文件行号（表头=1）
-            if not any((cell or "").strip() for cell in r):
+        for ridx, r in enumerate(rows, start=2):  # 文件行号（表头=1）
+            if r is None:
                 continue
-            counts["total"] += 1
-            if len(r) != len(csv_colnames):
-                counts["col_mismatch"] += 1
-                if len(col_mismatch_samples) < 5:
-                    col_mismatch_samples.append({"line": ridx, "cols": len(r),
-                                                 "expected": len(csv_colnames)})
-                continue
+            r = list(r)
+            if kind == "csv":
+                if not any((cell or "").strip() for cell in r):
+                    continue
+                counts["total"] += 1
+                if len(r) != n_src:
+                    counts["col_mismatch"] += 1
+                    if len(col_mismatch_samples) < 5:
+                        col_mismatch_samples.append({"line": ridx, "cols": len(r),
+                                                     "expected": n_src})
+                    continue
+            else:  # Excel：行长度补齐/截断到表头列数
+                counts["total"] += 1
+                if len(r) < n_src:
+                    r = r + [None] * (n_src - len(r))
+                elif len(r) > n_src:
+                    r = r[:n_src]
             raw_dict = dict(zip(raw_header, r))
+            # 已知文本变体归一化到维度表标准值（如新导出少了"表"字的支出类型）
+            for col, amap in aliases.items():
+                if col in raw_dict:
+                    v = raw_dict[col]
+                    if v is not None and str(v).strip() in amap:
+                        r[raw_header.index(col)] = amap[str(v).strip()]
             extras = db.compute_extras(table, raw_dict) if table in db.EXTRA else []
             csv_vals = {}
             row_amount_warn = False
             for i, name in enumerate(csv_colnames):
                 v = r[i]
-                if v is None or str(v).strip() == "":
+                if v is None:
                     csv_vals[name] = None
-                elif i in amount_idx:
+                elif isinstance(v, str):
+                    s = v.strip()
+                    if s == "":
+                        csv_vals[name] = None
+                    elif i in amount_idx:
+                        parsed = db.parse_amount(v)
+                        if parsed is None:
+                            row_amount_warn = True
+                            if len(amount_fail) < 10:
+                                amount_fail.append({"line": ridx, "col": name,
+                                                    "value": str(v)[:30]})
+                        csv_vals[name] = parsed
+                    else:
+                        csv_vals[name] = v
+                elif isinstance(v, bool):  # Excel 布尔单元格
+                    csv_vals[name] = "TRUE" if v else "FALSE"
+                elif i in amount_idx:  # Excel 金额单元格（数字）
                     parsed = db.parse_amount(v)
                     if parsed is None:
                         row_amount_warn = True
@@ -1532,8 +1618,8 @@ def _analyze_import(table, text):
                             amount_fail.append({"line": ridx, "col": name,
                                                 "value": str(v)[:30]})
                     csv_vals[name] = parsed
-                else:
-                    csv_vals[name] = v
+                else:  # Excel 数字/日期单元格 -> 文本，与命令行导入行为一致
+                    csv_vals[name] = str(v)
             if row_amount_warn:
                 counts["amount_warn"] += 1
 
@@ -1579,6 +1665,9 @@ def _analyze_import(table, text):
             },
             "counts": counts,
             "valid_rows": valid_rows,
+            "source": kind,
+            "sheet": sheet,
+            "encoding": "xlsx" if kind == "xlsx" else None,
         }
     finally:
         con.close()
