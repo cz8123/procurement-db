@@ -4,7 +4,8 @@ setlocal
 REM ============================================================
 REM  Procurement DB Admin - launcher
 REM  Kill any old process on port 5000, then start Flask.
-REM  Open http://localhost:5000 in your browser.
+REM  Your browser opens http://localhost:5000 automatically
+REM  (set BROWSER=0 before launching to disable auto-open).
 REM  Close this window to stop the service.
 REM ============================================================
 

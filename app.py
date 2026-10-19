@@ -8,7 +8,7 @@
   3) 导入 CSV 到指定表（复用 db_manager 的「追加新数据、跳过重复」逻辑）
 
 依赖：Flask（隔离 venv 中）
-启动：start-dbadmin.bat 或 `python app.py`（默认绑定 0.0.0.0:5000，浏览器访问 http://localhost:5000）
+启动：start-dbadmin.bat 或 `python app.py`（默认绑定 0.0.0.0:5000，启动后自动打开浏览器访问 http://localhost:5000；设 BROWSER=0 关闭自动打开）
 """
 import os
 import re
@@ -17,11 +17,12 @@ import io
 import json
 import time
 import threading
+import webbrowser
 import sqlite3
 import urllib.parse
 from difflib import SequenceMatcher
 
-from flask import Flask, request, jsonify, render_template, Response
+from flask import Flask, request, jsonify, render_template, Response, send_file
 from werkzeug.serving import make_server
 
 import db_manager as db
@@ -299,6 +300,14 @@ def _table_meta():
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/favicon.ico")
+def favicon():
+    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "procurement.ico")
+    if os.path.exists(icon_path):
+        return send_file(icon_path, mimetype="image/x-icon")
+    return ("", 204)
 
 
 # ---------------------------------------------------------------------------
@@ -1590,8 +1599,12 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     host = os.environ.get("HOST", "0.0.0.0")
     browse_host = "localhost" if host in ("0.0.0.0", "::", "") else host
-    print(f"采购数据库管理页面已启动： http://{browse_host}:{port}")
+    url = f"http://{browse_host}:{port}"
+    print(f"采购数据库管理页面已启动： {url}")
     if host in ("0.0.0.0", "::"):
         print("（已绑定所有网卡，同一局域网可通过本机 IP 访问）")
+    # 服务就绪后自动打开浏览器（设 BROWSER=0 可关闭，适合无界面环境）
+    if os.environ.get("BROWSER", "1") != "0":
+        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     SERVER = make_server(host, port, app, threaded=True)
     SERVER.serve_forever()
