@@ -8,7 +8,7 @@
   3) 导入 CSV 到指定表（复用 db_manager 的「追加新数据、跳过重复」逻辑）
 
 依赖：Flask（隔离 venv 中）
-启动：start-dbadmin.bat 或 `python app.py`（默认 0.0.0.0:5000）
+启动：start-dbadmin.bat 或 `python app.py`（默认绑定 0.0.0.0:5000，浏览器访问 http://localhost:5000）
 """
 import os
 import re
@@ -1589,6 +1589,9 @@ def api_shutdown():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     host = os.environ.get("HOST", "0.0.0.0")
-    print(f"采购数据库管理页面已启动： http://{host}:{port}")
+    browse_host = "localhost" if host in ("0.0.0.0", "::", "") else host
+    print(f"采购数据库管理页面已启动： http://{browse_host}:{port}")
+    if host in ("0.0.0.0", "::"):
+        print("（已绑定所有网卡，同一局域网可通过本机 IP 访问）")
     SERVER = make_server(host, port, app, threaded=True)
     SERVER.serve_forever()
