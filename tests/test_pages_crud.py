@@ -66,7 +66,7 @@ check("映射项含统计字段", all("rate" in x and "status" in x for x in m["
 
 # 2) 表+列下拉接口
 mt = jget("/api/mapping-tables")
-check("mapping-tables 返回表列表", len(mt["tables"]) >= 15)
+check("mapping-tables 返回表列表", len(mt["tables"]) >= 16)
 check("mapping-tables 每项含 columns", all("columns" in t for t in mt["tables"]))
 
 # 3) 创建：非法列应 400
@@ -168,7 +168,7 @@ if dim_rel:
 
 print("== 模型视图（/api/model-view + /api/model-layout） ==")
 mv = jget("/api/model-view")
-check("model-view 返回 15 张表", len(mv["tables"]) == 15, f"实际 {len(mv['tables'])}")
+check("model-view 返回 16 张表", len(mv["tables"]) == 16, f"实际 {len(mv['tables'])}")
 check("每张表含 columns/col_count/pk/row_count",
       all(("columns" in t and "col_count" in t and "row_count" in t and "kind" in t)
           for t in mv["tables"]))

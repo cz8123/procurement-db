@@ -3,6 +3,8 @@ procurement.db
 backups/
 *.db
 *.xlsx
+# 例外：经纬度维度表来源文件较小（~15KB），作为 dim_company_location 的唯一来源入库
+!经纬度.xlsx
 
 # ===== Python =====
 __pycache__/

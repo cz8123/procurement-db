@@ -3,7 +3,7 @@
 采购数据库 Web 管理页面 (Flask + SQLite)
 =========================================
 功能：
-  1) 浏览 15 张表的数据（分页 / 搜索 / 排序）
+  1) 浏览 16 张表的数据（分页 / 搜索 / 排序）
   2) 对数据行进行 新增 / 编辑 / 删除
   3) 导入 CSV 到指定表（复用 db_manager 的「追加新数据、跳过重复」逻辑）
 
@@ -32,6 +32,8 @@ SERVER = None
 
 DB_PATH = db.DB_PATH
 KNOWN_TABLES = {t for t, _, _ in db.FILE_MAP.values()}
+# 单独导入维护的维度表（非 FILE_MAP 批量导入来源），需在此显式注册
+KNOWN_TABLES.add("dim_company_location")
 
 # 表名 -> (中文简称, 一句话说明)  —— 供前端展示与检索使用
 TABLE_LABELS = {
@@ -41,6 +43,7 @@ TABLE_LABELS = {
     "dim_category": ("采购类别", "一级采购类别"),
     "dim_subcategory": ("采购子类别", "二级采购子类别"),
     "dim_company": ("公司", "公司主体主数据"),
+    "dim_company_location": ("公司位置(经纬度)", "公司门店中文名 → 省/市/区经纬度（地理维度）"),
     "dim_supplier_attribute": ("供应商属性", "供应商分类（A 完全豁免 / B / C）"),
     "dim_supplier_attribute_detail": ("供应商属性明细", "供应商属性明细项"),
     "dim_exception_reason": ("豁免理由", "单一来源 / 豁免理由字典"),
@@ -288,9 +291,22 @@ def get_pk(table, con):
 
 def _table_meta():
     out = []
+    con = get_con()
+    seen = set()
+    # 先按 FILE_MAP 顺序输出 15 张核心表
     for fn in db.LOAD_ORDER:
         t, pk, kind = db.FILE_MAP[fn]
         out.append({"table": t, "source": fn, "kind": kind, "pk": pk})
+        seen.add(t)
+    # 补充 KNOWN_TABLES 中手动导入的额外维度表（如 dim_company_location）
+    for t in sorted(KNOWN_TABLES - seen):
+        pk = None
+        for r in con.execute(f"PRAGMA table_info({db.qid(t)})").fetchall():
+            if r["pk"]:
+                pk = r["name"]
+                break
+        out.append({"table": t, "source": "(手动导入维度表)", "kind": "dim", "pk": pk})
+    con.close()
     return out
 
 
