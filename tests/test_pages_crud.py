@@ -210,6 +210,12 @@ check("无任何关系引用 dim_supplier",
               for r in mv["relationships"]))
 check("fct_supplier 在 /api/tables 中且 kind=fact",
       any(t["table"] == "fct_supplier" and t["kind"] == "fact" for t in jget("/api/tables")))
+# 公司位置(经纬度)：维度表 -> 事实表 改名
+check("无任何关系引用 dim_company_location",
+      not any(r["source_table"] == "dim_company_location" or r["target_table"] == "dim_company_location"
+              for r in mv["relationships"]))
+check("fct_company_location 在 /api/tables 中且 kind=fact",
+      any(t["table"] == "fct_company_location" and t["kind"] == "fact" for t in jget("/api/tables")))
 
 # 位置保存与读取
 r = jpost("/api/model-layout", {"positions": {"dim_company": {"x": 123, "y": 45}}})
