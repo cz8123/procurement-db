@@ -22,7 +22,7 @@ import sqlite3
 import urllib.parse
 from difflib import SequenceMatcher
 
-from flask import Flask, request, jsonify, render_template, Response, send_file
+from flask import Flask, request, jsonify, render_template, Response, send_file, make_response
 from werkzeug.serving import make_server
 
 import db_manager as db
@@ -316,7 +316,12 @@ def _table_meta():
 # ---------------------------------------------------------------------------
 @app.route("/")
 def index():
-    return render_template("index.html")
+    # 禁用浏览器缓存首页 HTML：避免用户一直加载旧的 index.html（滚动修复等前端改动即时生效，无需手动清缓存）
+    resp = make_response(render_template("index.html"))
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 @app.route("/favicon.ico")

@@ -154,17 +154,28 @@ check("删除后规则为空", len(qr4["rules"]) == 0)
 
 print("== 补录链路（重构后回归） ==")
 # 13) 选一个孤儿>0 的维度关系，做 skip 默认的补录（不改数据，只验证接口仍可用）
+#    若维度已全部补齐（孤儿=0），则改为断言「所有维度关系均无孤儿」并仍验证补录接口可达。
 dq4 = jget("/api/data-quality")
-dim_rel = next((x for x in dq4["relationships"]
-               if x["target_is_dim"] and x["orphan"] > 0), None)
-check("存在可补录的维度关系", dim_rel is not None)
+dim_rels = [x for x in dq4["relationships"] if x["target_is_dim"]]
+dim_rel = next((x for x in dim_rels if x["orphan"] > 0), None)
 if dim_rel:
+    check("存在可补录的维度关系", True)
     r = jpost("/api/backfill-map", {
         "fact": dim_rel["fact"], "fact_col": dim_rel["fact_col"],
         "dim": dim_rel["dim"], "dim_col": dim_rel["dim_col"],
         "mappings": [], "default_action": "skip", "extra": {},
     })
     check("补录接口(skip)成功(200)", r.status_code == 200, f"-> {r.status_code}")
+else:
+    # 维度已补齐：验证所有维度关系孤儿均为 0，并仍能访问补录接口（skip 无操作应 200）
+    check("所有维度关系均无孤儿(已补齐)", all(x["orphan"] == 0 for x in dim_rels))
+    first = dim_rels[0]
+    r = jpost("/api/backfill-map", {
+        "fact": first["fact"], "fact_col": first["fact_col"],
+        "dim": first["dim"], "dim_col": first["dim_col"],
+        "mappings": [], "default_action": "skip", "extra": {},
+    })
+    check("补录接口(skip,无孤儿)成功(200)", r.status_code == 200, f"-> {r.status_code}")
 
 print("== 模型视图（/api/model-view + /api/model-layout） ==")
 mv = jget("/api/model-view")

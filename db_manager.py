@@ -136,113 +136,20 @@ FKS = [
     ("fct_bom", "合同编号CN", "fct_framework_agreement", "合同编号（中文）"),
     # 集采前置审批
     ("fct_preapproval", "采购类别", "dim_category", "Category"),
-    # 采购方法 / 供应商属性：事实表为中文描述，维度表为英文代码，经交叉映射后关联
-    ("fct_prpo", "procurement_method_key", "dim_procurement_method", "ProcurementMethod"),
-    ("fct_prpo", "supplier_attribute_key", "dim_supplier_attribute", "SupplierCate"),
 ]
 
 # ---------------------------------------------------------------------------
-# 规范化派生键：修复「事实表文本」与「维度表文本」格式不一致导致的关联失败
+# 派生列（规范化关联键 supplier_cn / procurement_method_key / supplier_attribute_key）
+# 已按业务决定不再导入生成，故此处不再产生派生键；保留空字典与函数签名以兼容既有引用。
+# 历史维度匹配如需关联，请基于原始列（供应商名称 / 选择采购方法 / 供应商属性）进行。
 # ---------------------------------------------------------------------------
 import re
 
-_CJK = re.compile(r"[\u4e00-\u9fff]")
-
-
-def extract_cn(s):
-    """从「中文-英文」组合名称中提取中文部分作为关联键；无连字符或纯英文则原样返回。"""
-    if not s:
-        return None
-    s = str(s).strip()
-    if not s:
-        return None
-    for i, ch in enumerate(s):
-        if ch == "-" and i > 0 and i + 1 < len(s):
-            left, right = s[:i], s[i + 1:]
-            if _CJK.search(left) and right[:1].isascii() and right[:1].isalpha():
-                return left.strip()
-    return s
-
-
-# dim_procurement_method.ProcurementMethod 的英文方法代码（新 xlsx 导出直接使用）
-METHOD_EN = (
-    "Exempted from Single Source Justification",
-    "Micro Purchase",
-    "Quotation Purchase",
-    "Single Source Purchases",
-    "Tender Purchase",
-    "Variation Order",
-)
-
-
-def map_method(v):
-    """PRPO 采购方法 -> 维度表英文方法代码。
-
-    兼容两种源格式：
-      - 新 xlsx 导出：直接给英文方法名（与维度表 ProcurementMethod 一致，原样通过）
-      - 旧 CSV 导出：中文描述，按关键字归类
-    """
-    if not v:
-        return None
-    v = str(v).strip()
-    if not v:
-        return None
-    if v in METHOD_EN:
-        return v
-    low = v.lower()
-    for name in METHOD_EN:
-        if low.startswith(name.lower()):
-            return name
-    if "小额采购" in v:
-        return "Micro Purchase"
-    if "报价采购" in v:
-        return "Quotation Purchase"
-    if "招标采购" in v:
-        return "Tender Purchase"
-    if "变更订单" in v:
-        return "Variation Order"
-    if "单一来源采购" in v:
-        return "Single Source Purchases" if "不可豁免" in v else "Exempted from Single Source Justification"
-    return None
-
-
-def map_attr(v):
-    """PRPO 供应商属性描述 -> 维度表 A/B/C 分类。"""
-    if not v:
-        return None
-    v = str(v).strip()
-    if v.startswith("A"):
-        return "A 完全豁免"
-    if v.startswith("B"):
-        return "B 部分豁免"
-    if v.startswith("C"):
-        return "C 不豁免"
-    return None
-
-
-# 每张表在原始 CSV 列之外额外增加的派生列（规范化关联键）
-EXTRA = {
-    "fct_supplier": [("supplier_cn", "TEXT")],
-    "fct_po": [("supplier_cn", "TEXT")],
-    "fct_prpo": [
-        ("supplier_cn", "TEXT"),
-        ("procurement_method_key", "TEXT"),
-        ("supplier_attribute_key", "TEXT"),
-    ],
-}
+EXTRA = {}
 
 
 def compute_extras(table, raw_dict):
-    if table == "fct_supplier":
-        return [extract_cn(raw_dict.get("Vendor Name"))]
-    if table == "fct_po":
-        return [extract_cn(raw_dict.get("供应商名称"))]
-    if table == "fct_prpo":
-        return [
-            extract_cn(raw_dict.get("供应商名称")),
-            map_method(raw_dict.get("选择采购方法")),
-            map_attr(raw_dict.get("供应商属性")),
-        ]
+    # 派生列已不再生成，恒返回空列表（保留签名以兼容 load_table）
     return []
 
 AMOUNT_KEYWORDS = ("金额", "总额", "总价", "AMOUNT", "Amount", "amount")

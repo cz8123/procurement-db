@@ -199,7 +199,7 @@
   .mv-zoombox button:hover{background:#eef3ff;}
   .mv-zoombox .zv{font-size:11.5px;color:var(--muted);min-width:42px;text-align:center;padding:5px 0;
     border-left:1px solid var(--border);border-right:1px solid var(--border);}
-  .mv-scroll{position:relative;flex:1;min-height:300px;overflow:auto;border:1px solid var(--border);border-radius:10px;
+  .mv-scroll{position:relative;flex:1;min-height:300px;overflow:auto;border:1px solid var(--border);border-radius:10px;cursor:grab;
     background:#f7f9fb;background-image:radial-gradient(#dde3ea 1px,transparent 1px);background-size:16px 16px;
     /* 强制常显、可明显拖动的滚动条：避免 Windows「自动隐藏滚动条」导致模型视图画布看起来像“横向拖动条没了” */
     scrollbar-color:#9aa4b2 #e8ebef;scrollbar-width:thin;}
@@ -796,6 +796,12 @@ function filterTables(){ renderTableList(); }
 
 async function selectTable(t){
   state.table = t; state.view = "table";
+  // 还原表格视图滚动容器样式：从模型视图切回时，gridWrap/grid 上残留的
+  // overflow:hidden / display:flex / height:100% 会让内容被裁、滚动条消失，必须复位
+  const _wrap = document.getElementById("gridWrap");
+  if(_wrap){ _wrap.style.overflow = "auto"; _wrap.style.display = ""; _wrap.style.flexDirection = ""; }
+  const _grid = document.getElementById("grid");
+  if(_grid){ _grid.style.height = ""; }
   document.getElementById("navQuality").classList.remove("active");
   document.getElementById("toolbar").style.display = "flex";
   document.getElementById("filterBar").style.display = "none";
@@ -1779,11 +1785,14 @@ window._mv = { tables:[], rels:[], pos:{}, scale:1, selTable:null, selRel:null, 
                hoverRel:null, hoverField:null, hoverFieldKey:null, fidx:{} };
 let _mvSaveTimer = null;
 let _mvResizeBound = false;
+let _mvBoxRO = null;   // 卡片尺寸观察者：任意卡片因字体/布局变化而变高时，自动重算画布并重绘连线
 
 function mvListH(t){ return Math.min((t.col_count||0) * MV_ROW_H, MV_LIST_MAX_H); }
 function mvBoxH(t){ return MV_HEAD_H + mvListH(t) + 2; }
 
+let _mvRenderToken = 0;
 async function renderModelPage(){
+  const token = ++_mvRenderToken;   // 渲染令牌：新一次渲染会让旧的异步回填失效，避免“空画布”
   const grid = document.getElementById("grid");
   grid.innerHTML = `
     <div class="mv-page">
@@ -1822,6 +1831,7 @@ async function renderModelPage(){
     </div>`;
   try{
     const d = await api("/api/model-view");
+    if(token !== _mvRenderToken) return;   // 已有更新的渲染发起，放弃本次（避免旧请求把画布填空）
     const mv = window._mv;
     mv.tables = d.tables || [];
     mv.rels = d.relationships || [];
@@ -1836,14 +1846,29 @@ async function renderModelPage(){
     mvAutoLayout(true);          // 只给「从未拖过」的表分配位置，保留已保存布局
     mvRenderAndDraw();
     mvBindStage();
+    // 多重复查画布尺寸，彻底消除“首屏/重渲染偶发 mvSizeStage 量到 0 → 画布塌陷、卡片被裁剪、无法滚动”的竞态：
+    // ① 字体 / 布局稳定后（document.fonts.ready）② 双 rAF（下一帧布局已稳）③ 多次 setTimeout 兜底（防极端慢布局）
+    const remeasure = ()=>{ if(state.view === "model" && token === _mvRenderToken){ mvSizeStage(); mvDrawEdges(); } };
+    if(document.fonts && document.fonts.ready) document.fonts.ready.then(remeasure);
+    window.addEventListener("load", remeasure, {once:true});
+    requestAnimationFrame(()=>requestAnimationFrame(remeasure));
+    setTimeout(remeasure, 120);
+    setTimeout(remeasure, 400);
+    setTimeout(remeasure, 900);
     const q = document.getElementById("mvSearch");
     if(q && mv.q){ q.value = mv.q; mvSearch(mv.q); }
   }catch(e){
+    if(token !== _mvRenderToken) return;
     grid.innerHTML = '<div class="empty">加载模型视图失败：'+esc(e.message)+'</div>';
   }
 }
 
-function mvRenderAndDraw(){ mvRenderBoxes(); mvSizeStage(); mvDrawEdges(); }
+function mvRenderAndDraw(){
+  mvRenderBoxes();
+  // 延迟到下一帧再量算画布尺寸并重绘连线：卡片刚插入时字体 / 布局可能未稳，立即 mvSizeStage
+  // 可能量到 0 高度 → 画布被压成最小尺寸、卡片被裁剪、画布“空了”且无法滚动。下一帧可保证已布局。
+  requestAnimationFrame(()=>{ mvSizeStage(); mvDrawEdges(); });
+}
 
 function mvAutoLayout(fillMissing){
   const mv = window._mv;
@@ -1918,6 +1943,20 @@ function mvRenderBoxes(){
     const t = b.getAttribute("data-tbl");
     if(window._mv.heights && window._mv.heights[t]) mvApplyHeight(b, window._mv.heights[t]);
   });
+  mvObserveBoxes();   // 卡片尺寸一变化（字体加载、折叠/展开、拖高、内容回流）即重算画布 → 永不塌陷
+}
+
+// 任意卡片尺寸变化 → 重算画布尺寸并重绘连线。覆盖「setTimeout 兜底窗口错过最终布局」的所有场景
+// （真实浏览器字体/排版时序与无头不同，常晚于固定延时落地），从根本上杜绝「画布塌陷→无法滚动」。
+function mvObserveBoxes(){
+  if(!_mvBoxRO){
+    _mvBoxRO = new ResizeObserver(()=>{
+      if(state.view === "model"){ mvSizeStage(); mvDrawEdges(); }
+    });
+  }
+  const host = document.getElementById("mvBoxes");
+  if(!host) return;
+  host.querySelectorAll(".mv-box").forEach(b=> _mvBoxRO.observe(b));
 }
 
 function mvSizeStage(){
@@ -2165,10 +2204,30 @@ function mvBindStage(){
     if(e.target.closest && e.target.closest(".mv-box")) return;
     mvSelectTable(null); mvSelectRel(null); mvCloseRelPop();
   });
-  // 窗口尺寸变化后重绘连线；只绑一次，避免每次刷新页面重复叠加监听
+  // 拖拽空白处平移画布（Power BI 式）：彻底解决“画布无法滚动 / 横向拖动条不明显”的痛点。
+  // 仅在空白处（非卡片）生效；卡片拖拽 / 连线 / 字段滚动不受影响。
+  scroll.addEventListener("pointerdown", e=>{
+    if(e.target.closest && e.target.closest(".mv-box")) return;   // 卡片上交给卡片拖拽逻辑
+    if(e.button !== 0) return;
+    e.preventDefault();
+    const sx = e.clientX, sy = e.clientY, sl = scroll.scrollLeft, st = scroll.scrollTop;
+    scroll.style.cursor = "grabbing";
+    const move = ev=>{
+      scroll.scrollLeft = sl - (ev.clientX - sx);
+      scroll.scrollTop  = st - (ev.clientY - sy);
+    };
+    const up = ()=>{
+      scroll.style.cursor = "";
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+  });
+  // 窗口尺寸变化后重算画布并重绘连线；只绑一次，避免每次刷新页面重复叠加监听
   if(!_mvResizeBound){
     _mvResizeBound = true;
-    window.addEventListener("resize", ()=>{ if(state.view === "model") mvDrawEdges(); });
+    window.addEventListener("resize", ()=>{ if(state.view === "model"){ mvSizeStage(); mvDrawEdges(); } });
   }
 }
 
