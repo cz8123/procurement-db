@@ -260,6 +260,11 @@ def relation_advice(fact, fact_col, dim):
     if dim.startswith("dim_"):
         return ("recommend",
                 "目标为维度表：缺失即维度主数据不全，补录后关系完整、分析不漏项。")
+    # 目标为事实表：区分「维度→参照型事实表」与「事实→事实」
+    if not fact.startswith("fct_"):
+        return ("not_needed",
+                "目标为参照型事实表（如公司位置）：系统默认不自动补齐，但可在数据质量页手动补录——"
+                "补的是参照主数据、非交易流水（需二次确认并先备份 procurement.db）。")
     return ("not_needed",
             "目标为事实表：事实表之间多为「业务上本就不引用」的正常缺口，不建议补录。")
 
@@ -731,7 +736,10 @@ def api_data_quality():
                     "advice": adv, "advice_reason": adv_reason,
                     "note": r["note"], "ignored": ignored, "advice_override": override,
                     "extra_cols": dim_extra_cols(con, rt, rc) if is_dim else [],
-                    "allowed_modes": (["placeholder", "manual", "merge"] if is_dim else []),
+                    # fact→fact 不开放补录（会插事务假行）；其余均开放
+                    "allowed_modes": ([] if (t.startswith("fct_") and not is_dim)
+                                      else ["placeholder", "manual", "merge"]),
+                    "needs_confirm": ((not is_dim) and not t.startswith("fct_")),   # 仅 dim→fact 需二次确认
                 })
             except sqlite3.Error as e:
                 rels.append({"mid": r["id"], "fact": t, "fact_col": col,
@@ -804,6 +812,7 @@ def api_model_view():
                 "advice_override": r["advice_override"],
                 "total": total, "orphan": orphan, "rate": round(rate, 2), "status": status,
                 "target_is_dim": rt.startswith("dim_"),
+                "needs_confirm": (not rt.startswith("dim_")) and not t.startswith("fct_"),
                 "advice": adv, "advice_reason": adv_reason,
             })
         # 2) 表 + 完整字段明细（名称 / 声明类型 / 是否主键 / 是否金额列）
@@ -1218,13 +1227,37 @@ def api_backfill():
         return jsonify({"ok": False, "error": "参数缺失或非法"}), 400
     if mode not in ("placeholder", "manual", "merge"):
         return jsonify({"ok": False, "error": f"不支持的补录方式：{mode}"}), 400
-    if not rt.startswith("dim_"):
+    # 事实表目标 / 源：系统默认不建议自动补齐。dim→fact（参照型事实表）允许手动补录（需二次确认 + 备份）；
+    # fact→fact 补录会向事务事实表插入占位假行，不开放。
+    target_is_fact = rt.startswith("fct_")
+    source_is_fact = t.startswith("fct_")
+    if source_is_fact and target_is_fact:
         adv, reason = relation_advice(t, col, rt)
         return jsonify({"ok": False, "advice": adv,
-                        "error": "该关系无需补录：" + reason}), 400
+                        "error": "该关系为事实表之间关联，补录会向事务事实表插入占位假行，不开放补录。" + reason}), 400
+    if mode in ("placeholder", "manual"):
+        fact_warn = target_is_fact          # dim→fact：向参照型事实表插入新行
+    elif mode == "merge":
+        fact_warn = source_is_fact          # 改写事实表列（fact→dim 的归并）
+    else:
+        fact_warn = False
 
     con = get_con()
     try:
+        # 事实表修改需二次确认：先返回预览，待前端带 confirm 重试才真正执行
+        if fact_warn and not body.get("confirm"):
+            keys = [r[0] for r in con.execute(
+                f"SELECT DISTINCT {db.qid(col)} FROM {db.qid(t)} "
+                f"WHERE {db.qid(col)} IS NOT NULL "
+                f"AND {db.qid(col)} NOT IN (SELECT {db.qid(rc)} FROM {db.qid(rt)})"
+            ).fetchall()]
+            _msg = ("该关系涉及事实表，系统默认不建议自动补齐。"
+                    + ("补录将向事实表「%s」插入新行；" % table_label(rt) if target_is_fact else "")
+                    + ("「归并」将改写事实表「%s」的「%s」列；" % (table_label(t), col) if (mode == "merge" and source_is_fact) else "")
+                    + "操作不可撤销，请确认已备份 procurement.db 后再执行。")
+            return jsonify({"ok": False, "require_confirm": True, "warning": _msg,
+                            "preview": {"missing_keys": len(keys), "sample": keys[:20]},
+                            "message": "如需手动补录事实表，请在确认已备份后重试（带 confirm 标记）。"})
         keys = [r[0] for r in con.execute(
             f"SELECT DISTINCT {db.qid(col)} FROM {db.qid(t)} "
             f"WHERE {db.qid(col)} IS NOT NULL "
@@ -1318,10 +1351,15 @@ def api_backfill_map():
     rt = body.get("dim"); rc = body.get("dim_col")
     if not all([t, col, rt, rc]) or t not in KNOWN_TABLES or rt not in KNOWN_TABLES:
         return jsonify({"ok": False, "error": "参数缺失或非法"}), 400
-    if not rt.startswith("dim_"):
+    # 事实表目标 / 源：系统默认不建议自动补齐。dim→fact 允许手动补录（需二次确认 + 备份）；
+    # fact→fact 补录会向事务事实表插入占位假行，不开放。fact→dim 为常规维度补录，维持原行为。
+    target_is_fact = rt.startswith("fct_")
+    source_is_fact = t.startswith("fct_")
+    if source_is_fact and target_is_fact:
         adv, reason = relation_advice(t, col, rt)
         return jsonify({"ok": False, "advice": adv,
-                        "error": "该关系无需补录：" + reason}), 400
+                        "error": "该关系为事实表之间关联，补录会向事务事实表插入占位假行，不开放补录。" + reason}), 400
+    fact_warn = target_is_fact
 
     con = get_con()
     try:
@@ -1333,6 +1371,15 @@ def api_backfill_map():
             f"SELECT {db.qid(col)} AS k, COUNT(*) AS c FROM {db.qid(t)} "
             f"{miss_where} GROUP BY {db.qid(col)}").fetchall()
         missing = {r["k"]: r["c"] for r in miss}
+        # 事实表修改需二次确认：先返回预览，待前端带 confirm 重试才真正执行
+        if fact_warn and not body.get("confirm"):
+            _msg = ("该关系涉及事实表，系统默认不建议自动补齐。"
+                    + ("补录将向事实表「%s」插入新行；" % table_label(rt) if target_is_fact else "")
+                    + ("改写事实表「%s」的「%s」列；" % (table_label(t), col) if source_is_fact else "")
+                    + "操作不可撤销，请确认已备份 procurement.db 后再执行。")
+            return jsonify({"ok": False, "require_confirm": True, "warning": _msg,
+                            "preview": {"missing_keys": len(missing), "sample": list(missing.keys())[:20]},
+                            "message": "如需手动补录事实表，请在确认已备份后重试（带 confirm 标记）。"})
         if not missing:
             return jsonify({"ok": True, "created": 0, "merged_keys": 0, "merged_rows": 0,
                             "remaining": 0, "message": "无缺失维度，无需补录"})

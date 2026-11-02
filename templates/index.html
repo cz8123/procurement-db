@@ -163,6 +163,11 @@
   .advbox.recommend{background:#f2fbf4;border-left-color:#3aa563;}
   .advbox.not_needed{background:#f7f8fa;border-left-color:#9aa3ae;}
   .advbox.optional{background:#fffbf2;border-left-color:#e0a33a;}
+  /* 事实表补录警示横幅 */
+  .factwarn{font-size:12px;line-height:1.6;border-radius:7px;padding:9px 11px;margin:6px 0 10px;
+            background:#fff4f3;border-left:3px solid var(--danger);color:#9a2b1e;}
+  .factwarn.info{background:#f2f6fb;border-left-color:#7a8ca3;color:#3a4a5e;}
+  .factwarn code{background:#fde3df;padding:0 4px;border-radius:3px;font-size:11.5px;}
   .bfpanel{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:#fcfdff;}
   .bf-head{font-size:12px;font-weight:600;margin-bottom:7px;color:#3a4250;}
   .bf-form{margin:2px 0 8px 0;padding:9px 10px;background:#f8fafc;border-radius:6px;border:1px dashed var(--border);}
@@ -444,6 +449,7 @@
     <div class="body">
       <div id="missingMeta" class="hint"></div>
       <div id="adviceBox" class="advbox"></div>
+      <div id="factWarn" class="factwarn" style="display:none;"></div>
 
       <!-- 逐条映射补录（仅当目标为维度表、且建议补录时显示） -->
       <div id="backfillPanel" class="bfpanel">
@@ -1217,6 +1223,17 @@ async function shutdownServer(){
 async function openQuality(){ openMask("qualityMask"); if(!TABLES.length) await loadTables(); loadQuality(); }
 const ADV_TXT = {recommend:"建议补录", optional:"按需补录", not_needed:"无需补录"};
 const ADV_ORDER = {recommend:0, optional:1, not_needed:2};
+/* 补录可用性：fact→fact 关系补录会向事务事实表插假行，不开放入口；
+   fact→dim 为常规维度补录；dim→fact（参照型事实表，如公司位置）开放但需二次确认。 */
+function relBackfillable(r){
+  const srcFact = String(r.fact||"").startsWith("fct_");
+  const tgtFact = !r.target_is_dim;
+  return !(srcFact && tgtFact);
+}
+function relBtnLabel(r){
+  if(!relBackfillable(r)) return "查看缺失值";
+  return (!r.target_is_dim) ? "补录(事实表)" : "补录缺失值";
+}
 
 async function loadQuality(){
   try{
@@ -1255,7 +1272,7 @@ async function loadQuality(){
         `<div class="rel-actions">`+
           `<span class="tag ${r.status}">${tagTxt}</span>`+
           (r.orphan>0
-            ? `<button class="btn ghost sm" onclick="openMissing(${i})">${r.target_is_dim?"补录缺失值":"查看缺失值"}(${r.orphan})</button>`
+            ? `<button class="btn ghost sm" onclick="openMissing(${i})">${relBtnLabel(r)}(${r.orphan})</button>`
             : `<span class="hint" style="margin:0;">无缺失，关系完整。</span>`)+
         `</div>`;
       box.appendChild(div);
@@ -1268,18 +1285,36 @@ let _relSorted = [];
 function openMissing(i){
   const r = _relSorted[i];
   if(!r) return;
-  qual.rel = r; qual.page = 1; qual.canBackfill = !!r.target_is_dim && r.advice !== "not_needed";
+  qual.rel = r; qual.page = 1;
+  qual.targetIsFact = !r.target_is_dim;   // 目标为事实表：系统默认不建议自动补齐，需二次确认
+  // 有孤儿且补录合法（fact→fact 不开放）才显示补录面板；事实表目标额外加警示 + 强制二次确认
+  qual.canBackfill = (r.orphan > 0) && relBackfillable(r);
   document.getElementById("missingTitle").innerHTML =
-    `缺失维度值 · ${esc(tlabel(r.fact))}.${esc(r.fact_col)} → ${esc(tlabel(r.dim))}`;
+    `缺失值 · ${esc(tlabel(r.fact))}.${esc(r.fact_col)} → ${esc(tlabel(r.dim))}`;
   document.getElementById("missingMeta").textContent =
-    `事实表「${tlabel(r.fact)}（${r.fact}）」里多出来 ${r.orphan} 行「${r.fact_col}」，`+
-    `涉及若干个在维度表「${tlabel(r.dim)}（${r.dim}）」中找不到对应的值。`;
+    `源表「${tlabel(r.fact)}（${r.fact}）」里多出来 ${r.orphan} 行「${r.fact_col}」，`+
+    `在目标表「${tlabel(r.dim)}（${r.dim}）」中找不到对应的值。`;
 
   // 建议说明框
   const adv = r.advice || "not_needed";
   const ab = document.getElementById("adviceBox");
   ab.className = "advbox " + adv;
   ab.innerHTML = `<b>${ADV_TXT[adv]||""}</b>：${esc(r.advice_reason||"")}`;
+
+  // 事实表目标警示横幅：系统默认不建议自动补齐，手动补录需二次确认并先备份
+  const fw = document.getElementById("factWarn");
+  if(qual.targetIsFact && qual.canBackfill){
+    fw.style.display = ""; fw.className = "factwarn";
+    fw.innerHTML = "⚠️ <b>该关系目标为事实表，系统默认不建议自动补齐。</b>"
+      + "手动补录将向事实表「" + esc(tlabel(r.dim)) + "」写入新行（或改写事实表列），"
+      + "<b>操作不可撤销</b>。执行前请确认已备份 <code>procurement.db</code>。";
+  } else if(qual.targetIsFact && !qual.canBackfill){
+    fw.style.display = ""; fw.className = "factwarn info";
+    fw.innerHTML = "ℹ️ 该关系为<b>事实表之间</b>的关联，补录会向事务事实表插入占位假行，"
+      + "因此<b>不开放补录</b>，仅可查看缺失值。";
+  } else {
+    fw.style.display = "none";
+  }
 
   // 是否允许补录
   const panel = document.getElementById("backfillPanel");
@@ -1290,7 +1325,7 @@ function openMissing(i){
     panel.style.display = "";
     btn.style.display = "";
     btn.className = "btn";
-    btn.textContent = "执行补录映射";
+    btn.textContent = qual.targetIsFact ? "执行补录映射（事实表，需确认）" : "执行补录映射";
     document.getElementById("mapDefault").value = "keep";
     document.getElementById("batchTgtInput").value = "";
     const ef = document.getElementById("bfExtraForm");
@@ -1590,15 +1625,22 @@ async function doBackfillMap(){
   const withEx = mappings.filter(m=>m.extra).length;
 
   let tip =
-    `本页 ${items.length} 个缺失值将这样处理：\n`+
-    `  · 归到现有维度值：${st.merge} 个（改写事实表）\n`+
-    `  · 新建维度成员（新值）：${st.create} 个\n`+
+    (qual.targetIsFact ? "⚠️ 该关系目标为事实表，系统默认不建议自动补齐，你正手动执行。\n" : "")
+    + `本页 ${items.length} 个缺失值将这样处理：\n`+
+    `  · 归到现有维度值：${st.merge} 个\n`+
+    `  · 新建成员（新值）：${st.create} 个\n`+
     `  · 以原值新建同名成员：${st.same} 个\n`;
   if(withEx) tip += `  · 其中 ${withEx} 行会附带写入 `+
     `${qual.extraCols.map(esc).join("、")}（如 DepartmentEn=Admin/Aftersales）\n`;
   if(notShown) tip += `  · 本页未显示的其它 ${notShown} 个：按「${def === "keep" ? "也各自新建同名成员" : "暂不处理"}」\n`;
   const touched = st.merge + st.create;
-  if(touched) tip += `\n⚠️ 其中 ${touched} 个会改写事实表「${tlabel(r.fact)}」的「${r.fact_col}」列，不可撤销；建议先备份 procurement.db。\n`;
+  if(touched){
+    if(qual.targetIsFact){
+      tip += `\n⚠️ 其中 ${touched} 个会向事实表「${tlabel(r.dim)}」插入新行，不可撤销；建议先备份 procurement.db。\n`;
+    }else{
+      tip += `\n⚠️ 其中 ${touched} 个会改写事实表「${tlabel(r.fact)}」的「${r.fact_col}」列，不可撤销；建议先备份 procurement.db。\n`;
+    }
+  }
   if(!mappings.length && def !== "keep") tip += `\n（没有指定任何映射，将不做改动。确认继续？）\n`;
   tip += `\n确认执行？`;
   if(!confirm(tip)) return;
@@ -1606,10 +1648,20 @@ async function doBackfillMap(){
   const btn = document.getElementById("backfillBtn");
   btn.disabled = true;
   try{
-    const d = await api("/api/backfill-map", {method:"POST",
+    let d = await api("/api/backfill-map", {method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({fact:r.fact, fact_col:r.fact_col, dim:r.dim, dim_col:r.dim_col,
-                           mappings, default_action:def, extra})});
+                           mappings, default_action:def, extra, confirm:true})});
+    // 兜底：若后端仍要求二次确认（如未带 confirm），再弹一次风险提示后带 confirm 重试
+    if(d && d.require_confirm){
+      if(!confirm((d.warning || "该操作将修改事实表") + "\n\n确认已备份 procurement.db，仍要执行？")){
+        btn.disabled = false; return;
+      }
+      d = await api("/api/backfill-map", {method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({fact:r.fact, fact_col:r.fact_col, dim:r.dim, dim_col:r.dim_col,
+                             mappings, default_action:def, extra, confirm:true})});
+    }
     toast(d.message || "补录完成");
     qual.map = {}; qual.extraMap = {};
     await loadDimOptions();
@@ -2403,7 +2455,7 @@ function mvOpenRelPop(id, ev){
     +   ` onchange="mvPutRel(${id},{ignored:this.checked?1:0})"></div>`
     + `<div class="acts">`
     +   ((r.orphan>0) ? `<button class="btn ghost sm" onclick="mvCloseRelPop();openMissingFromList(${id})">`
-                      + `${r.target_is_dim?"补录缺失值":"查看缺失值"}(${r.orphan})</button>` : "")
+                      + `${relBtnLabel(r)}(${r.orphan})</button>` : "")
     +   `<button class="btn ghost sm" onclick="mvCloseRelPop();openMappingEditor(${id})">编辑…</button>`
     +   `<button class="btn danger sm" onclick="mvCloseRelPop();deleteMapping(${id})">删除</button>`
     + `</div>`;
@@ -2542,7 +2594,7 @@ async function renderQualityPage(){
       const tagTxt = r.status==="ok"?"完整":(r.status==="warn"?"轻微缺失":(r.status==="err"?"错误":"缺失 "+r.orphan));
       const adv = r.advice||"not_needed";
       const act = (r.orphan>0)
-        ? `<button class="btn ghost sm" onclick="openMissingFromQ(${i})">${r.target_is_dim?"补录缺失值":"查看缺失值"}(${r.orphan})</button>`
+        ? `<button class="btn ghost sm" onclick="openMissingFromQ(${i})">${relBtnLabel(r)}(${r.orphan})</button>`
         : `<span class="hint" style="margin:0;">无缺失</span>`;
       const ov = r.ignored ? ' <span class="adv not_needed">已忽略</span>'
         : (r.advice_override?` <span class="adv optional">覆盖:${ADV_TXT[r.advice_override]||r.advice_override}</span>`:'');
