@@ -1,0 +1,121 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/2.1.0/schema.json",
+  "name": "f96bd955f7e8f877cccf",
+  "displayName": "Geo",
+  "displayOption": "FitToPage",
+  "height": 720,
+  "width": 1280,
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "b021ae713060027514a3",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "po"
+              }
+            },
+            "Property": "Category"
+          }
+        },
+        "type": "Categorical",
+        "howCreated": "User",
+        "objects": {
+          "general": [
+            {
+              "properties": {
+                "isInvertedSelectionMode": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "true"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "objects": {
+    "background": [
+      {
+        "properties": {
+          "image": {
+            "image": {
+              "name": {
+                "expr": {
+                  "Literal": {
+                    "Value": "'图片3.jpg'"
+                  }
+                }
+              },
+              "url": {
+                "expr": {
+                  "ResourcePackageItem": {
+                    "PackageName": "RegisteredResources",
+                    "PackageType": 1,
+                    "ItemName": "__313523880500125474.jpg"
+                  }
+                }
+              },
+              "scaling": {
+                "expr": {
+                  "Literal": {
+                    "Value": "'Fit'"
+                  }
+                }
+              }
+            }
+          },
+          "transparency": {
+            "expr": {
+              "Literal": {
+                "Value": "0D"
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "visualInteractions": [
+    {
+      "source": "5f8aa92dce83a1fa8845",
+      "target": "20891106556563f52342",
+      "type": "NoFilter"
+    },
+    {
+      "source": "e9c54f3c4293149566be",
+      "target": "b13b8bfbd83488f0cd1f",
+      "type": "DataFilter"
+    },
+    {
+      "source": "e9c54f3c4293149566be",
+      "target": "20891106556563f52342",
+      "type": "NoFilter"
+    },
+    {
+      "source": "e9c54f3c4293149566be",
+      "target": "7e08bd1ea5dcc2d9b9e5",
+      "type": "DataFilter"
+    },
+    {
+      "source": "20891106556563f52342",
+      "target": "b13b8bfbd83488f0cd1f",
+      "type": "DataFilter"
+    },
+    {
+      "source": "20891106556563f52342",
+      "target": "e9c54f3c4293149566be",
+      "type": "HighlightFilter"
+    },
+    {
+      "source": "20891106556563f52342",
+      "target": "7e08bd1ea5dcc2d9b9e5",
+      "type": "DataFilter"
+    }
+  ]
+}

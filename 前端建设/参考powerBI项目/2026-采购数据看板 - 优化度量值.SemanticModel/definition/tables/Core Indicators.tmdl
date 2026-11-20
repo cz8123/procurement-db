@@ -1,0 +1,37 @@
+table 'Core Indicators'
+	lineageTag: 093f1589-3ad3-4952-af64-e0efb75a1bec
+
+	column 'Indicator Name'
+		dataType: string
+		lineageTag: d2834123-e6f8-4323-85a6-e627c76a21a6
+		summarizeBy: none
+		sourceColumn: Indicator Name
+		sortByColumn: ID
+
+		changedProperty = SortByColumn
+
+		annotation SummarizationSetBy = Automatic
+
+	column ID
+		dataType: int64
+		formatString: 0
+		lineageTag: d1c1d229-f3a0-4325-a828-16b6cede5657
+		summarizeBy: none
+		sourceColumn: ID
+
+		annotation SummarizationSetBy = User
+
+	partition 'Core Indicators' = m
+		mode: import
+		source =
+				let
+				    源 = Table.FromRows(Json.Document(Binary.Decompress(Binary.FromText("i45WCskvScxRcMzNL80rUdJRMlSK1YlWcitKzE1VcM7PKylKTAYJG4GF/YtSUouKgVxjpdhYAA==", BinaryEncoding.Base64), Compression.Deflate)), let _t = ((type nullable text) meta [Serialized.Text = true]) in type table [#"Indicator Name" = _t, ID = _t]),
+				    更改的类型 = Table.TransformColumnTypes(源,{{"Indicator Name", type text}, {"ID", Int64.Type}}),
+				    替换的值 = Table.ReplaceValue(更改的类型,"Frame Contract","Centralized Procurement",Replacer.ReplaceText,{"Indicator Name"})
+				in
+				    替换的值
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = 导航
+

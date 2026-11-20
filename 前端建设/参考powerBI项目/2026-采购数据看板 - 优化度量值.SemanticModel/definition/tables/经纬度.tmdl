@@ -1,0 +1,94 @@
+table 经纬度
+	lineageTag: 2a19bd4d-05a9-454d-be4c-c977639530e7
+
+	column Company_cn
+		dataType: string
+		lineageTag: d65f8897-3ac8-4a0c-a1fb-e075cb768de7
+		summarizeBy: none
+		sourceColumn: Company_cn
+
+		annotation SummarizationSetBy = Automatic
+
+	column Color
+		dataType: string
+		lineageTag: 45f5e1b2-a12a-42ee-9174-0e2cadbde5f1
+		summarizeBy: none
+		sourceColumn: Color
+
+		annotation SummarizationSetBy = Automatic
+
+	column Region
+		dataType: string
+		lineageTag: ec540a2d-2f56-41b7-9013-f0b26a58e219
+		summarizeBy: none
+		sourceColumn: Region
+
+		annotation SummarizationSetBy = Automatic
+
+	column 省
+		dataType: string
+		lineageTag: 6081c73b-bea3-474f-b491-d07b6d12b084
+		summarizeBy: none
+		sourceColumn: 省
+
+		annotation SummarizationSetBy = Automatic
+
+	column 市
+		dataType: string
+		lineageTag: a0387bfe-a034-4ae5-b46b-40d7f813658a
+		summarizeBy: none
+		sourceColumn: 市
+
+		annotation SummarizationSetBy = Automatic
+
+	column 区
+		dataType: string
+		lineageTag: a9f0e3fe-66d9-4833-b195-9d153e5e779a
+		summarizeBy: none
+		sourceColumn: 区
+
+		annotation SummarizationSetBy = Automatic
+
+	column longitude
+		dataType: double
+		lineageTag: c17a2ba5-ebdf-4024-9960-2dd3c5c88d2c
+		summarizeBy: none
+		sourceColumn: longitude
+
+		annotation SummarizationSetBy = User
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column latitude
+		dataType: double
+		lineageTag: da6021b2-ab9d-4761-bba5-b76e1d3775f2
+		summarizeBy: none
+		sourceColumn: latitude
+
+		annotation SummarizationSetBy = User
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column Column9
+		dataType: string
+		lineageTag: 1d17c39f-bd27-4a49-a2cc-31bfe4517121
+		summarizeBy: none
+		sourceColumn: Column9
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 经纬度 = m
+		mode: import
+		source =
+				let
+				    源 = Excel.Workbook(File.Contents(OneDriveRoot{0}[Path] & "\数据表\经纬度.xlsx"), null, true),
+				    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+				    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true]),
+				    更改的类型 = Table.TransformColumnTypes(提升的标题,{{"Company_cn", type text}, {"Color", type text}, {"Region", type text}, {"省", type text}, {"市", type text}, {"区", type text}, {"longitude", type number}, {"latitude", type number}})
+				in
+				    更改的类型
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+

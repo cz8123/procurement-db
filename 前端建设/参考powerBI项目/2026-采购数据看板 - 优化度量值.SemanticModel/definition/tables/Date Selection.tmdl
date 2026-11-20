@@ -1,0 +1,35 @@
+table 'Date Selection'
+	lineageTag: a4ca2fe2-0bcd-468c-a576-6e7ba42e82a3
+
+	column 'Date Selection'
+		dataType: string
+		lineageTag: 3ce511b2-9dfc-4646-8d88-61fe4258d400
+		summarizeBy: none
+		sourceColumn: Date Selection
+		sortByColumn: Index
+
+		changedProperty = SortByColumn
+
+		annotation SummarizationSetBy = Automatic
+
+	column Index
+		dataType: int64
+		formatString: 0
+		lineageTag: 5dee34b7-8401-4cfc-bd26-89e80d373770
+		summarizeBy: none
+		sourceColumn: Index
+
+		annotation SummarizationSetBy = User
+
+	partition 'Date Selection' = m
+		mode: import
+		source =
+				let
+				    源 = Table.FromRows(Json.Document(Binary.Decompress(Binary.FromText("i45WMgxX0lEyVIrVATJ9gUwjMNMYxDQGM0MigUwTiAIQ0xTMdPTxAbLNlGJjAQ==", BinaryEncoding.Base64), Compression.Deflate)), let _t = ((type nullable text) meta [Serialized.Text = true]) in type table [#"Date Select" = _t, Index = _t]),
+				    更改的类型 = Table.TransformColumnTypes(源,{{"Date Select", type text}, {"Index", Int64.Type}}),
+				    重命名的列 = Table.RenameColumns(更改的类型,{{"Date Select", "Date Selection"}, {"Index", "Index"}})
+				in
+				    重命名的列
+
+	annotation PBI_ResultType = Table
+

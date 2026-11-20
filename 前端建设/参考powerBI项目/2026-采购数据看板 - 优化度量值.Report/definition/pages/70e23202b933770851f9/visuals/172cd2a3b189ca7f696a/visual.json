@@ -1,0 +1,108 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.10.0/schema.json",
+  "name": "172cd2a3b189ca7f696a",
+  "position": {
+    "x": 184.52573946498742,
+    "y": 200.01512635438417,
+    "z": 0,
+    "height": 240.4222225875931,
+    "width": 766.38792522319591,
+    "tabOrder": 0
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "po"
+                    }
+                  },
+                  "Property": "Supplier_cn"
+                }
+              },
+              "queryRef": "po.Supplier_cn",
+              "nativeQueryRef": "Supplier_cn"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "DAX表"
+                    }
+                  },
+                  "Property": "1_Total Amount"
+                }
+              },
+              "queryRef": "DAX表.1_Total Amount",
+              "nativeQueryRef": "1_Total Amount"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "po"
+                    }
+                  },
+                  "Property": "Procurement Method"
+                }
+              },
+              "queryRef": "po.Procurement Method",
+              "nativeQueryRef": "Procurement Method"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "po"
+                    }
+                  },
+                  "Property": "Exception Reason"
+                }
+              },
+              "queryRef": "po.Exception Reason",
+              "nativeQueryRef": "Exception Reason"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "po"
+                    }
+                  },
+                  "Property": "Contract Name"
+                }
+              },
+              "queryRef": "po.Contract Name",
+              "nativeQueryRef": "Contract Name"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "po"
+                    }
+                  },
+                  "Property": "Company_cn"
+                }
+              },
+              "queryRef": "po.Company_cn",
+              "nativeQueryRef": "Company_cn"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

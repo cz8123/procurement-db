@@ -1,0 +1,28 @@
+table 基础日期表
+	lineageTag: d830e74b-9231-4738-b67b-0669c8592764
+
+	column Date
+		formatString: General Date
+		lineageTag: df00ae02-cfc5-4859-a6c9-bcf53422f20a
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Date]
+
+		variation 变体
+			isDefault
+			relationship: 917bd7c5-bb37-41bf-b6ad-0763979b223f
+			defaultHierarchy: LocalDateTable_849c3cf0-acd4-4f19-9a1c-596224b3a70d.日期层次结构
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 基础日期表 = calculated
+		mode: import
+		source =
+				
+				CALENDAR(
+				    min(PO[Date]),    // 根据你的实际数据调整开始日期
+				    max(PO[Date])  // 根据你的实际数据调整结束日期
+				)
+
+	annotation PBI_Id = 1aa36a4626c04a668236babd9899fff6
+

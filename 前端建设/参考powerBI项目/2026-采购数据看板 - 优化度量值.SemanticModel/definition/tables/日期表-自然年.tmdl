@@ -1,0 +1,208 @@
+table 日期表-自然年
+	lineageTag: 7c49c044-7e93-43af-ad25-04bb26fa9c5c
+
+	column Date
+		formatString: General Date
+		lineageTag: dd4b1bdc-8b91-40fc-b5a9-c882b5cc07d3
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: 基础日期表[Date]
+
+		variation 变体
+			isDefault
+			relationship: cf01c15d-3bed-47ec-bcf1-bc5b787e0a0a
+			defaultHierarchy: LocalDateTable_737ce073-fee1-47c1-8ab2-252888ae5b07.日期层次结构
+
+		annotation SummarizationSetBy = Automatic
+
+	column Year
+		formatString: 0
+		lineageTag: 414334d8-4412-478c-baed-3175a5ebb310
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Year]
+
+		annotation SummarizationSetBy = User
+
+	column Quarter
+		formatString: 0
+		lineageTag: c515b8fd-b74e-4f3f-98ae-24a756dfd1b1
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Quarter]
+
+		annotation SummarizationSetBy = User
+
+	column DayOfWeek
+		formatString: 0
+		lineageTag: 968c8459-1b5a-45cb-9bd4-a55413f422e4
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [DayOfWeek]
+
+		annotation SummarizationSetBy = Automatic
+
+	column YearMonthSort
+		formatString: 0
+		lineageTag: d35c6f28-c92e-4943-8f25-67f4fb8c9be6
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [YearMonthSort]
+
+		annotation SummarizationSetBy = Automatic
+
+	column YearQuarterSort
+		formatString: 0
+		lineageTag: 5dfdede5-230b-4d83-952e-d1855eff0d15
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [YearQuarterSort]
+
+		annotation SummarizationSetBy = Automatic
+
+	column YearWeekSort
+		formatString: 0
+		lineageTag: e1219b97-a28e-4121-b1f7-cd4b3afbd399
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [YearWeekSort]
+
+		annotation SummarizationSetBy = Automatic
+
+	column 年月
+		lineageTag: ce6df4c3-cee1-41cd-b0cb-2e0b6771ba71
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [年月]
+		sortByColumn: YearMonthSort
+
+		annotation SummarizationSetBy = Automatic
+
+	column 年季度
+		lineageTag: 71964f8c-2611-4cf4-94e2-90c455e6eaed
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [年季度]
+
+		annotation SummarizationSetBy = Automatic
+
+	column 季度
+		lineageTag: bd04b5cd-625c-4fab-864b-89c7c66cf42f
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [季度]
+
+		annotation SummarizationSetBy = Automatic
+
+	column 月份
+		lineageTag: 2ea645c5-3dcc-47dd-8989-b93e84004b1c
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [月份]
+
+		annotation SummarizationSetBy = Automatic
+
+	column MonthName
+		lineageTag: 816a76ef-995e-4db7-9822-2a02315de8a7
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [MonthName]
+		sortByColumn: MonthNumber
+
+		annotation SummarizationSetBy = Automatic
+
+	column MonthNameShort
+		lineageTag: bcddbbd3-7c97-4bd5-a297-38cce0bc62ef
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [MonthNameShort]
+
+		annotation SummarizationSetBy = Automatic
+
+	column DateKey
+		lineageTag: 9f6cc364-cf8b-475f-94f2-7402c6635ee8
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [DateKey]
+
+		annotation SummarizationSetBy = Automatic
+
+	column QuarterName
+		lineageTag: 8abd202e-d5c9-47bd-bb6b-66b5ffb992aa
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [QuarterName]
+
+		annotation SummarizationSetBy = Automatic
+
+	column MonthNumber
+		formatString: 0
+		lineageTag: 90752cbb-9b4c-4480-818e-651d73d03381
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [MonthNumber]
+
+		annotation SummarizationSetBy = Automatic
+
+	column WeekNumber
+		formatString: 0
+		lineageTag: a6915463-e6d4-491f-b757-3c04626be169
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [WeekNumber]
+
+		annotation SummarizationSetBy = Automatic
+
+	column DayName
+		lineageTag: 96ec38ee-504d-4073-aaba-43b5151e849d
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [DayName]
+
+		annotation SummarizationSetBy = Automatic
+
+	column 年
+		formatString: 0
+		lineageTag: e83681a6-0ad5-4773-943a-c2dec8568d58
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [年]
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 日期表-自然年 = calculated
+		mode: import
+		source = ```
+				
+				ADDCOLUMNS (
+				    '基础日期表',
+				    // 基础字段（英文，兼容性好）
+				    "DateKey", FORMAT([Date], "YYYYMMDD"),  // 日期键
+				    "Year", YEAR([Date]),
+				    "Quarter", QUARTER([Date]),  // 季度编号：1-4
+				    "QuarterName", "Q" & QUARTER([Date]),  // 季度名称
+				    "MonthNumber", MONTH([Date]),  // 月份编号
+				    "MonthName", FORMAT([Date], "MMMM"),  // 月份全名
+				    "MonthNameShort", FORMAT([Date], "MMM"),  // 月份缩写
+				    
+				    // 周相关字段
+				    "WeekNumber", WEEKNUM([Date], 2),  // 周数（周一为第一天）
+				    "DayOfWeek", WEEKDAY([Date], 2),  // 星期几编号（1=周一）
+				    "DayName", FORMAT([Date], "dddd"),  // 星期几名称
+				    
+				    // 排序字段（关键！）
+				    "YearQuarterSort", YEAR([Date]) * 10 + QUARTER([Date]),  // 可用于排序
+				    "YearMonthSort", YEAR([Date]) * 100 + MONTH([Date]),
+				    "YearWeekSort", YEAR([Date]) * 100 + WEEKNUM([Date], 2),
+				    
+				    // 显示字段（可自定义为中文）
+				    "年", YEAR([Date]),
+				    "季度", "第" & QUARTER([Date]) & "季度",
+				    "月份", MONTH([Date]) & "月",
+				    "年季度", YEAR([Date]) & "年Q" & QUARTER([Date]),
+				    "年月", YEAR([Date]) & "年" & MONTH([Date]) & "月"
+				)
+				```
+
+	annotation PBI_Id = 7f43c7b75c7b495f9229f541f2bd3670
+

@@ -1,0 +1,4980 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/bookmark/2.1.0/schema.json",
+  "displayName": "filter panel close",
+  "name": "4fb3bfa0db549c7007d1",
+  "options": {
+    "applyOnlyToTargetVisuals": true,
+    "targetVisualNames": [
+      "2b207841c5c1a59449b6",
+      "2ec8435ebd7ee4411099",
+      "8cf2f904b6a7e2570260",
+      "2f0fec0d17a0d8180608",
+      "036698aebb7a14cd1b95",
+      "798c42b39009bb908626",
+      "6968a7b6b7e0d872ea06",
+      "15a5b11a68d078413132",
+      "3a5f63bcaec956b7e900",
+      "609546bb47b41745b1cb",
+      "882445881405e7519d63"
+    ],
+    "suppressData": true
+  },
+  "explorationState": {
+    "version": "1.3",
+    "activeSection": "1731a4550a79b5c9e044",
+    "sections": {
+      "1731a4550a79b5c9e044": {
+        "visualContainers": {
+          "003afa0be81ba421c3be": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "bf466c31e9ba2ee50035",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "3ef84f361b80cc5aa25b",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Total Amount"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "treemap",
+              "objects": {},
+              "activeProjections": {
+                "Group": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  }
+                ]
+              },
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "00bb5900173e59770088": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "ed52c904637ecc5b43c6",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_CP_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_CP_汇率"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "02eb6a979350ca95bec0": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "1666b452331b92e31b14",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'South2'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "59cf2b92d5e6088943aa",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Order_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "14ec41a6d3d9905a2396",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Orders"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "5e41edd5bbc0dc2ceeb1",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "05512a4951b883d7dc6d": {
+            "singleVisual": {
+              "visualType": "actionButton",
+              "objects": {}
+            }
+          },
+          "08aab399198d9ce0c129": {
+            "singleVisual": {
+              "visualType": "actionButton",
+              "objects": {}
+            }
+          },
+          "0b8bb982a11e9b86e900": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "1666b452331b92e31b14",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'Others'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "b2338228ebb4a8bc7a8b",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Order_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "27d396987bd625c71a6b",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Orders"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "19e2ad28b927594a0b30",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "0c3d8056197c36604e56": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "20f1adf8aa8c1ddb0ce7",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'East'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "0724789026cca2bb8096",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_CP_汇率_百万_RMB_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "7ce5ee000bdd04dabb14",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_CP_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "d928fe96b073e0062b20",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "0ec7a1b0d8218b594800": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "bc7a276873d9ba5d619b",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'South1'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "8662e36adb0738210e79",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Supplier_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "9077de2e01070e2b1012",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Suppliers"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "1ca4db805cd04d6921a3",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "1ae35590247a94aad94a": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "20f1adf8aa8c1ddb0ce7",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'South1'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "ef15169100386a7b9896",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_CP_汇率_百万_RMB_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "35d14a1895092c9172d3",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_CP_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "8389224103001707d86d",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "2046bc9135edc00900a0": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "20f1adf8aa8c1ddb0ce7",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'North'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "ba6bbbfa36b35bab4b54",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_CP_汇率_百万_RMB_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "60b47f40c2c0074204b6",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_CP_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "be2bd287ead1e35090c0",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "224ac6ddc83b9098edb1": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "1666b452331b92e31b14",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'South1'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "9c195f9abb502846e83e",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Order_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "304d8f4a8238e2a5ba19",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Orders"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "2840030100e093500320",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "29f2071d40c00cc0b765": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "6a65cdd830b93a7bbc42",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'East'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "c5fe1b52e3b9036d1d04",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Total Amount__汇率_百万_RMB_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "da8bd7a8698b7b270e05",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_Total Amount_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "59e1d40ee19cda4158e4",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "29ffc01c4c00c660040c": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "64d0f0b39620618506d3",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'South1'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "9f1aee2e255eb92366e0",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Time Taken_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "e71e1900709028a04552",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Time Taken"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "ea90af55a21c0dd068dd",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "2d453590868c6ede6dc2": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "6c72384b14652133ce14",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Orders"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Orders"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "30cca0ab69070b5dde2a": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "553400f0922102dbaada",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "Not": {
+                            "Expression": {
+                              "In": {
+                                "Expressions": [
+                                  {
+                                    "Column": {
+                                      "Expression": {
+                                        "SourceRef": {
+                                          "Source": "p"
+                                        }
+                                      },
+                                      "Property": "Category"
+                                    }
+                                  }
+                                ],
+                                "Values": [
+                                  [
+                                    {
+                                      "Literal": {
+                                        "Value": "'Vehicles/AAP (Principal)'"
+                                      }
+                                    }
+                                  ]
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Category"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "e0fcc0018e30ab8192d2",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_Total Amount_汇率"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "5764d863893089c00c1d",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Suppliers"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "f784ee150cb765066561",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Orders"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "pivotTable",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Category"
+                    }
+                  }
+                }
+              ],
+              "activeProjections": {
+                "Rows": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Category"
+                    }
+                  }
+                ]
+              },
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "3193596d50ae24dc47b5": {
+            "singleVisual": {
+              "visualType": "image",
+              "objects": {}
+            }
+          },
+          "323639767a9c869378a7": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "64d0f0b39620618506d3",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'Others'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "06285d822e90d74b2dd4",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Time Taken_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "026f91959a0b433ca7a0",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Time Taken"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "344c541859ab6cd0e786",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "3f28e3a15dc80c775096": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "db2528930661a0e761a1",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "l",
+                        "Entity": "logo-svg映射表新",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "Not": {
+                            "Expression": {
+                              "In": {
+                                "Expressions": [
+                                  {
+                                    "Column": {
+                                      "Expression": {
+                                        "SourceRef": {
+                                          "Source": "l"
+                                        }
+                                      },
+                                      "Property": "Brand"
+                                    }
+                                  }
+                                ],
+                                "Values": [
+                                  [
+                                    {
+                                      "Literal": {
+                                        "Value": "null"
+                                      }
+                                    }
+                                  ]
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "logo-svg映射表新"
+                        }
+                      },
+                      "Property": "Brand"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "4f6e5f18e05073632c9d",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_Total Amount_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "pieChart",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_Total Amount_汇率"
+                    }
+                  }
+                }
+              ],
+              "activeProjections": {
+                "Category": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "logo-svg映射表新"
+                        }
+                      },
+                      "Property": "Brand"
+                    }
+                  }
+                ]
+              },
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "3fac2ff00420e8357c4c": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "bc7a276873d9ba5d619b",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'East'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "75c865006ae4072d471a",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Supplier_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "bef5bb203a102720eb25",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Suppliers"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "afeaed923c63edb093eb",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "4148be69de890c99d875": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "6a65cdd830b93a7bbc42",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'Others'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "6d45b67966a7266c02d3",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Total Amount__汇率_百万_RMB_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "4adc171706d0a0b016a1",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_Total Amount_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "ae6fb2397029366a3b31",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "49890c060b05b103d91d": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "20f1adf8aa8c1ddb0ce7",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'South2'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "ef0d6ca942b3940c1d7e",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_CP_汇率_百万_RMB_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "5c6194d9a4a99d050da6",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_CP_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "c9b3694750b070ed0046",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "49dd258dc322c4a6d05b": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "bc7a276873d9ba5d619b",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'South2'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "50d1e60a1ed2bcc16702",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Supplier_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "b4a98e18053598346b62",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Suppliers"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "b94ba9a613a86aac191c",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "4c4a527ecd5ad1e40330": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "ab5b3a5960c077670d6e",
+                  "type": "Advanced",
+                  "expression": {
+                    "Aggregation": {
+                      "Expression": {
+                        "Column": {
+                          "Expression": {
+                            "SourceRef": {
+                              "Entity": "po"
+                            }
+                          },
+                          "Property": "Supplier_cn"
+                        }
+                      },
+                      "Function": 2
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Aggregation": {
+                      "Expression": {
+                        "Column": {
+                          "Expression": {
+                            "SourceRef": {
+                              "Entity": "po"
+                            }
+                          },
+                          "Property": "Supplier_cn"
+                        }
+                      },
+                      "Function": 2
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "55da5df508e220a101be": {
+            "singleVisual": {
+              "visualType": "shape",
+              "objects": {}
+            }
+          },
+          "5a4a43c4b9290b00c096": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "1666b452331b92e31b14",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'East'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "7fb5fbfb0a370ce87011",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Order_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "ac9ed659a10904cb20eb",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Orders"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "7a109144725890b93875",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "5dda68ab0a0412000000": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "2bf5644e9874b70e7699",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Currency Param"
+                        }
+                      },
+                      "Property": "Currency"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "slicer",
+              "objects": {
+                "merge": {
+                  "general": [
+                    {
+                      "properties": {
+                        "filter": {
+                          "filter": {
+                            "Version": 2,
+                            "From": [
+                              {
+                                "Name": "c",
+                                "Entity": "Currency Param",
+                                "Type": 0
+                              }
+                            ],
+                            "Where": [
+                              {
+                                "Condition": {
+                                  "In": {
+                                    "Expressions": [
+                                      {
+                                        "Column": {
+                                          "Expression": {
+                                            "SourceRef": {
+                                              "Source": "c"
+                                            }
+                                          },
+                                          "Property": "Currency"
+                                        }
+                                      }
+                                    ],
+                                    "Values": [
+                                      [
+                                        {
+                                          "Literal": {
+                                            "Value": "'RMB'"
+                                          }
+                                        }
+                                      ]
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "data": [
+                    {
+                      "properties": {
+                        "numericStart": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "1990D"
+                            }
+                          }
+                        },
+                        "numericEnd": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "2040D"
+                            }
+                          }
+                        },
+                        "mode": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "'Basic'"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "selection": [
+                    {
+                      "properties": {
+                        "strictSingleSelect": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "true"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "activeProjections": {
+                "Values": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Currency Param"
+                        }
+                      },
+                      "Property": "Currency"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "6249f1c6d9dbcad46ed2": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "6a65cdd830b93a7bbc42",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'South1'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "fbbe020ab8654b9ac028",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Total Amount__汇率_百万_RMB_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "f1e8494cb97190b235d4",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_Total Amount_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "7e6da3da1a90c34b1c09",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "64a3f480c58dc0214e65": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "49c3d894e692bb33088b",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_Total Amount_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "cardVisual",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_Total Amount_汇率"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "84dcddb9049e69aa40a8": {
+            "singleVisual": {
+              "visualType": "textbox",
+              "objects": {}
+            }
+          },
+          "84f69b2beb31d301bb18": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "52b11ec1c096020207ae",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'South2'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "dec9124deaa95ca39e78",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Time Taken_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "04963adb0120c5646b09",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Time Taken"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "713fdd90ba31830060ae",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "8567b0ff3d76be90444a": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "bc7a276873d9ba5d619b",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'West'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "4bf5c2734686eea90008",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Supplier_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "e263b430396350353945",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Suppliers"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "a38cdb51c463699e6672",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "887c965837939827018a": {
+            "singleVisual": {
+              "visualType": "actionButton",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "8a486390a816c667267b": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "64d0f0b39620618506d3",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'East'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "d70bcd1330249a908003",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Time Taken_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "31f69edbe29b75ab94e6",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Time Taken"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "ad27883ea001080d9cb0",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "9129152001b5e85a39db": {
+            "singleVisual": {
+              "visualType": "actionButton",
+              "objects": {}
+            }
+          },
+          "9c92b6d3a98981ec1083": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "bc7a276873d9ba5d619b",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'Others'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "ed72b9e15c05cd43b484",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Supplier_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "e6d9e5b48789810167ce",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Suppliers"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "1316e5de584e67384e00",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "a049a639e36b48ea292d": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "64d0f0b39620618506d3",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'North'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "27646c737a2d3b70b52a",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Time Taken_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "e4e7ef44d507a20cae7c",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Time Taken"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "3abd3217089325bd09e8",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "a48b2e95bb7409991b00": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "1666b452331b92e31b14",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'North'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "a4bd985071bb0657a33c",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Order_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "0da929d8653d10bc9e18",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Orders"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "addb71ba20b047c2d963",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "acc20ac87d9c93ce314e": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "20f1adf8aa8c1ddb0ce7",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'West'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "c32bfd0959e0b32809c7",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_CP_汇率_百万_RMB_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "567cb6e03703a774d6e3",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_CP_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "8bf135fdb05a505a12d8",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "ad6a69254c7999a1decb": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "52b11ec1c096020207ae",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'West'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "76e688f14c924d05d001",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Time Taken_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "cbe08712b929d644aed8",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Time Taken"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "80148cf91ee02dba26b3",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "af07c082435402b2a987": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "2a80be71314cde151e50",
+                  "type": "TopN",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "subquery",
+                        "Expression": {
+                          "Subquery": {
+                            "Query": {
+                              "Version": 2,
+                              "From": [
+                                {
+                                  "Name": "p1",
+                                  "Entity": "po",
+                                  "Type": 0
+                                },
+                                {
+                                  "Name": "d",
+                                  "Entity": "DAX表",
+                                  "Type": 0
+                                }
+                              ],
+                              "Select": [
+                                {
+                                  "Column": {
+                                    "Expression": {
+                                      "SourceRef": {
+                                        "Source": "p1"
+                                      }
+                                    },
+                                    "Property": "Supplier_en"
+                                  },
+                                  "Name": "field"
+                                }
+                              ],
+                              "OrderBy": [
+                                {
+                                  "Direction": 2,
+                                  "Expression": {
+                                    "Measure": {
+                                      "Expression": {
+                                        "SourceRef": {
+                                          "Source": "d"
+                                        }
+                                      },
+                                      "Property": "1_Total Amount"
+                                    }
+                                  }
+                                }
+                              ],
+                              "Top": 10
+                            }
+                          }
+                        },
+                        "Type": 2
+                      },
+                      {
+                        "Name": "p1",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p1"
+                                    }
+                                  },
+                                  "Property": "Supplier_en"
+                                }
+                              }
+                            ],
+                            "Table": {
+                              "SourceRef": {
+                                "Source": "subquery"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Supplier_en"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "6317296e000065d593e2",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_Total Amount_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "treemap",
+              "objects": {},
+              "activeProjections": {
+                "Group": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Supplier_en"
+                    }
+                  }
+                ]
+              },
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "b61682df0660096a00d0": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "6a65cdd830b93a7bbc42",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'North'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "8ec247a5e2500cb30434",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Total Amount__汇率_百万_RMB_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "4c16810d50c29e6dc988",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_Total Amount_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "4fbb181db80ac78e1165",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "bbd522ed5cc50e84445b": {
+            "singleVisual": {
+              "visualType": "actionButton",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "dadc63d0b5654a90dc6a": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "20f1adf8aa8c1ddb0ce7",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'Others'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "a46ef59d967da5248a20",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_CP_汇率_百万_RMB_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "0d03ce91b39c75ba8958",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_CP_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "c0ed26e0a75bd32972ec",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "ddb97e588a14b15a6ee9": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "287b94820e44059008ea",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "Not": {
+                            "Expression": {
+                              "In": {
+                                "Expressions": [
+                                  {
+                                    "Column": {
+                                      "Expression": {
+                                        "SourceRef": {
+                                          "Source": "p"
+                                        }
+                                      },
+                                      "Property": "Region_en"
+                                    }
+                                  }
+                                ],
+                                "Values": [
+                                  [
+                                    {
+                                      "Literal": {
+                                        "Value": "'HO'"
+                                      }
+                                    }
+                                  ]
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "slicer",
+              "objects": {
+                "merge": {
+                  "general": [
+                    {
+                      "properties": {
+                        "filter": {
+                          "filter": {
+                            "Version": 2,
+                            "From": [
+                              {
+                                "Name": "p",
+                                "Entity": "po",
+                                "Type": 0
+                              }
+                            ],
+                            "Where": [
+                              {
+                                "Condition": {
+                                  "In": {
+                                    "Expressions": [
+                                      {
+                                        "Column": {
+                                          "Expression": {
+                                            "SourceRef": {
+                                              "Source": "p"
+                                            }
+                                          },
+                                          "Property": "Region_en"
+                                        }
+                                      }
+                                    ],
+                                    "Values": [
+                                      [
+                                        {
+                                          "Literal": {
+                                            "Value": "'East'"
+                                          }
+                                        }
+                                      ],
+                                      [
+                                        {
+                                          "Literal": {
+                                            "Value": "'North'"
+                                          }
+                                        }
+                                      ],
+                                      [
+                                        {
+                                          "Literal": {
+                                            "Value": "'Others'"
+                                          }
+                                        }
+                                      ],
+                                      [
+                                        {
+                                          "Literal": {
+                                            "Value": "'South1'"
+                                          }
+                                        }
+                                      ],
+                                      [
+                                        {
+                                          "Literal": {
+                                            "Value": "'South2'"
+                                          }
+                                        }
+                                      ],
+                                      [
+                                        {
+                                          "Literal": {
+                                            "Value": "'West'"
+                                          }
+                                        }
+                                      ]
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "data": [
+                    {
+                      "properties": {
+                        "mode": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "'Basic'"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "orderBy": [
+                {
+                  "Direction": 1,
+                  "Expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  }
+                }
+              ],
+              "activeProjections": {
+                "Values": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "e5d1a9455b8a7053510c": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "1666b452331b92e31b14",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'West'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "366369f50d0acb4e866e",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Order_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "c83b368e9a00062526c0",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Orders"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "4068f028d58b7a4c1701",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "e9e6cebd51306827756a": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "8a9867b02dc67d448d91",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "MonthName"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "fadf754122bdb773dde4",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_Total Amount_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "6bfc04aa4347c9a918ac",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_CP_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "clusteredColumnChart",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 1,
+                  "Expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "MonthName"
+                    }
+                  }
+                }
+              ],
+              "activeProjections": {
+                "Category": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "MonthName"
+                    }
+                  }
+                ]
+              },
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "eab241957d48ed702390": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "6a65cdd830b93a7bbc42",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'South2'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "57c5db55ea2dca909d15",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Total Amount__汇率_百万_RMB_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "1444950d680b13934603",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_Total Amount_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "be35618e3acb7773681d",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "ed8004b1a93302bdb324": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "6a65cdd830b93a7bbc42",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'West'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "131376dd2ce5d9d5006c",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Total Amount__汇率_百万_RMB_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "bade8760a619b32d86cc",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_Total Amount_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "536ac6719d77d0a34972",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "fac19a45802d201bd452": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "b87ce3810017d0664b33",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "日",
+                        "Entity": "日期表-自然年",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "Not": {
+                            "Expression": {
+                              "In": {
+                                "Expressions": [
+                                  {
+                                    "Column": {
+                                      "Expression": {
+                                        "SourceRef": {
+                                          "Source": "日"
+                                        }
+                                      },
+                                      "Property": "Year"
+                                    }
+                                  }
+                                ],
+                                "Values": [
+                                  [
+                                    {
+                                      "Literal": {
+                                        "Value": "null"
+                                      }
+                                    }
+                                  ]
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "Year"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "slicer",
+              "objects": {
+                "merge": {
+                  "general": [
+                    {
+                      "properties": {
+                        "filter": {
+                          "filter": {
+                            "Version": 2,
+                            "From": [
+                              {
+                                "Name": "日",
+                                "Entity": "日期表-自然年",
+                                "Type": 0
+                              }
+                            ],
+                            "Where": [
+                              {
+                                "Condition": {
+                                  "In": {
+                                    "Expressions": [
+                                      {
+                                        "Column": {
+                                          "Expression": {
+                                            "SourceRef": {
+                                              "Source": "日"
+                                            }
+                                          },
+                                          "Property": "Year"
+                                        }
+                                      }
+                                    ],
+                                    "Values": [
+                                      [
+                                        {
+                                          "Literal": {
+                                            "Value": "2025L"
+                                          }
+                                        }
+                                      ]
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "data": [
+                    {
+                      "properties": {
+                        "numericStart": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "1990D"
+                            }
+                          }
+                        },
+                        "numericEnd": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "2040D"
+                            }
+                          }
+                        },
+                        "mode": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "'Dropdown'"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "selection": [
+                    {
+                      "properties": {
+                        "strictSingleSelect": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "true"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "activeProjections": {
+                "Values": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "Year"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "fb58ef4da4a26d50ad19": {
+            "singleVisual": {
+              "visualType": "shape",
+              "objects": {}
+            }
+          },
+          "fd7070e62b38e2643424": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "bc7a276873d9ba5d619b",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "p",
+                        "Entity": "po",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "p"
+                                    }
+                                  },
+                                  "Property": "Region_en"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'North'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "b5da1d435e23dd5cac6a",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "3_Supplier_PY_FY"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "089a6be82e9220019630",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Suppliers"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "997b43f08e54a0d6bded",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "年月"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "kpi",
+              "objects": {}
+            }
+          },
+          "8cf2f904b6a7e2570260": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "7e7fc751edc2c1034e23",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Department"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "slicer",
+              "objects": {
+                "merge": {
+                  "data": [
+                    {
+                      "properties": {
+                        "mode": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "'Dropdown'"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "selection": [
+                    {
+                      "properties": {
+                        "strictSingleSelect": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "false"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "activeProjections": {
+                "Values": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Department"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "2f0fec0d17a0d8180608": {
+            "singleVisual": {
+              "visualType": "textbox",
+              "objects": {}
+            }
+          },
+          "036698aebb7a14cd1b95": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "75b731f9e6dde657d0e1",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Brand"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "slicer",
+              "objects": {
+                "merge": {
+                  "data": [
+                    {
+                      "properties": {
+                        "mode": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "'Dropdown'"
+                            }
+                          }
+                        },
+                        "isInvertedSelectionMode": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "true"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "selection": [
+                    {
+                      "properties": {
+                        "strictSingleSelect": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "false"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "activeProjections": {
+                "Values": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Brand"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "798c42b39009bb908626": {
+            "singleVisual": {
+              "visualType": "actionButton",
+              "objects": {}
+            }
+          },
+          "6968a7b6b7e0d872ea06": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "05cec21e520c3045897b",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Company_en"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "slicer",
+              "objects": {
+                "merge": {
+                  "data": [
+                    {
+                      "properties": {
+                        "mode": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "'Dropdown'"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "selection": [
+                    {
+                      "properties": {
+                        "strictSingleSelect": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "false"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "activeProjections": {
+                "Values": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Company_en"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "15a5b11a68d078413132": {
+            "singleVisual": {
+              "visualType": "shape",
+              "objects": {}
+            }
+          },
+          "3a5f63bcaec956b7e900": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "0f7e8398c1d949b81689",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "City_en"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "slicer",
+              "objects": {
+                "merge": {
+                  "data": [
+                    {
+                      "properties": {
+                        "mode": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "'Dropdown'"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "selection": [
+                    {
+                      "properties": {
+                        "strictSingleSelect": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "false"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "activeProjections": {
+                "Values": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "City_en"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "609546bb47b41745b1cb": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "eeb03c88bb20065a3330",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "slicer",
+              "objects": {
+                "merge": {
+                  "data": [
+                    {
+                      "properties": {
+                        "mode": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "'Dropdown'"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "selection": [
+                    {
+                      "properties": {
+                        "strictSingleSelect": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "false"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "activeProjections": {
+                "Values": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "po"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "882445881405e7519d63": {
+            "singleVisual": {
+              "visualType": "actionButton",
+              "objects": {}
+            }
+          }
+        },
+        "visualContainerGroups": {
+          "3f0a0ec69b7d36b2d529": {
+            "isHidden": false
+          },
+          "8be4e1000a00651933ec": {
+            "isHidden": false
+          },
+          "2b207841c5c1a59449b6": {
+            "isHidden": true,
+            "children": {
+              "2ec8435ebd7ee4411099": {
+                "isHidden": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "objects": {
+      "merge": {
+        "outspacePane": [
+          {
+            "properties": {
+              "expanded": {
+                "expr": {
+                  "Literal": {
+                    "Value": "false"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

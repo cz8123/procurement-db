@@ -1,0 +1,315 @@
+table po
+	lineageTag: 4aa07045-1697-487c-8832-0254382ecab1
+
+	column 'No.'
+		dataType: string
+		lineageTag: f8864a3c-c6d4-47f6-8bdc-09e4046242c5
+		summarizeBy: none
+		sourceColumn: No.
+
+		annotation SummarizationSetBy = Automatic
+
+	column Date
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: 6155fc14-4f8b-43bd-9fb0-fcbff96db756
+		summarizeBy: none
+		sourceColumn: Date
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column Company
+		dataType: string
+		lineageTag: 6ce55fbf-804c-4064-86ad-ce92be617c21
+		summarizeBy: none
+		sourceColumn: Company
+
+		annotation SummarizationSetBy = Automatic
+
+	column Company_cn
+		dataType: string
+		lineageTag: 501f2279-f597-4c66-a770-a18157880da5
+		summarizeBy: none
+		sourceColumn: Company_cn
+
+		annotation SummarizationSetBy = Automatic
+
+	column Company_en
+		dataType: string
+		lineageTag: c0903dac-c06a-4d44-a180-fc5c0081f241
+		summarizeBy: none
+		sourceColumn: Company_en
+
+		annotation SummarizationSetBy = Automatic
+
+	column Region_cn
+		dataType: string
+		lineageTag: e23d26c6-7136-470a-b559-5673d6d8d01d
+		summarizeBy: none
+		sourceColumn: Region_cn
+
+		annotation SummarizationSetBy = Automatic
+
+	column Region_en
+		dataType: string
+		lineageTag: 0647db14-3266-4c2d-8717-2adcb737daad
+		summarizeBy: none
+		sourceColumn: Region_en
+
+		annotation SummarizationSetBy = Automatic
+
+	column City_cn
+		dataType: string
+		lineageTag: ade8dddc-84f3-46b0-bf17-7da7209ea7c8
+		summarizeBy: none
+		sourceColumn: City_cn
+
+		annotation SummarizationSetBy = Automatic
+
+	column City_en
+		dataType: string
+		lineageTag: 4bbc6f73-14c4-476c-b2a2-967f0971279f
+		summarizeBy: none
+		sourceColumn: City_en
+
+		annotation SummarizationSetBy = Automatic
+
+	column Brand
+		dataType: string
+		lineageTag: e66c5c0e-4bb8-46d0-96bb-710441d793cf
+		summarizeBy: none
+		sourceColumn: Brand
+
+		annotation SummarizationSetBy = Automatic
+
+	column Department
+		dataType: string
+		lineageTag: 70efdc64-bbaa-4f07-ba0f-7b76b5999f0c
+		summarizeBy: none
+		sourceColumn: Department
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Expense Type'
+		dataType: string
+		lineageTag: f8c5928d-4beb-43fe-aeea-e8b5200e0617
+		summarizeBy: none
+		sourceColumn: Expense Type
+
+		annotation SummarizationSetBy = Automatic
+
+	column FY
+		dataType: string
+		lineageTag: 6472b452-7421-4d6d-8e14-f12f8c88baac
+		summarizeBy: none
+		sourceColumn: FY
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Budget Type'
+		dataType: string
+		lineageTag: 92e66d4d-8e05-4f45-911c-81b7a18a81b4
+		summarizeBy: none
+		sourceColumn: Budget Type
+
+		annotation SummarizationSetBy = Automatic
+
+	column DT-related
+		dataType: string
+		lineageTag: f7081f3b-bc24-4c8c-9ef7-39d9a5557c41
+		summarizeBy: none
+		sourceColumn: DT-related
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Procurement Method'
+		dataType: string
+		lineageTag: a2c44c3c-40f0-47f5-a1dc-ca24c12c4b28
+		summarizeBy: none
+		sourceColumn: Procurement Method
+
+		annotation SummarizationSetBy = Automatic
+
+	column Note
+		dataType: string
+		lineageTag: c74ae79f-f6d5-4400-9963-ea60a7706156
+		summarizeBy: none
+		sourceColumn: Note
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Contract Type'
+		dataType: string
+		lineageTag: a0eb4211-cc54-4261-8997-ecdcceb8aa5b
+		summarizeBy: none
+		sourceColumn: Contract Type
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Contract Name'
+		dataType: string
+		lineageTag: 8c419b07-68f0-4e29-8a2b-93530dc1639d
+		summarizeBy: none
+		sourceColumn: Contract Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Contract No.'
+		dataType: string
+		lineageTag: bea56a4f-fbb5-42c1-b68f-4e5ac3ecf3c5
+		summarizeBy: none
+		sourceColumn: Contract No.
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Contract Value'
+		dataType: int64
+		formatString: 0
+		lineageTag: 116f1042-7985-413e-acda-6bb70751a721
+		summarizeBy: sum
+		sourceColumn: Contract Value
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Contract Start Date'
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: 379f76b8-28bf-4f07-aefe-242db25272b9
+		summarizeBy: none
+		sourceColumn: Contract Start Date
+
+		variation 变体
+			isDefault
+			relationship: de5f1541-102d-4d1f-9851-3177fff5f936
+			defaultHierarchy: LocalDateTable_8bc034c8-bdbf-4979-b2ea-7cb13f602f25.日期层次结构
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column 'Contract Expiry Date'
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: 8782219c-900e-4280-9762-375e778d92e2
+		summarizeBy: none
+		sourceColumn: Contract Expiry Date
+
+		variation 变体
+			isDefault
+			relationship: 67d43580-405f-4fad-b534-84b4f6fa5479
+			defaultHierarchy: LocalDateTable_47f9f97a-93a4-457f-9395-21aae5ef6dd7.日期层次结构
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column Category
+		dataType: string
+		lineageTag: 206b26c1-488d-424f-90cb-6b96bf3cc016
+		summarizeBy: none
+		sourceColumn: Category
+
+		annotation SummarizationSetBy = Automatic
+
+	column Sub-Category
+		dataType: string
+		lineageTag: 4bceee9a-59d8-4722-bea0-028d5b9b141b
+		summarizeBy: none
+		sourceColumn: Sub-Category
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Category Description'
+		dataType: string
+		lineageTag: 4c968292-b092-4532-a716-36ad3c482bab
+		summarizeBy: none
+		sourceColumn: Category Description
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Exception Reason'
+		dataType: string
+		lineageTag: 5712fe10-32fe-48b4-addd-0abfae8d831a
+		summarizeBy: none
+		sourceColumn: Exception Reason
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Total Price'
+		dataType: double
+		lineageTag: 3e4d7a1a-f2dc-46ab-b341-d036e04877da
+		summarizeBy: sum
+		sourceColumn: Total Price
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Time Taken'
+		dataType: double
+		lineageTag: 7f080289-d44f-4cae-84ee-c4cb32d29282
+		summarizeBy: sum
+		sourceColumn: Time Taken
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column Supplier_cn
+		dataType: string
+		lineageTag: 0adf4bca-e755-4d17-8ae0-7f2cc9026265
+		summarizeBy: none
+		sourceColumn: Supplier_cn
+
+		annotation SummarizationSetBy = Automatic
+
+	column Supplier_en
+		dataType: string
+		lineageTag: 6bb083df-f3ad-48c1-b2ab-9ff4d26ff843
+		summarizeBy: none
+		sourceColumn: Supplier_en
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'AVL No.'
+		dataType: string
+		lineageTag: cb8027e5-a727-46f8-af94-b4b035d184dc
+		summarizeBy: none
+		sourceColumn: AVL No.
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Supplier Category'
+		dataType: string
+		lineageTag: cbc9c3f0-5940-4620-94db-f6f7c5fc3ed2
+		summarizeBy: none
+		sourceColumn: Supplier Category
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Category Detail'
+		dataType: string
+		lineageTag: 0e7bb3f8-8e2e-4e07-89b0-22956ed8556a
+		summarizeBy: none
+		sourceColumn: Category Detail
+
+		annotation SummarizationSetBy = Automatic
+
+	partition po = m
+		mode: import
+		source =
+				let
+				    源 = Excel.Workbook(File.Contents(OneDriveRoot{0}[Path] & "\数据表\采购分析报表.xlsx"), null, true),
+				    报表1_Sheet = 源{[Item="报表1",Kind="Sheet"]}[Data],
+				    提升的标题 = Table.PromoteHeaders(报表1_Sheet, [PromoteAllScalars=true]),
+				    更改的类型 = Table.TransformColumnTypes(提升的标题,{{"No.", type text}, {"Date", type date}, {"Company", type text}, {"Company_cn", type text}, {"Company_en", type text}, {"Region_cn", type text}, {"Region_en", type text}, {"City_cn", type text}, {"City_en", type text}, {"Brand", type text}, {"Department", type text}, {"Expense Type", type text}, {"FY", type text}, {"Budget Type", type text}, {"DT-related", type text}, {"Procurement Method", type text}, {"Note", type text}, {"Contract Type", type text}, {"Contract Name", type text}, {"Contract No.", type text}, {"Contract Value", Int64.Type}, {"Contract Start Date", type date}, {"Contract Expiry Date", type date}, {"Category", type text}, {"Sub-Category", type text}, {"Category Description", type text}, {"Exception Reason", type text}, {"Total Price", type number}, {"Time Taken", type number}, {"Supplier_cn", type text}, {"Supplier_en", type text}, {"AVL No.", type text}, {"Supplier Category", type text}, {"Category Detail", type text}}),
+				    已删除的空行 = Table.SelectRows(更改的类型, each not List.IsEmpty(List.RemoveMatchingItems(Record.FieldValues(_), {"", null})))
+				in
+				    已删除的空行
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+

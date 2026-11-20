@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Procurement Data Dashboard</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='board/board.css') }}?v={{ v_css }}">
+</head>
+<body>
+
+<!-- 固定区：滚动时标题栏 / KPI / 筛选框保持不动 -->
+<div class="sticky-head">
+
+<!-- 顶栏 -->
+<header class="hd">
+  <div class="hd-l">
+    <img class="hd-logo" src="{{ url_for('static', filename='board/logo-sime.png') }}" alt="Sime">
+    <div>
+      <h1>Procurement Data Dashboard</h1>
+      <p class="hd-sub" id="hdSub">Procurement spend analysis · Loading…</p>
+    </div>
+  </div>
+  <div class="hd-r">
+    <label class="sel">
+      <span>Fiscal Year</span>
+      <select id="fySel"></select>
+    </label>
+    <div class="seg" id="curSeg">
+      <button data-cur="RM">RM</button>
+      <button data-cur="RMB" class="on">RMB</button>
+    </div>
+    <button class="btn" id="btnExport" title="Export purchase requisition detail for the current fiscal year and filters">Export View</button>
+  </div>
+</header>
+
+<!-- KPI -->
+<section class="kpis" id="kpis"></section>
+
+<!-- 筛选 -->
+<section class="fbar">
+  <div class="fbar-in" id="fbar"></div>
+  <div class="fbar-r">
+    <button class="spec-btn" data-spec="global" title="How the whole dashboard is calculated">?</button>
+    <button class="btn ghost" id="btnReset">Reset Filters</button>
+  </div>
+</section>
+<div class="chips" id="chips"></div>
+
+</div><!-- /.sticky-head -->
+
+<!-- 主区 -->
+<main class="grid">
+  <section class="card g8">
+    <div class="card-h">
+      <h2 id="mTitle">Monthly Spend by Region</h2>
+      <div class="card-tools">
+        <div class="seg-sw" id="mSw">
+          <button type="button" data-m="region" class="on">Region</button>
+          <button type="button" data-m="pair">Total vs Framework</button>
+        </div>
+        <button class="spec-btn" data-spec="monthly" title="View calculation logic">?</button>
+        <span class="lg" id="mLegend"></span>
+      </div>
+    </div>
+    <div class="chart" id="chMonthly" data-empty="No monthly data"></div>
+  </section>
+
+  <section class="card g4">
+    <div class="card-h">
+      <h2>Spend by Expense Type</h2>
+      <div class="card-tools">
+        <button class="spec-btn" data-spec="donut" title="View calculation logic">?</button>
+      </div>
+    </div>
+    <div class="chart" id="chDonut" data-empty="No expense type data"></div>
+    <div class="legend-list" id="donutLegend"></div>
+  </section>
+
+  <section class="card g7">
+    <div class="card-h">
+      <h2>Category Spend (Pareto)</h2>
+      <div class="card-tools">
+        <button class="spec-btn" data-spec="pareto" title="View calculation logic">?</button>
+        <span class="hint">Bars = spend · line = cumulative %</span>
+      </div>
+    </div>
+    <div class="chart" id="chPareto" data-empty="No category data"></div>
+  </section>
+
+  <section class="card g5">
+    <div class="card-h">
+      <h2>Top 10 Suppliers</h2>
+      <div class="card-tools">
+        <button class="spec-btn" data-spec="top" title="View calculation logic">?</button>
+        <select id="topCat" class="mini-sel"><option value="">All categories</option></select>
+        <select id="topMth" class="mini-sel"><option value="">All methods</option></select>
+      </div>
+    </div>
+    <div class="chart" id="chTop" data-empty="No supplier data"></div>
+  </section>
+
+  <section class="card g5" id="catCard">
+    <div class="card-h">
+      <h2>Category Details <span class="card-note">· click a row to cross-filter</span></h2>
+      <div class="card-tools">
+        <button class="spec-btn" data-spec="catdetail" title="View calculation logic">?</button>
+      </div>
+    </div>
+    <div class="cd-wrap" id="chCat"></div>
+  </section>
+
+  <section class="card g7">
+    <div class="card-h">
+      <h2>Top 10 Suppliers × Category</h2>
+      <div class="card-tools">
+        <button class="spec-btn" data-spec="heat" title="View calculation logic">?</button>
+        <span class="hint">Cell shading = spend</span>
+      </div>
+    </div>
+    <div class="chart heat-wrap" id="chHeat" data-empty="No cross data"></div>
+  </section>
+
+  <section class="card g12" id="fcCard">
+    <div class="card-h">
+      <h2>Framework Agreements <span class="card-note">· Separate source · 190 agreements · PA counts framework-contract POs only</span></h2>
+      <div class="card-tools">
+        <button class="spec-btn" data-spec="contracts" title="View calculation logic">?</button>
+        <select id="fcType" class="mini-sel"><option value="">All types</option></select>
+        <select id="fcStatus" class="mini-sel">
+          <option value="">All statuses</option>
+          <option value="active">Active</option>
+          <option value="expiring">Expiring ≤ 90 days</option>
+          <option value="expired">Expired</option>
+        </select>
+        <span class="date-range">
+          <input id="fcFrom" class="mini-inp" type="date" title="Start date from">
+          <span>–</span>
+          <input id="fcTo" class="mini-inp" type="date" title="Start date to">
+        </span>
+        <input id="fcQ" class="mini-inp" type="search" placeholder="Search contract">
+        <input id="fcSup" class="mini-inp" type="search" placeholder="Search supplier">
+        <button class="btn ghost sm" id="fcReset">Reset</button>
+        <button class="btn ghost sm" id="fcExport">Export</button>
+      </div>
+    </div>
+    <div class="fc-summary" id="fcSummary"></div>
+    <div class="tbl-wrap">
+      <table class="tbl fc-tbl" id="fcTbl">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="pager" id="fcPager"></div>
+  </section>
+</main>
+
+<!-- 明细抽屉 -->
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-h">
+    <div>
+      <h3 id="drawerTitle">Details</h3>
+      <p id="drawerSub"></p>
+    </div>
+    <button class="icon" id="drawerClose" title="Close">×</button>
+  </div>
+  <div class="drawer-b">
+    <div class="drawer-tools">
+      <input id="drawerQ" class="mini-inp" type="search" placeholder="Search…">
+      <select id="drawerSize" class="mini-sel">
+        <option value="50">50 rows</option>
+        <option value="100">100 rows</option>
+        <option value="200">200 rows</option>
+      </select>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl" id="drawerTbl"><thead></thead><tbody></tbody></table>
+    </div>
+    <div class="pager" id="drawerPager"></div>
+  </div>
+</aside>
+<div class="mask" id="mask"></div>
+
+<div class="tip" id="tip"></div>
+<div class="toast" id="toast"></div>
+
+<!-- 取值计算逻辑说明 -->
+<div class="spec-pop" id="specPop" aria-hidden="true">
+  <div class="sp-head">
+    <div>
+      <h4 id="spTitle">计算逻辑</h4>
+      <p id="spSource"></p>
+    </div>
+    <button class="icon" id="spClose" title="Close">×</button>
+  </div>
+  <div class="sp-body">
+    <div class="sp-sec">
+      <div class="sp-sec-t">这个数是怎么来的</div>
+      <ul class="sp-notes" id="spNotes"></ul>
+    </div>
+    <div class="sp-sec">
+      <div class="sp-sec-t">用了哪些数据库字段</div>
+      <div class="sp-fields" id="spFields"></div>
+    </div>
+    <div class="sp-sec">
+      <div class="sp-sec-t">当前生效的条件</div>
+      <div class="sp-kv" id="spParams"></div>
+      <div class="sp-hint" id="spHint"></div>
+    </div>
+    <div class="sp-sec">
+      <div class="sp-sec-t">名词解释</div>
+      <div class="sp-terms" id="spTerms"></div>
+    </div>
+  </div>
+</div>
+
+<script>window.__BOARD__ = { css: {{ v_css|tojson }}, js: {{ v_js|tojson }} };</script>
+<script src="{{ url_for('static', filename='board/board.js') }}?v={{ v_js }}"></script>
+</body>
+</html>

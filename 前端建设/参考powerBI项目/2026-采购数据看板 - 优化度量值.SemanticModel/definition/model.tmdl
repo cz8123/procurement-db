@@ -1,0 +1,47 @@
+model Model
+	culture: zh-CN
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: zh-CN
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation __PBI_TimeIntelligenceEnabled = 1
+
+annotation PBI_QueryOrder = ["OneDriveRoot","DAX表","Date Selection","Core Indicators","Currency Param","Moving Average","logo-svg映射表新","po","经纬度","采购类别id","Flags","框架协议_搜索提交","框架协议前置审批_搜索提交","订单支付表"]
+
+annotation PBI_ProTooling = ["MCP-PBIModeling","DevMode"]
+
+ref table DAX表
+ref table 日期表-自然年
+ref table 基础日期表
+ref table 'Date Selection'
+ref table 'Core Indicators'
+ref table 'Currency Param'
+ref table 'Moving Average'
+ref table 参数_窗口月数
+ref table 参数_违规阈值
+ref table logo-svg映射表新
+ref table po
+ref table 经纬度
+ref table 采购类别id
+ref table Flags
+ref table DateTableTemplate_5e7d4ef0-f061-4719-9e15-9c00950ac596
+ref table 框架协议_搜索提交
+ref table LocalDateTable_f8dbe342-f8f6-44a5-9665-0ee3bf1b5947
+ref table LocalDateTable_97d8f982-1d34-478f-a8fe-ca6e3c7537fb
+ref table LocalDateTable_a55a17ff-3428-4489-b812-0ddcd356fa85
+ref table 框架协议前置审批_搜索提交
+ref table LocalDateTable_970d6c6b-6c2f-481e-b27a-56f716c0799e
+ref table LocalDateTable_849c3cf0-acd4-4f19-9a1c-596224b3a70d
+ref table LocalDateTable_737ce073-fee1-47c1-8ab2-252888ae5b07
+ref table 日期表-财年
+ref table LocalDateTable_47f9f97a-93a4-457f-9395-21aae5ef6dd7
+ref table LocalDateTable_8bc034c8-bdbf-4979-b2ea-7cb13f602f25
+ref table LocalDateTable_ca7fd6f0-e85b-4c20-ad55-423d21be970b
+ref table 订单支付表
+ref table OneDriveRoot
+ref table LocalDateTable_61e1172d-b657-4f0b-80e0-e4ba1a40d0d3
+
+ref cultureInfo zh-CN
+

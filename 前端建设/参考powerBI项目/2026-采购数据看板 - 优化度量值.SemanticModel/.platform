@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "2026-采购数据看板 - 优化度量值"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "6165b911-1d3e-4b26-90b5-3ccf16b89b5d"
+  }
+}

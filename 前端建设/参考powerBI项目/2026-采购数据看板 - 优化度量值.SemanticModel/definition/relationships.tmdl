@@ -1,0 +1,78 @@
+relationship f1c314b2-d387-ee0a-bd43-e1e5e9b8fd7f
+	fromColumn: po.Brand
+	toColumn: logo-svg映射表新.Brand
+
+relationship AutoDetected_ebe8c635-9344-484e-a244-2ef243699d17
+	fromColumn: po.Company_cn
+	toColumn: 经纬度.Company_cn
+
+relationship AutoDetected_5d63660f-6ed1-441c-8358-43c26a67db94
+	fromColumn: po.Category
+	toColumn: 采购类别id.'Category name'
+
+relationship 35052962-8adb-4b27-9088-96cf4349eeb9
+	joinOnDateBehavior: datePartOnly
+	fromColumn: 框架协议_搜索提交.提交日期
+	toColumn: LocalDateTable_f8dbe342-f8f6-44a5-9665-0ee3bf1b5947.Date
+
+relationship 67a34efb-b0c9-4dc0-8b32-909f056a2f27
+	joinOnDateBehavior: datePartOnly
+	fromColumn: 框架协议_搜索提交.开始日期
+	toColumn: LocalDateTable_97d8f982-1d34-478f-a8fe-ca6e3c7537fb.Date
+
+relationship 96ae4be2-e3c4-4a23-8bd8-5741be672468
+	joinOnDateBehavior: datePartOnly
+	fromColumn: 框架协议_搜索提交.结束日期
+	toColumn: LocalDateTable_a55a17ff-3428-4489-b812-0ddcd356fa85.Date
+
+relationship d4bd820a-f408-451f-b850-1f653aa4941a
+	joinOnDateBehavior: datePartOnly
+	fromColumn: 框架协议前置审批_搜索提交.提交日期
+	toColumn: LocalDateTable_970d6c6b-6c2f-481e-b27a-56f716c0799e.Date
+
+relationship 37f37042-4582-e99e-0db7-c75db2817dd6
+	fromColumn: 框架协议_搜索提交.前置审批单号
+	toColumn: 框架协议前置审批_搜索提交.参考编号
+
+relationship aba88fbe-f570-54d2-9a93-bc1d095d4511
+	fromColumn: po.'Contract No.'
+	toColumn: 框架协议_搜索提交.合同编号（中文）
+
+relationship 917bd7c5-bb37-41bf-b6ad-0763979b223f
+	joinOnDateBehavior: datePartOnly
+	fromColumn: 基础日期表.Date
+	toColumn: LocalDateTable_849c3cf0-acd4-4f19-9a1c-596224b3a70d.Date
+
+relationship cf01c15d-3bed-47ec-bcf1-bc5b787e0a0a
+	joinOnDateBehavior: datePartOnly
+	fromColumn: 日期表-自然年.Date
+	toColumn: LocalDateTable_737ce073-fee1-47c1-8ab2-252888ae5b07.Date
+
+relationship 7471600e-e804-2780-f906-81bbcdda1444
+	fromColumn: po.Date
+	toColumn: 日期表-自然年.Date
+
+relationship 67d43580-405f-4fad-b534-84b4f6fa5479
+	joinOnDateBehavior: datePartOnly
+	fromColumn: po.'Contract Expiry Date'
+	toColumn: LocalDateTable_47f9f97a-93a4-457f-9395-21aae5ef6dd7.Date
+
+relationship de5f1541-102d-4d1f-9851-3177fff5f936
+	joinOnDateBehavior: datePartOnly
+	fromColumn: po.'Contract Start Date'
+	toColumn: LocalDateTable_8bc034c8-bdbf-4979-b2ea-7cb13f602f25.Date
+
+relationship e11c36d2-5513-4900-ab56-d8ebed681087
+	joinOnDateBehavior: datePartOnly
+	fromColumn: 日期表-财年.Date
+	toColumn: LocalDateTable_ca7fd6f0-e85b-4c20-ad55-423d21be970b.Date
+
+relationship 98f88a3d-cc35-c1f0-b87a-44f2e5943247
+	fromColumn: po.Date
+	toColumn: 日期表-财年.Date
+
+relationship 2cf758d5-3caf-4aa3-b79c-70cf1d57c5a0
+	joinOnDateBehavior: datePartOnly
+	fromColumn: 订单支付表.提交日期
+	toColumn: LocalDateTable_61e1172d-b657-4f0b-80e0-e4ba1a40d0d3.Date
+

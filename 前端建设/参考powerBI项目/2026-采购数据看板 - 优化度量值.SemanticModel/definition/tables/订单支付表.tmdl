@@ -1,0 +1,148 @@
+table 订单支付表
+	lineageTag: 69c999f6-c4dc-46a9-ac02-17db3ca45151
+
+	column 序
+		dataType: int64
+		formatString: 0
+		lineageTag: ecab1168-fb32-4f47-b15f-66bb92db6930
+		summarizeBy: sum
+		sourceColumn: 序
+
+		annotation SummarizationSetBy = Automatic
+
+	column 表单编号
+		dataType: string
+		lineageTag: cd0d154a-b9cd-479c-9577-2533b76e9a21
+		summarizeBy: none
+		sourceColumn: 表单编号
+
+		annotation SummarizationSetBy = Automatic
+
+	column 提交者
+		dataType: string
+		lineageTag: e0b02cd6-dca1-43ef-b6ba-e9ac14616bfd
+		summarizeBy: none
+		sourceColumn: 提交者
+
+		annotation SummarizationSetBy = Automatic
+
+	column 提交日期
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: b5ed338c-3d13-4ddf-b749-22eb3a1ac7d3
+		summarizeBy: none
+		sourceColumn: 提交日期
+
+		variation 变体
+			isDefault
+			relationship: 2cf758d5-3caf-4aa3-b79c-70cf1d57c5a0
+			defaultHierarchy: LocalDateTable_61e1172d-b657-4f0b-80e0-e4ba1a40d0d3.日期层次结构
+
+		annotation SummarizationSetBy = Automatic
+
+	column 公司
+		dataType: string
+		lineageTag: 18c09aa9-4b7a-45ae-b115-35b75bd6e411
+		summarizeBy: none
+		sourceColumn: 公司
+
+		annotation SummarizationSetBy = Automatic
+
+	column 部门
+		dataType: string
+		lineageTag: c34e81b0-924c-40dd-b79f-8b6b58cec433
+		summarizeBy: none
+		sourceColumn: 部门
+
+		annotation SummarizationSetBy = Automatic
+
+	column 已批准的采购申请参考
+		dataType: string
+		lineageTag: 907d4bae-7b65-4635-afe5-387c5345d8ef
+		summarizeBy: none
+		sourceColumn: 已批准的采购申请参考
+
+		annotation SummarizationSetBy = Automatic
+
+	column 批准采购总额（人民币）
+		dataType: decimal
+		formatString: "¥"#,0.###############;"¥"-#,0.###############;"¥"#,0.###############
+		lineageTag: 0693545e-cd8f-43dd-b8dc-bd0ddd4c2b94
+		summarizeBy: sum
+		sourceColumn: 批准采购总额（人民币）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"currencyCulture":"zh-CN"}
+
+	column 供应商名称
+		dataType: string
+		lineageTag: 258e876b-60ff-492a-b3fc-77a3231bebc6
+		summarizeBy: none
+		sourceColumn: 供应商名称
+
+		annotation SummarizationSetBy = Automatic
+
+	column 采购状态
+		dataType: string
+		lineageTag: 2eba2b5c-ac98-45c6-93c8-2d89f55f338b
+		summarizeBy: none
+		sourceColumn: 采购状态
+
+		annotation SummarizationSetBy = Automatic
+
+	column 状态
+		dataType: string
+		lineageTag: 3ff5d1a2-f1b9-4692-a120-a6a61157221b
+		summarizeBy: none
+		sourceColumn: 状态
+
+		annotation SummarizationSetBy = Automatic
+
+	column 总采购订单总额（人民币)
+		dataType: decimal
+		formatString: "¥"#,0.###############;"¥"-#,0.###############;"¥"#,0.###############
+		lineageTag: aa539ceb-cfc4-4ccc-b093-336e6760f0e2
+		summarizeBy: sum
+		sourceColumn: 总采购订单总额（人民币)
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"currencyCulture":"zh-CN"}
+
+	column 剩余已批准采购总额（人民币）
+		dataType: decimal
+		formatString: "¥"#,0.###############;"¥"-#,0.###############;"¥"#,0.###############
+		lineageTag: f390e6c0-6535-428c-bf8e-002bd1c78f10
+		summarizeBy: sum
+		sourceColumn: 剩余已批准采购总额（人民币）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"currencyCulture":"zh-CN"}
+
+	column 总支付总额（人民币）
+		dataType: decimal
+		formatString: "¥"#,0.###############;"¥"-#,0.###############;"¥"#,0.###############
+		lineageTag: f1dd47e2-6171-4011-8ea4-c2d8ebf0be62
+		summarizeBy: sum
+		sourceColumn: 总支付总额（人民币）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"currencyCulture":"zh-CN"}
+
+	partition 订单支付表 = m
+		mode: import
+		source =
+				let
+				  源 = Csv.Document(File.Contents(OneDriveRoot{0}[Path] & "\数据表\Purchase Order-采购订单（仅供查看与下载）_搜索提交.csv"), [Delimiter = ",", Columns = 14, Encoding = 65001, QuoteStyle = QuoteStyle.None]),
+				  已提升标题 = Table.PromoteHeaders(源, [PromoteAllScalars = true]),
+				  已更改列类型 = Table.TransformColumnTypes(已提升标题, {{"序", Int64.Type}, {"表单编号", type text}, {"提交者", type text}, {"提交日期", type datetime}, {"公司", type text}, {"部门", type text}, {"已批准的采购申请参考", type text}, {"批准采购总额（人民币）", Currency.Type}, {"供应商名称", type text}, {"采购状态", type text}, {"状态", type text}, {"总采购订单总额（人民币)", Currency.Type}, {"剩余已批准采购总额（人民币）", Currency.Type}, {"总支付总额（人民币）", Currency.Type}}, "zh-Hans")
+				in
+				  已更改列类型
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+

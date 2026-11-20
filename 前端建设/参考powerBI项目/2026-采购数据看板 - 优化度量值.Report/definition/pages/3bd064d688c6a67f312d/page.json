@@ -1,0 +1,161 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/2.1.0/schema.json",
+  "name": "3bd064d688c6a67f312d",
+  "displayName": "Category",
+  "displayOption": "FitToPage",
+  "height": 720,
+  "width": 1280,
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "bc372b384512ae433d02",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "po"
+              }
+            },
+            "Property": "Category"
+          }
+        },
+        "type": "Categorical",
+        "howCreated": "User",
+        "objects": {
+          "general": [
+            {
+              "properties": {
+                "isInvertedSelectionMode": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "true"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "objects": {
+    "background": [
+      {
+        "properties": {
+          "image": {
+            "image": {
+              "name": {
+                "expr": {
+                  "Literal": {
+                    "Value": "'图片3.jpg'"
+                  }
+                }
+              },
+              "url": {
+                "expr": {
+                  "ResourcePackageItem": {
+                    "PackageName": "RegisteredResources",
+                    "PackageType": 1,
+                    "ItemName": "__34698040341521962.jpg"
+                  }
+                }
+              },
+              "scaling": {
+                "expr": {
+                  "Literal": {
+                    "Value": "'Fit'"
+                  }
+                }
+              }
+            }
+          },
+          "transparency": {
+            "expr": {
+              "Literal": {
+                "Value": "0D"
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "visualInteractions": [
+    {
+      "source": "6783f5d3acedec345e93",
+      "target": "9ec5ebe75df993037f56",
+      "type": "DataFilter"
+    },
+    {
+      "source": "6783f5d3acedec345e93",
+      "target": "5313cb409ac713ba1c32",
+      "type": "NoFilter"
+    },
+    {
+      "source": "6783f5d3acedec345e93",
+      "target": "cf9f5ac53b3fe7b01204",
+      "type": "NoFilter"
+    },
+    {
+      "source": "6783f5d3acedec345e93",
+      "target": "8e24839e8ce83df5da96",
+      "type": "NoFilter"
+    },
+    {
+      "source": "6783f5d3acedec345e93",
+      "target": "de987973a5cfc27f33c1",
+      "type": "NoFilter"
+    },
+    {
+      "source": "9ec5ebe75df993037f56",
+      "target": "de987973a5cfc27f33c1",
+      "type": "NoFilter"
+    },
+    {
+      "source": "9ec5ebe75df993037f56",
+      "target": "8e24839e8ce83df5da96",
+      "type": "NoFilter"
+    },
+    {
+      "source": "9ec5ebe75df993037f56",
+      "target": "5313cb409ac713ba1c32",
+      "type": "NoFilter"
+    },
+    {
+      "source": "6783f5d3acedec345e93",
+      "target": "9225cc360a668a1a1307",
+      "type": "NoFilter"
+    },
+    {
+      "source": "8e24839e8ce83df5da96",
+      "target": "9225cc360a668a1a1307",
+      "type": "NoFilter"
+    },
+    {
+      "source": "5313cb409ac713ba1c32",
+      "target": "9225cc360a668a1a1307",
+      "type": "NoFilter"
+    },
+    {
+      "source": "9ec5ebe75df993037f56",
+      "target": "9225cc360a668a1a1307",
+      "type": "NoFilter"
+    },
+    {
+      "source": "9ec5ebe75df993037f56",
+      "target": "6783f5d3acedec345e93",
+      "type": "HighlightFilter"
+    },
+    {
+      "source": "5313cb409ac713ba1c32",
+      "target": "9ec5ebe75df993037f56",
+      "type": "DataFilter"
+    },
+    {
+      "source": "8e24839e8ce83df5da96",
+      "target": "9ec5ebe75df993037f56",
+      "type": "DataFilter"
+    }
+  ]
+}

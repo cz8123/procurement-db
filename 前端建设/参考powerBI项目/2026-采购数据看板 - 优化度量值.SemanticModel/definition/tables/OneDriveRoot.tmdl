@@ -1,0 +1,27 @@
+table OneDriveRoot
+	lineageTag: 7f3c2a1b-9d4e-4c5a-8b6f-1e2d3c4b5a60
+
+	column Path
+		dataType: string
+		lineageTag: a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+		summarizeBy: none
+		sourceColumn: Path
+
+		annotation SummarizationSetBy = Automatic
+
+	partition OneDriveRoot = m
+		mode: import
+		source =
+				let
+				    // 2026-09-07 硬编码固定路径（方案 A）。此前动态探测（注册表+盘符扫描）被 C 盘 OneDrive 残留误命中，
+				    // 导致 ProjectRoot 解析为 C:\OneDrive - ...（实际数据在 D 盘），8 张数据表刷新全部报"未能找到路径"。
+				    // 如需改回自适应探测，参照 git 历史版本恢复动态 M。
+				    ProjectRoot = "D:\OneDrive - Sime Darby Holdings Berhad\过程办公文件\06 项目资料\采购数据可视化项目\1 项目 2.0",
+				    Result = #table({"Path"}, {{ProjectRoot}})
+				in
+				    Result
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_Hidden = true
+

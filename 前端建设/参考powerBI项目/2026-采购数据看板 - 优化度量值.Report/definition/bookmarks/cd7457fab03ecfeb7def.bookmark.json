@@ -1,0 +1,1357 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/bookmark/2.1.0/schema.json",
+  "displayName": "帕累托图",
+  "name": "cd7457fab03ecfeb7def",
+  "options": {
+    "targetVisualNames": [],
+    "suppressData": true
+  },
+  "explorationState": {
+    "version": "1.3",
+    "activeSection": "3bd064d688c6a67f312d",
+    "filters": {
+      "byExpr": [
+        {
+          "name": "629ad18da8ebcf4c742a",
+          "type": "Categorical",
+          "expression": {
+            "Column": {
+              "Expression": {
+                "SourceRef": {
+                  "Entity": "PRPO"
+                }
+              },
+              "Property": "Category"
+            }
+          },
+          "howCreated": 1
+        },
+        {
+          "name": "c11ee16f71247849bac2",
+          "type": "Categorical",
+          "expression": {
+            "Column": {
+              "Expression": {
+                "SourceRef": {
+                  "Entity": "PRPO"
+                }
+              },
+              "Property": "Sub-Category"
+            }
+          },
+          "howCreated": 1
+        }
+      ]
+    },
+    "sections": {
+      "3bd064d688c6a67f312d": {
+        "visualContainers": {
+          "5313cb409ac713ba1c32": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "e099dc1685e3503a7925",
+                  "type": "Advanced",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "d",
+                        "Entity": "DAX表",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "Comparison": {
+                            "ComparisonKind": 1,
+                            "Left": {
+                              "Measure": {
+                                "Expression": {
+                                  "SourceRef": {
+                                    "Source": "d"
+                                  }
+                                },
+                                "Property": "1_Time Taken"
+                              }
+                            },
+                            "Right": {
+                              "Literal": {
+                                "Value": "0L"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Time Taken"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "bc56d61df5c43655693d",
+                  "type": "Advanced",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "d",
+                        "Entity": "DAX表",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "Comparison": {
+                            "ComparisonKind": 1,
+                            "Left": {
+                              "Measure": {
+                                "Expression": {
+                                  "SourceRef": {
+                                    "Source": "d"
+                                  }
+                                },
+                                "Property": "1_Total Amount"
+                              }
+                            },
+                            "Right": {
+                              "Literal": {
+                                "Value": "0M"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Total Amount"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "7ea9ec6fa1f439059e5a",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Procurement_Method"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "25d3d7f0cc96c87fbb85",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Suppliers"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "65de5438962f6e03902f",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Orders"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "scatterChart",
+              "objects": {
+                "merge": {
+                  "zoom": [
+                    {
+                      "properties": {
+                        "categoryMin": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "1D"
+                            }
+                          }
+                        },
+                        "categorySize": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "993797037.1827431D"
+                            }
+                          }
+                        },
+                        "valueMin": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "1D"
+                            }
+                          }
+                        },
+                        "valueSize": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "854.5677546589444D"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "activeProjections": {
+                "Category": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Procurement_Method"
+                    }
+                  }
+                ],
+                "X": [
+                  {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Total Amount"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "8e24839e8ce83df5da96": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "e099dc1685e3503a7925",
+                  "type": "Advanced",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "d",
+                        "Entity": "DAX表",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "Comparison": {
+                            "ComparisonKind": 1,
+                            "Left": {
+                              "Measure": {
+                                "Expression": {
+                                  "SourceRef": {
+                                    "Source": "d"
+                                  }
+                                },
+                                "Property": "1_Time Taken"
+                              }
+                            },
+                            "Right": {
+                              "Literal": {
+                                "Value": "0L"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Time Taken"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "bc56d61df5c43655693d",
+                  "type": "Advanced",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "d",
+                        "Entity": "DAX表",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "Comparison": {
+                            "ComparisonKind": 1,
+                            "Left": {
+                              "Measure": {
+                                "Expression": {
+                                  "SourceRef": {
+                                    "Source": "d"
+                                  }
+                                },
+                                "Property": "1_Total Amount"
+                              }
+                            },
+                            "Right": {
+                              "Literal": {
+                                "Value": "0M"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Total Amount"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "56b33842fecedb6cc773",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Category"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "77e81107a70098e2ac94",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Suppliers"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "f107711111cc81bebdf1",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Orders"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "scatterChart",
+              "objects": {
+                "merge": {
+                  "zoom": [
+                    {
+                      "properties": {
+                        "categoryMin": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "1D"
+                            }
+                          }
+                        },
+                        "categorySize": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "99791987.58976172D"
+                            }
+                          }
+                        },
+                        "valueMin": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "1D"
+                            }
+                          }
+                        },
+                        "valueSize": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "992.6841268849385D"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "activeProjections": {
+                "Category": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Category"
+                    }
+                  }
+                ],
+                "X": [
+                  {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Total Amount"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "9225cc360a668a1a1307": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "3b90f7ed53399cf535b9",
+                  "type": "Advanced",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "d",
+                        "Entity": "DAX表",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "Comparison": {
+                            "ComparisonKind": 0,
+                            "Left": {
+                              "Measure": {
+                                "Expression": {
+                                  "SourceRef": {
+                                    "Source": "d"
+                                  }
+                                },
+                                "Property": "Is Top 80%"
+                              }
+                            },
+                            "Right": {
+                              "Literal": {
+                                "Value": "1L"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "Is Top 80%"
+                    }
+                  },
+                  "howCreated": 1
+                },
+                {
+                  "name": "dee5e34e9d31458f895a",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Supplier_cn"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "af80a671393fbf7461bc",
+                  "type": "Advanced",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "d",
+                        "Entity": "DAX表",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "Comparison": {
+                            "ComparisonKind": 1,
+                            "Left": {
+                              "Measure": {
+                                "Expression": {
+                                  "SourceRef": {
+                                    "Source": "d"
+                                  }
+                                },
+                                "Property": "2_Total Amount_汇率"
+                              }
+                            },
+                            "Right": {
+                              "Literal": {
+                                "Value": "1000000M"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_Total Amount_汇率"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "57860d4592c67577ded0",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "5_Cumulative Amount_by supplier"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "lineClusteredColumnComboChart",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_Total Amount_汇率"
+                    }
+                  }
+                }
+              ],
+              "activeProjections": {
+                "Category": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Supplier_cn"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "9ec5ebe75df993037f56": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "c1f8ab1b2948d5641c1d",
+                  "type": "Advanced",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "d",
+                        "Entity": "DAX表",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "Comparison": {
+                            "ComparisonKind": 1,
+                            "Left": {
+                              "Measure": {
+                                "Expression": {
+                                  "SourceRef": {
+                                    "Source": "d"
+                                  }
+                                },
+                                "Property": "1_Total Amount"
+                              }
+                            },
+                            "Right": {
+                              "Literal": {
+                                "Value": "1500000M"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Total Amount"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "fd83ca6fe827ccbb07b5",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Supplier_cn"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "84e48c6d2d9133a616a0",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Category"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "ChordChart1444757060245",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "1_Total Amount"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "aa9b4314783725ffdd83": {
+            "singleVisual": {
+              "visualType": "shape",
+              "objects": {}
+            }
+          },
+          "cf9f5ac53b3fe7b01204": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "b87ce3810017d0664b33",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "日",
+                        "Entity": "日期表-自然年",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "Not": {
+                            "Expression": {
+                              "In": {
+                                "Expressions": [
+                                  {
+                                    "Column": {
+                                      "Expression": {
+                                        "SourceRef": {
+                                          "Source": "日"
+                                        }
+                                      },
+                                      "Property": "Year"
+                                    }
+                                  }
+                                ],
+                                "Values": [
+                                  [
+                                    {
+                                      "Literal": {
+                                        "Value": "null"
+                                      }
+                                    }
+                                  ]
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "Year"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "slicer",
+              "objects": {
+                "merge": {
+                  "general": [
+                    {
+                      "properties": {
+                        "filter": {
+                          "filter": {
+                            "Version": 2,
+                            "From": [
+                              {
+                                "Name": "日",
+                                "Entity": "日期表-自然年",
+                                "Type": 0
+                              }
+                            ],
+                            "Where": [
+                              {
+                                "Condition": {
+                                  "In": {
+                                    "Expressions": [
+                                      {
+                                        "Column": {
+                                          "Expression": {
+                                            "SourceRef": {
+                                              "Source": "日"
+                                            }
+                                          },
+                                          "Property": "Year"
+                                        }
+                                      }
+                                    ],
+                                    "Values": [
+                                      [
+                                        {
+                                          "Literal": {
+                                            "Value": "2026L"
+                                          }
+                                        }
+                                      ]
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "data": [
+                    {
+                      "properties": {
+                        "numericStart": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "1990D"
+                            }
+                          }
+                        },
+                        "numericEnd": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "2040D"
+                            }
+                          }
+                        },
+                        "mode": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "'Dropdown'"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "selection": [
+                    {
+                      "properties": {
+                        "strictSingleSelect": {
+                          "expr": {
+                            "Literal": {
+                              "Value": "true"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "activeProjections": {
+                "Values": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "日期表-自然年"
+                        }
+                      },
+                      "Property": "Year"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "de987973a5cfc27f33c1": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "9c5cac0a7bd595744de4",
+                  "type": "Advanced",
+                  "expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_Total Amount_汇率_百万_RMB"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "3eee5ce45419fe12b96e",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "9121ee8a0c89e2bbad20",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "City_en"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "9144ed303db30ef117b2",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Company_en"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "d2375a83b1a9c6507120",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Department_name"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "55031b3efeb1cc5b1b27",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Category"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "43464eec0849c4b62851",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Supplier_en"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "decompositionTreeVisual",
+              "objects": {},
+              "orderBy": [
+                {
+                  "Direction": 2,
+                  "Expression": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "DAX表"
+                        }
+                      },
+                      "Property": "2_Total Amount_汇率_百万_RMB"
+                    }
+                  }
+                }
+              ],
+              "activeProjections": {
+                "ExplainBy": [
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Region_en"
+                    }
+                  },
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "City_en"
+                    }
+                  },
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Company_en"
+                    }
+                  },
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Department_name"
+                    }
+                  },
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Category"
+                    }
+                  },
+                  {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "PRPO"
+                        }
+                      },
+                      "Property": "Supplier_en"
+                    }
+                  }
+                ]
+              },
+              "expansionStates": [
+                {
+                  "roles": [
+                    "ExplainBy"
+                  ],
+                  "levels": [
+                    {
+                      "queryRefs": [
+                        "PRPO.Region_en"
+                      ],
+                      "isCollapsed": true,
+                      "identityKeys": [
+                        {
+                          "Column": {
+                            "Expression": {
+                              "SourceRef": {
+                                "Entity": "PRPO"
+                              }
+                            },
+                            "Property": "Region_en"
+                          }
+                        }
+                      ],
+                      "isPinned": true,
+                      "isLocked": true
+                    },
+                    {
+                      "queryRefs": [
+                        "PRPO.City_en"
+                      ],
+                      "isCollapsed": true,
+                      "identityKeys": [
+                        {
+                          "Column": {
+                            "Expression": {
+                              "SourceRef": {
+                                "Entity": "PRPO"
+                              }
+                            },
+                            "Property": "City_en"
+                          }
+                        }
+                      ],
+                      "isPinned": true,
+                      "isLocked": true
+                    },
+                    {
+                      "queryRefs": [
+                        "PRPO.Company_en"
+                      ],
+                      "isCollapsed": true,
+                      "identityKeys": [
+                        {
+                          "Column": {
+                            "Expression": {
+                              "SourceRef": {
+                                "Entity": "PRPO"
+                              }
+                            },
+                            "Property": "Company_en"
+                          }
+                        }
+                      ],
+                      "isPinned": true,
+                      "isLocked": true
+                    },
+                    {
+                      "queryRefs": [
+                        "PRPO.Department_name"
+                      ],
+                      "isCollapsed": true,
+                      "identityKeys": [
+                        {
+                          "Column": {
+                            "Expression": {
+                              "SourceRef": {
+                                "Entity": "PRPO"
+                              }
+                            },
+                            "Property": "Department_name"
+                          }
+                        }
+                      ],
+                      "isPinned": true,
+                      "isLocked": true
+                    },
+                    {
+                      "queryRefs": [
+                        "PRPO.Category"
+                      ],
+                      "isCollapsed": true,
+                      "identityKeys": [
+                        {
+                          "Column": {
+                            "Expression": {
+                              "SourceRef": {
+                                "Entity": "PRPO"
+                              }
+                            },
+                            "Property": "Category"
+                          }
+                        }
+                      ],
+                      "isPinned": true,
+                      "isLocked": true
+                    },
+                    {
+                      "queryRefs": [
+                        "PRPO.Supplier_en"
+                      ],
+                      "isCollapsed": true,
+                      "isPinned": true
+                    }
+                  ],
+                  "root": {
+                    "identityValues": [],
+                    "children": [
+                      {
+                        "identityValues": [
+                          {
+                            "Literal": {
+                              "Value": "'West'"
+                            }
+                          }
+                        ],
+                        "isToggled": true,
+                        "children": [
+                          {
+                            "identityValues": [
+                              {
+                                "Literal": {
+                                  "Value": "'Kunming'"
+                                }
+                              }
+                            ],
+                            "isToggled": true,
+                            "children": [
+                              {
+                                "identityValues": [
+                                  {
+                                    "Literal": {
+                                      "Value": "'KMBC'"
+                                    }
+                                  }
+                                ],
+                                "isToggled": true,
+                                "children": [
+                                  {
+                                    "identityValues": [
+                                      {
+                                        "Literal": {
+                                          "Value": "'Aftersales'"
+                                        }
+                                      }
+                                    ],
+                                    "isToggled": true,
+                                    "children": [
+                                      {
+                                        "identityValues": [
+                                          {
+                                            "Literal": {
+                                              "Value": "'Aftersales Service'"
+                                            }
+                                          }
+                                        ],
+                                        "isToggled": true
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ],
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "31e0239ce6fc7447aa53": {
+            "singleVisual": {
+              "visualType": "actionButton",
+              "objects": {}
+            }
+          },
+          "098e83d6cd8e14a0519f": {
+            "singleVisual": {
+              "visualType": "actionButton",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "f20a8358975069365e1a": {
+            "singleVisual": {
+              "visualType": "actionButton",
+              "objects": {},
+              "display": {
+                "mode": "hidden"
+              }
+            }
+          },
+          "0a39c31cad2b086867c8": {
+            "singleVisual": {
+              "visualType": "actionButton",
+              "objects": {}
+            }
+          }
+        }
+      }
+    },
+    "objects": {
+      "merge": {
+        "outspacePane": [
+          {
+            "properties": {
+              "expanded": {
+                "expr": {
+                  "Literal": {
+                    "Value": "false"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,48 @@
+table 采购类别id
+	lineageTag: 5bde0bdf-245c-4872-845b-9dae0035e04e
+
+	column 'Category ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: 8194fc66-8c16-4919-ad0d-ac828735873c
+		summarizeBy: none
+		sourceColumn: Category ID
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Category name'
+		dataType: string
+		lineageTag: 26289aab-03c7-491c-bb4d-cfd2ab67f6f5
+		summarizeBy: none
+		sourceColumn: Category name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Segmented by'
+		dataType: string
+		lineageTag: 959d2860-ce1d-47b1-b978-7f0da188db39
+		summarizeBy: none
+		sourceColumn: Segmented by
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Image URL'
+		dataType: string
+		lineageTag: a4bfcf0f-da41-4026-bf37-4730e9fcb95c
+		summarizeBy: none
+		sourceColumn: Image URL
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 采购类别id = m
+		mode: import
+		source =
+				let
+				    源 = Csv.Document(File.Contents(OneDriveRoot{0}[Path] & "\数据表\采购类别id.csv"),[Delimiter=",", Columns=4, Encoding=65001, QuoteStyle=QuoteStyle.None]),
+				    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true]),
+				    更改的类型 = Table.TransformColumnTypes(提升的标题,{{"Category ID", Int64.Type}, {"Category name", type text}, {"Segmented by", type text}, {"Image URL", type text}})
+				in
+				    更改的类型
+
+	annotation PBI_ResultType = Table
+

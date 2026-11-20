@@ -20,6 +20,12 @@ if os.path.exists(TEST_DB):
     os.remove(TEST_DB)
 shutil.copy2(os.path.join(ROOT, "procurement.db"), TEST_DB)
 A.DB_PATH = TEST_DB
+
+import _dim_fixture  # noqa: E402  (同目录)
+
+# 维度表已在真实库中删除，这里在副本里重建最小夹具
+_dim_fixture.build(TEST_DB)
+
 cli = A.app.test_client()
 OK = FAIL = 0
 
@@ -88,12 +94,19 @@ print()
 print("=" * 74)
 print("C  fct_prpo.部门 同样支持（同一维度表、不同事实表）")
 print("=" * 74)
+# A 段用 keep 把它们建成了成员，这里删掉，还原「另一张事实表还有没补录的值」的真实场景
+_c = sqlite3.connect(TEST_DB)
+for _k in ["Marketing-MINI-市场部-Mini", "Admin_BMW_行政部-BMW", "HSE-HSE"]:
+    _c.execute("DELETE FROM dim_department WHERE DepartmentName = ?", (_k,))
+_c.commit()
+_c.close()
 mk2 = cli.get("/api/missing-keys", query_string={
     "fact": "fct_prpo", "fact_col": "部门", "dim": "dim_department",
     "dim_col": "DepartmentName", "page": 1, "size": 200}).get_json()
 ex_ok = all((it.get("extra") or {}).get("DepartmentEn") for it in mk2["items"] if it["key"] in
             ["Marketing-MINI-市场部-Mini", "Admin_BMW_行政部-BMW", "HSE-HSE"])
-chk(ex_ok, f"fct_prpo 的 {len(mk2['items'])} 个缺失值也给出了分类建议")
+chk(ex_ok and len(mk2["items"]) >= 3,
+    f"fct_prpo 的 {len(mk2['items'])} 个缺失值也给出了分类建议")
 rep3 = cli.post("/api/backfill-map", json={
     "fact": "fct_prpo", "fact_col": "部门", "dim": "dim_department", "dim_col": "DepartmentName",
     "mappings": [{"key": it["key"], "target": "", "extra": it.get("extra")}

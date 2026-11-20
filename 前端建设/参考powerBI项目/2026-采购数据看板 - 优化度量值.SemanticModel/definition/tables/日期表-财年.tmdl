@@ -1,0 +1,369 @@
+table 日期表-财年
+	lineageTag: d3c30013-04fb-476b-9d8e-ff17c00fc173
+
+	column Date
+		formatString: General Date
+		lineageTag: a4d144b4-fdef-449b-afb1-8b5d33828137
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: 基础日期表[Date]
+
+		variation 变体
+			isDefault
+			relationship: e11c36d2-5513-4900-ab56-d8ebed681087
+			defaultHierarchy: LocalDateTable_ca7fd6f0-e85b-4c20-ad55-423d21be970b.日期层次结构
+
+		annotation SummarizationSetBy = Automatic
+
+	column DateKey
+		lineageTag: e4df365b-9794-4ba6-82a5-0174444c1d0b
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [DateKey]
+
+		annotation SummarizationSetBy = Automatic
+
+	column Year
+		formatString: 0
+		lineageTag: 8e185b61-9981-440d-b740-3bdf782dd8b6
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [Year]
+
+		annotation SummarizationSetBy = Automatic
+
+	column Quarter
+		formatString: 0
+		lineageTag: 4c1f7fd6-5296-42ac-b16d-15985418787d
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [Quarter]
+
+		annotation SummarizationSetBy = Automatic
+
+	column QuarterName
+		lineageTag: 8ab9fb74-ce88-41ad-9e26-5ce8c288501c
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [QuarterName]
+
+		annotation SummarizationSetBy = Automatic
+
+	column MonthNumber
+		formatString: 0
+		lineageTag: 2e0b6dde-82e2-4889-b076-97e83476ef3b
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [MonthNumber]
+
+		annotation SummarizationSetBy = Automatic
+
+	column MonthName
+		lineageTag: 790f6030-3637-4966-9bd5-9dcfce4c3b8f
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [MonthName]
+		sortByColumn: FiscalMonthNumber
+
+		annotation SummarizationSetBy = Automatic
+
+	column MonthNameShort
+		lineageTag: 6897db98-9f4a-4fd6-a373-5f5a75c88a68
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [MonthNameShort]
+
+		annotation SummarizationSetBy = Automatic
+
+	column WeekNumber
+		formatString: 0
+		lineageTag: 07b0f3c1-9c46-4efa-8525-e1c18e901f68
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [WeekNumber]
+
+		annotation SummarizationSetBy = Automatic
+
+	column DayOfWeek
+		formatString: 0
+		lineageTag: 3961d68c-cbf8-474b-ae76-dcc9463ceaa3
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [DayOfWeek]
+
+		annotation SummarizationSetBy = Automatic
+
+	column DayName
+		lineageTag: 0c8f27c4-72bf-4a0c-be98-7cd9fefa515f
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [DayName]
+
+		annotation SummarizationSetBy = Automatic
+
+	column YearQuarterSort
+		formatString: 0
+		lineageTag: f74824df-7114-42fc-8331-9470d1dc17c6
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [YearQuarterSort]
+
+		annotation SummarizationSetBy = Automatic
+
+	column YearMonthSort
+		formatString: 0
+		lineageTag: 25363951-3941-4459-b2d6-fd0340ad471b
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [YearMonthSort]
+
+		annotation SummarizationSetBy = Automatic
+
+	column YearWeekSort
+		formatString: 0
+		lineageTag: e5db78e7-9fb6-4308-b1e4-74969ea9b227
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [YearWeekSort]
+
+		annotation SummarizationSetBy = Automatic
+
+	column 年
+		formatString: 0
+		lineageTag: 0cfe1cd9-dc07-45d2-bba5-61509aa4cad8
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [年]
+
+		annotation SummarizationSetBy = Automatic
+
+	column 季度
+		lineageTag: 5c6dd541-a9d8-4be7-a7c5-07f323c3285b
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [季度]
+
+		annotation SummarizationSetBy = Automatic
+
+	column 月份
+		lineageTag: a4e408eb-ca05-4177-ad81-f7ab618e1bb5
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [月份]
+
+		annotation SummarizationSetBy = Automatic
+
+	column 年季度
+		lineageTag: 0499a356-2105-404a-badf-818ac371fc63
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [年季度]
+
+		annotation SummarizationSetBy = Automatic
+
+	column 年月
+		lineageTag: 900fe639-5cc3-4bac-83c8-4761e9664b3c
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [年月]
+
+		annotation SummarizationSetBy = Automatic
+
+	column FiscalYear
+		formatString: 0
+		lineageTag: 3de8bd38-ef57-4d5e-bedd-2fb890079c75
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [FiscalYear]
+
+		annotation SummarizationSetBy = Automatic
+
+	column FiscalQuarter
+		formatString: 0
+		lineageTag: a8e938b0-91c5-437c-934c-2b18c528f058
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [FiscalQuarter]
+
+		annotation SummarizationSetBy = Automatic
+
+	column FiscalQuarterName
+		lineageTag: 796075f4-54da-457e-8ed9-5cbd704cb517
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [FiscalQuarterName]
+
+		annotation SummarizationSetBy = Automatic
+
+	column FiscalMonthNumber
+		formatString: 0
+		lineageTag: 51e05a05-c002-4ff7-8aa5-9b3cd049029e
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [FiscalMonthNumber]
+
+		annotation SummarizationSetBy = Automatic
+
+	column FiscalYearSort
+		formatString: 0
+		lineageTag: 180af7b8-caae-4ef2-a74f-a8f72fa7d510
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [FiscalYearSort]
+
+		annotation SummarizationSetBy = Automatic
+
+	column FiscalYearName
+		lineageTag: d6ef613a-a6bb-4475-bf6f-cc516f272cb8
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [FiscalYearName]
+
+		annotation SummarizationSetBy = Automatic
+
+	column FiscalYearMonthSort
+		formatString: 0
+		lineageTag: 202576f0-f331-48b1-ad60-1cf831ef77dd
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [FiscalYearMonthSort]
+
+		annotation SummarizationSetBy = Automatic
+
+	column FiscalWeekNumber
+		formatString: 0
+		lineageTag: 0c8ee5d2-6f0d-4d8a-81d5-d50f3d011dad
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [FiscalWeekNumber]
+
+		annotation SummarizationSetBy = Automatic
+
+	column FiscalYearEnd
+		formatString: 0
+		lineageTag: 73dda114-3638-4fe9-a005-3a65d0621e44
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [FiscalYearEnd]
+
+		annotation SummarizationSetBy = Automatic
+
+	column FiscalMonthName
+		lineageTag: b55832da-4c7d-4dce-b561-20c50ac7de1b
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [FiscalMonthName]
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 日期表-财年 = calculated
+		mode: import
+		source = ```
+				
+				ADDCOLUMNS (
+				    '基础日期表',
+				    // ========== 基础字段（英文，兼容性好） ==========
+				    "DateKey", FORMAT([Date], "YYYYMMDD"),
+				    "Year", YEAR([Date]),
+				    "Quarter", QUARTER([Date]),
+				    "QuarterName", "Q" & QUARTER([Date]),
+				    "MonthNumber", MONTH([Date]),
+				    "MonthName", FORMAT([Date], "MMMM"),
+				    "MonthNameShort", FORMAT([Date], "MMM"),
+				    
+				    // ========== 周相关字段 ==========
+				    "WeekNumber", WEEKNUM([Date], 2),
+				    "DayOfWeek", WEEKDAY([Date], 2),
+				    "DayName", FORMAT([Date], "dddd"),
+				    
+				    // ========== 排序字段 ==========
+				    "YearQuarterSort", YEAR([Date]) * 10 + QUARTER([Date]),
+				    "YearMonthSort", YEAR([Date]) * 100 + MONTH([Date]),
+				    "YearWeekSort", YEAR([Date]) * 100 + WEEKNUM([Date], 2),
+				    
+				    // ========== 显示字段（中文） ==========
+				    "年", YEAR([Date]),
+				    "季度", "第" & QUARTER([Date]) & "季度",
+				    "月份", MONTH([Date]) & "月",
+				    "年季度", YEAR([Date]) & "年Q" & QUARTER([Date]),
+				    "年月", YEAR([Date]) & "年" & MONTH([Date]) & "月",
+				    
+				    // ========== 财年相关字段（财年：7月1日 - 次年6月30日） ==========
+				    
+				    // 财年开始年份
+				    "FiscalYear", 
+				        IF(MONTH([Date]) >= 7, YEAR([Date]), YEAR([Date]) - 1),
+				    
+				    // 财年结束年份
+				    "FiscalYearEnd",
+				        IF(MONTH([Date]) >= 7, YEAR([Date]) + 1, YEAR([Date])),
+				    
+				    // 财年名称：FY2425 格式
+				    "FiscalYearName", 
+				        "FY" & 
+				        RIGHT(IF(MONTH([Date]) >= 7, YEAR([Date]), YEAR([Date]) - 1), 2) & 
+				        RIGHT(IF(MONTH([Date]) >= 7, YEAR([Date]) + 1, YEAR([Date])), 2),
+				    
+				    // 财年季度（1-4）
+				    "FiscalQuarter", 
+				        SWITCH(TRUE(),
+				            MONTH([Date]) >= 7 && MONTH([Date]) <= 9, 1,
+				            MONTH([Date]) >= 10 && MONTH([Date]) <= 12, 2,
+				            MONTH([Date]) >= 1 && MONTH([Date]) <= 3, 3,
+				            MONTH([Date]) >= 4 && MONTH([Date]) <= 6, 4
+				        ),
+				    
+				    // 财年季度名称：FY2425 Q1
+				    "FiscalQuarterName", 
+				        "FY" & 
+				        RIGHT(IF(MONTH([Date]) >= 7, YEAR([Date]), YEAR([Date]) - 1), 2) & 
+				        RIGHT(IF(MONTH([Date]) >= 7, YEAR([Date]) + 1, YEAR([Date])), 2) & 
+				        " Q" & 
+				        SWITCH(TRUE(),
+				            MONTH([Date]) >= 7 && MONTH([Date]) <= 9, 1,
+				            MONTH([Date]) >= 10 && MONTH([Date]) <= 12, 2,
+				            MONTH([Date]) >= 1 && MONTH([Date]) <= 3, 3,
+				            MONTH([Date]) >= 4 && MONTH([Date]) <= 6, 4
+				        ),
+				    
+				    // 财年月份编号（7月=1, 8月=2, ..., 6月=12）
+				    "FiscalMonthNumber",
+				        MOD(MONTH([Date]) - 7 + 12, 12) + 1,
+				    
+				    // 财年月份名称（1月-12月，对应7月-6月）
+				    "FiscalMonthName",
+				        SWITCH(TRUE(),
+				            MONTH([Date]) >= 7 && MONTH([Date]) <= 9, "Q1",
+				            MONTH([Date]) >= 10 && MONTH([Date]) <= 12, "Q2",
+				            MONTH([Date]) >= 1 && MONTH([Date]) <= 3, "Q3",
+				            MONTH([Date]) >= 4 && MONTH([Date]) <= 6, "Q4"
+				        ),
+				    
+				    // 财年排序键
+				    "FiscalYearSort", 
+				        IF(MONTH([Date]) >= 7, YEAR([Date]), YEAR([Date]) - 1) * 100 + 
+				        SWITCH(TRUE(),
+				            MONTH([Date]) >= 7 && MONTH([Date]) <= 9, 1,
+				            MONTH([Date]) >= 10 && MONTH([Date]) <= 12, 2,
+				            MONTH([Date]) >= 1 && MONTH([Date]) <= 3, 3,
+				            MONTH([Date]) >= 4 && MONTH([Date]) <= 6, 4
+				        ),
+				    
+				    // 财年月排序键
+				    "FiscalYearMonthSort", 
+				        IF(MONTH([Date]) >= 7, YEAR([Date]), YEAR([Date]) - 1) * 100 + 
+				        MOD(MONTH([Date]) - 7 + 12, 12) + 1,
+				    
+				    // 财年周数
+				    "FiscalWeekNumber",
+				        INT((DATEDIFF(
+				            DATE(IF(MONTH([Date]) >= 7, YEAR([Date]), YEAR([Date]) - 1), 7, 1),
+				            [Date],
+				            DAY
+				        ) + WEEKDAY(DATE(IF(MONTH([Date]) >= 7, YEAR([Date]), YEAR([Date]) - 1), 7, 1), 2) - 1) / 7) + 1
+				
+				)
+				```
+
+	annotation PBI_Id = 72358ee8a9eb44a89e43402bf5fd92b7
+

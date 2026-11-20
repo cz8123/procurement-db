@@ -1,0 +1,39 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.7.0/schema.json",
+  "name": "83d15e76d02c5a1b8de2",
+  "position": {
+    "x": 772.99219876415475,
+    "y": 358.9081054898262,
+    "z": 0,
+    "height": 85.333333333333329,
+    "width": 151.7037037037037,
+    "tabOrder": 0
+  },
+  "visual": {
+    "visualType": "card",
+    "autoSelectVisualType": true,
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "DAX表"
+                    }
+                  },
+                  "Property": "1_Time Taken"
+                }
+              },
+              "queryRef": "DAX表.1_Time Taken",
+              "nativeQueryRef": "1_Time Taken"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

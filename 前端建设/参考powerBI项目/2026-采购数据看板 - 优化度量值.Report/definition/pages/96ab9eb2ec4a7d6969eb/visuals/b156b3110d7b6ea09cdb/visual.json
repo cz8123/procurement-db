@@ -1,0 +1,357 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
+  "name": "b156b3110d7b6ea09cdb",
+  "position": {
+    "x": 18.797534884679635,
+    "y": 13.389121338912133,
+    "z": 1000,
+    "height": 342.09205020920507,
+    "width": 766.74155450666774,
+    "tabOrder": 3000
+  },
+  "visual": {
+    "visualType": "geos_bi",
+    "query": {
+      "queryState": {
+        "popup_properties": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "经纬度"
+                    }
+                  },
+                  "Property": "Company_cn"
+                }
+              },
+              "queryRef": "经纬度.Company_cn",
+              "nativeQueryRef": "Company_cn"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "DAX表"
+                    }
+                  },
+                  "Property": "1_Total Amount"
+                }
+              },
+              "queryRef": "DAX表.1_Total Amount",
+              "nativeQueryRef": "Total Amount",
+              "displayName": "Total Amount",
+              "format": "\"¥\"#,0;\"¥\"-#,0;\"¥\"#,0"
+            }
+          ]
+        },
+        "latitude": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "经纬度"
+                    }
+                  },
+                  "Property": "latitude"
+                }
+              },
+              "queryRef": "经纬度.latitude",
+              "nativeQueryRef": "latitude"
+            }
+          ]
+        },
+        "longitude": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "经纬度"
+                    }
+                  },
+                  "Property": "longitude"
+                }
+              },
+              "queryRef": "经纬度.longitude",
+              "nativeQueryRef": "longitude"
+            }
+          ]
+        },
+        "color": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "经纬度"
+                    }
+                  },
+                  "Property": "Color"
+                }
+              },
+              "queryRef": "经纬度.Color",
+              "nativeQueryRef": "Color"
+            }
+          ]
+        },
+        "size": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "DAX表"
+                    }
+                  },
+                  "Property": "1_Total Amount"
+                }
+              },
+              "queryRef": "DAX表.1_Total Amount",
+              "nativeQueryRef": "Total Amount",
+              "displayName": "Total Amount",
+              "format": "\"¥\"#,0;\"¥\"-#,0;\"¥\"#,0"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Measure": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "DAX表"
+                  }
+                },
+                "Property": "1_Total Amount"
+              }
+            },
+            "direction": "Descending"
+          }
+        ],
+        "isDefaultSort": true
+      }
+    },
+    "objects": {
+      "default": [
+        {
+          "properties": {
+            "style": {
+              "expr": {
+                "Literal": {
+                  "Value": "'black'"
+                }
+              }
+            },
+            "zoom": {
+              "expr": {
+                "Literal": {
+                  "Value": "3D"
+                }
+              }
+            },
+            "latitude": {
+              "expr": {
+                "Literal": {
+                  "Value": "28.12D"
+                }
+              }
+            },
+            "longitude": {
+              "expr": {
+                "Literal": {
+                  "Value": "109.12D"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "styling": [
+        {
+          "properties": {
+            "max_size": {
+              "expr": {
+                "Literal": {
+                  "Value": "22L"
+                }
+              }
+            },
+            "min_size": {
+              "expr": {
+                "Literal": {
+                  "Value": "7L"
+                }
+              }
+            },
+            "default_size": {
+              "expr": {
+                "Literal": {
+                  "Value": "14L"
+                }
+              }
+            },
+            "fill_transparency": {
+              "expr": {
+                "Literal": {
+                  "Value": "'70'"
+                }
+              }
+            },
+            "border_width": {
+              "expr": {
+                "Literal": {
+                  "Value": "1L"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "add_on_point_clustering": [
+        {
+          "properties": {
+            "enabled": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "layer_wms": [
+        {
+          "properties": {
+            "enabled": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "controls": [
+        {
+          "properties": {
+            "navigation": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "scale": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "geolocate": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "additional_attribution": {
+              "expr": {
+                "Literal": {
+                  "Value": "''"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "background": [
+        {
+          "properties": {
+            "color": {
+              "solid": {
+                "color": {
+                  "expr": {
+                    "ThemeDataColor": {
+                      "ColorId": 1,
+                      "Percent": 0
+                    }
+                  }
+                }
+              }
+            },
+            "transparency": {
+              "expr": {
+                "Literal": {
+                  "Value": "40D"
+                }
+              }
+            },
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "general": [
+        {
+          "properties": {
+            "keepLayerOrder": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "visualHeader": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  },
+  "parentGroupName": "a62974448ab029ac0a2a"
+}

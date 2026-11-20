@@ -1,0 +1,28 @@
+table 参数_违规阈值
+	lineageTag: 1b777ba9-bb69-482a-b19b-a86ca1811ad6
+
+	measure '参数_违规阈值 值' = SELECTEDVALUE('参数_违规阈值'[参数_违规阈值], 15000)
+		lineageTag: 3778e2da-d467-4eef-a4c6-6a12d8579f8d
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 参数_违规阈值
+		dataType: double
+		formatString: 0
+		lineageTag: bc20a517-39a3-400a-9643-ac9e3d01f82c
+		summarizeBy: none
+		sourceColumn: [Value]
+
+		extendedProperty ParameterMetadata =
+				{
+				  "version": 0
+				}
+
+		annotation SummarizationSetBy = User
+
+	partition 参数_违规阈值 = calculated
+		mode: import
+		source = GENERATESERIES(0, 100000, 1000)
+
+	annotation PBI_Id = d4374587f4c24988affcc0391bd53b92
+

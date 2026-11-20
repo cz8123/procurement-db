@@ -374,9 +374,18 @@ def migrate_schema(con):
                 print(f"[迁移] {old} -> {new} 跳过：{e}")
 
 
-def ensure_meta_tables(con, seed=True):
-    """创建 map_config / quality_rules 两张元数据表，并按需在 map_config 为空时
-    用代码里的 FKS 常量完成首次播种。幂等，可重复调用。"""
+def ensure_meta_tables(con, seed=True, force_seed=False):
+    """创建 map_config / quality_rules 等元数据表，并在「map_config 表首次创建」时
+    用代码里的 FKS 常量播种一次基线映射。幂等，可重复调用。
+
+    播种条件（重要）：只在 map_config 表**本次新建**时播种；已存在的表即使为空
+    也不再自动补回。这样用户可以主动清空映射（例如退回到「只有事实表、无任何
+    映射」的干净状态），重启服务不会被 FKS 常量复活。
+    需要强制重建基线时显式传 force_seed=True。
+    """
+    _had_map_config = con.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='map_config'"
+    ).fetchone() is not None
     con.execute("""CREATE TABLE IF NOT EXISTS map_config (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         source_table TEXT NOT NULL,
@@ -404,6 +413,35 @@ def ensure_meta_tables(con, seed=True):
         x REAL NOT NULL DEFAULT 0,
         y REAL NOT NULL DEFAULT 0
     )""")
+    # 「数据转换」步骤链（类 Power Query）：源表 + 有序步骤，可落地为视图 / 物化表
+    con.execute("""CREATE TABLE IF NOT EXISTS transform_query (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,          -- 输出对象名（视图或表）
+        label TEXT,                         -- 中文显示名
+        descr TEXT,
+        source_table TEXT NOT NULL,
+        steps TEXT NOT NULL DEFAULT '[]',   -- JSON 步骤数组
+        output_mode TEXT NOT NULL DEFAULT 'view',   -- view / table
+        enabled INTEGER NOT NULL DEFAULT 1,
+        last_run TEXT,
+        last_rows INTEGER,
+        last_error TEXT,
+        created_at TEXT,
+        updated_at TEXT
+    )""")
+    # 「映射聚合」任务：记录某字段被聚合成哪张维度表（聚合结果本身存在 dim_agg_* 表里）
+    con.execute("""CREATE TABLE IF NOT EXISTS agg_task (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,                 -- 显示名，如「采购子类别 · 聚合」
+        source_table TEXT NOT NULL,         -- 聚合来源表
+        source_col   TEXT NOT NULL,         -- 聚合来源字段
+        dim_table TEXT NOT NULL UNIQUE,     -- 生成的聚合维度表（dim_agg_*）
+        key_col TEXT NOT NULL DEFAULT '原始值',
+        value_col TEXT NOT NULL DEFAULT '聚合值',
+        method TEXT,                        -- auto / import / manual
+        note TEXT,
+        created_at TEXT, updated_at TEXT
+    )""")
     # 历史命名迁移（如 dim_supplier -> fct_supplier），须在元数据表建好之后执行
     migrate_schema(con)
     # 兼容已有库：补充 cardinality 列（Power BI 风格基数徽章 *:1 / 1:* / 1:1）
@@ -426,7 +464,7 @@ def ensure_meta_tables(con, seed=True):
         pass
     if seed:
         cur = con.execute("SELECT COUNT(*) FROM map_config").fetchone()[0]
-        if cur == 0:
+        if cur == 0 and (not _had_map_config or force_seed):
             _derived = {"supplier_cn", "procurement_method_key", "supplier_attribute_key"}
             for (t, col, rt, rc) in FKS:
                 kind = "derived" if col in _derived else ("dim" if rt.startswith("dim_") else "fact")
@@ -441,15 +479,16 @@ def ensure_meta_tables(con, seed=True):
 def get_fks(con):
     """返回当前生效的映射关系列表 [(源表,源列,目标表,目标列), ...]。
 
-    优先读取 map_config（支持 Web 页 CRUD），表不存在时回退到代码常量 FKS。
+    优先读取 map_config（支持 Web 页 CRUD）。**表存在就以表为准**——即使为空也
+    返回空列表，表示「用户主动清空了所有映射」；只有 map_config 表尚不存在时
+    才回退到代码常量 FKS。
     """
     try:
         rows = con.execute(
             "SELECT source_table,source_col,target_table,target_col "
             "FROM map_config WHERE enabled=1"
         ).fetchall()
-        if rows:
-            return [(r[0], r[1], r[2], r[3]) for r in rows]
+        return [(r[0], r[1], r[2], r[3]) for r in rows]
     except sqlite3.Error:
         pass
     return list(FKS)
@@ -482,15 +521,18 @@ def create_table(con, filename, source):
 
     colnames = csv_colnames + [c for c, _ in extra_cols]
 
-    fk_clauses = []
-    for (t, col, rt, rc) in get_fks(con):
-        if t == table:
-            fk_clauses.append(f"FOREIGN KEY({qid(col)}) REFERENCES {qid(rt)}({qid(rc)})")
-
+    # 建表不再写 FOREIGN KEY 子句。
+    # 原因（2026-11-03 实测）：
+    #   ① SQLite 默认 foreign_keys=OFF，写了也没有约束力；
+    #   ② 源数据本身就有孤儿（fct_po.已批准的采购申请参考 → fct_prpo 有 73/47986 即
+    #      0.15% 在有值中命中不了，属源系统同步时序问题），硬约束与事实不符；
+    #   ③ 维度表下线后，DDL 里的 REFERENCES 会指向已删表 —— 一旦任何工具/代码开启
+    #      PRAGMA foreign_keys=ON，对 fct_po / fct_prpo 的**任何写入都会报
+    #      no such table: main.dim_company**，导入/补录/行编辑全线失败；
+    #   ④ 关系定义由 map_config 维护，Power BI 也用自己的关系模型，不依赖 DDL。
+    # 需要导出外键约束时用 get_fks(con) 现取，不要固化进表结构。
     sql = f"CREATE TABLE IF NOT EXISTS {qid(table)} (\n  " + ",\n  ".join(col_defs)
     sql += f",\n  PRIMARY KEY({qid(pk_col)})"
-    if fk_clauses:
-        sql += ",\n  " + ",\n  ".join(fk_clauses)
     sql += "\n)"
     con.execute(sql)
     return {
@@ -649,6 +691,27 @@ def cmd_update():
     cmd_verify()
 
 
+def dangling_fks(con):
+    """返回 {表: [缺失目标表, ...]}，用于发现 DDL 里指向已删表的外键。
+
+    维度表下线 / 表改名后，早期用 get_fks() 固化进 DDL 的 FOREIGN KEY 会悬空。
+    SQLite 默认不强制外键，所以平时无感；但只要有人开启 foreign_keys=ON，
+    对这些表的任何写入都会报 "no such table"。
+    """
+    exist = {r[0] for r in con.execute(
+        "SELECT name FROM sqlite_master WHERE type IN ('table','view')")}
+    out = {}
+    for (t,) in con.execute("SELECT name FROM sqlite_master WHERE type='table' "
+                            "AND name NOT LIKE 'sqlite_%'"):
+        ddl = con.execute("SELECT sql FROM sqlite_master WHERE name=?", (t,)).fetchone()[0] or ""
+        if "REFERENCES" not in ddl:
+            continue
+        miss = [m for m in re.findall(r'REFERENCES\s+"?([A-Za-z_]\w*)"?', ddl) if m not in exist]
+        if miss:
+            out[t] = miss
+    return out
+
+
 def cmd_verify():
     if not os.path.exists(DB_PATH):
         print("数据库不存在，请先执行 build。")
@@ -659,18 +722,53 @@ def cmd_verify():
     print("一、各表行数")
     print("=" * 78)
     tables = [FILE_MAP[f][0] for f in LOAD_ORDER]
+    exist = {r[0] for r in con.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
+    missing = [t for t in tables if t not in exist]
     for t in tables:
+        if t not in exist:
+            continue
         try:
             n = con.execute(f"SELECT COUNT(*) FROM {qid(t)}").fetchone()[0]
             print(f"  {t:<32} {n:>8} 行")
         except sqlite3.Error as e:
             print(f"  {t:<32} 错误: {e}")
+    # 动态建出来的表（聚合维度表 dim_agg_* / 数据转换产物）也一并列出
+    _meta = {"map_config", "quality_rules", "map_layout", "transform_query", "agg_task"}
+    extra = sorted(exist - set(tables) - _meta)
+    for t in extra:
+        try:
+            n = con.execute(f"SELECT COUNT(*) FROM {qid(t)}").fetchone()[0]
+            tag = "  (非 CSV 源导入)" if t.startswith("fct_") else "  (动态表)"
+            print(f"  {t:<32} {n:>8} 行{tag}")
+        except sqlite3.Error:
+            pass
+    if missing:
+        print(f"  （{len(missing)} 张已知维度表当前未建，已按「维度未接入」跳过：{', '.join(missing)}）")
+
+    # 结构体检：DDL 里残留的 FOREIGN KEY 若指向已删除的表，开启 foreign_keys=ON
+    # 后会让该表的**所有写入**报 "no such table: main.xxx"（2026-11-03 实测）。
+    print("\n" + "=" * 78)
+    print("二、表结构约束体检（DDL 里指向已删表的外键 = 定时炸弹）")
+    print("=" * 78)
+    _dangling = dangling_fks(con)
+    if not _dangling:
+        print("  ✓ 无悬空外键（表结构中没有任何 FOREIGN KEY 指向不存在的表）")
+    else:
+        for t, targets in _dangling.items():
+            print(f"  ✗ {t}: 引用了已不存在的表 {', '.join(targets)}")
+        print("  影响：一旦任何工具或代码执行 PRAGMA foreign_keys=ON，"
+              "对该表的插入/更新会直接报 no such table。")
+        print("  处置：运行 python fix_dangling_fk.py 重建这些表（会先自动备份）。")
 
     print("\n" + "=" * 78)
-    print("二、外键关联完整性（事实表引用在目标表中不存在的行数 = 孤儿）")
+    print("三、外键关联完整性（事实表引用在目标表中不存在的行数 = 孤儿）")
     print("=" * 78)
     has_orphan = False
-    for (t, col, rt, rc) in get_fks(con):
+    _fks = get_fks(con)
+    if not _fks:
+        print("  （当前没有任何映射关系，未做映射，无需校验）")
+    for (t, col, rt, rc) in _fks:
         try:
             q = (
                 f"SELECT COUNT(*) FROM {qid(t)} "
@@ -685,9 +783,9 @@ def cmd_verify():
                 has_orphan = True
         except sqlite3.Error as e:
             print(f"  {t}.{col} -> {rt}.{rc} : 校验跳过 ({e})")
-    if not has_orphan:
+    if not has_orphan and _fks:
         print("  ✓ 全部外键引用均可命中目标表（关联完整，Power BI 可直接建关系）")
-    else:
+    elif has_orphan:
         print("  说明：存在少量孤儿多为源系统文本/编码差异，不影响整体分析；可在 Power BI 中按需清洗。")
     con.close()
 

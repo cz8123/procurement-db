@@ -6,6 +6,8 @@ REM  Procurement DB Admin - launcher
 REM  Kill any old process on port 5000, then start Flask.
 REM  Your browser opens http://localhost:5000 automatically
 REM  (set BROWSER=0 before launching to disable auto-open).
+REM  Binds 127.0.0.1 only by default (not reachable from the LAN).
+REM  To share on the LAN:  set HOST=0.0.0.0 & set DBADMIN_TOKEN=your-password
 REM  Close this window to stop the service.
 REM ============================================================
 

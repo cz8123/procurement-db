@@ -1,0 +1,51 @@
+table logo-svg映射表新
+	lineageTag: de27b148-4874-4384-aed3-d6608f9c4258
+
+	column svg_name
+		dataType: string
+		lineageTag: 3f9de17a-a625-40f1-9ece-ec1e5f0bf1ff
+		summarizeBy: none
+		sourceColumn: svg_name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Brand
+		dataType: string
+		lineageTag: 4aa3518a-d1cd-4839-b834-96961ed990df
+		summarizeBy: none
+		sourceColumn: Brand
+
+		annotation SummarizationSetBy = Automatic
+
+	column url
+		dataType: string
+		lineageTag: 501d62f6-c213-4212-a20a-ae50c671ac51
+		summarizeBy: none
+		sourceColumn: url
+
+		annotation SummarizationSetBy = Automatic
+
+	column Note
+		dataType: string
+		lineageTag: 95536b53-6735-4ecc-9966-36cd1be05664
+		summarizeBy: none
+		sourceColumn: Note
+
+		annotation SummarizationSetBy = Automatic
+
+	partition logo-svg映射表新 = m
+		mode: import
+		source =
+				let
+				    Source = Excel.Workbook(File.Contents(OneDriveRoot{0}[Path] & "\数据表\logo-svg映射表新.xlsx"), null, true),
+				    Sheet1_Sheet = Source{[Item="Sheet1",Kind="Sheet"]}[Data],
+				    #"Changed Type" = Table.TransformColumnTypes(Sheet1_Sheet,{{"Column1", type text}, {"Column2", type text}}),
+				    #"Promoted Headers" = Table.PromoteHeaders(#"Changed Type", [PromoteAllScalars=true]),
+				    #"Changed Type1" = Table.TransformColumnTypes(#"Promoted Headers",{{"svg_name", type text}, {"Brand", type text}})
+				in
+				    #"Changed Type1"
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = Navigation
+

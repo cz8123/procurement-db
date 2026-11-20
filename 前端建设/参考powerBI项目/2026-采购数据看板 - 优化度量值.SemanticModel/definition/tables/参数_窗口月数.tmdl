@@ -1,0 +1,28 @@
+table 参数_窗口月数
+	lineageTag: 066305bc-8ebe-4310-92c7-65ff0002fd4a
+
+	measure '参数_窗口月数 值' = SELECTEDVALUE('参数_窗口月数'[参数_窗口月数], 12)
+		lineageTag: c2ea543b-0533-4cdf-b776-9195fc5a62db
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 参数_窗口月数
+		dataType: double
+		formatString: 0
+		lineageTag: 44acc513-433c-43b0-9ed2-91f984e45944
+		summarizeBy: none
+		sourceColumn: [Value]
+
+		extendedProperty ParameterMetadata =
+				{
+				  "version": 0
+				}
+
+		annotation SummarizationSetBy = User
+
+	partition 参数_窗口月数 = calculated
+		mode: import
+		source = GENERATESERIES(1, 24, 1)
+
+	annotation PBI_Id = 49bc14a8e6f34b86b5c7bac944f0e87a
+

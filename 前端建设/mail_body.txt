@@ -1,0 +1,493 @@
+Hi Jesch, Howard and Jack,
+
+ 
+
+After walk thru of the POC dashboard in the meeting this morning, please also find the requested information as follows:
+
+ 
+
+
+Data source for the global filters
+
+ 
+
+
+Dashboard Filter
+
+Prepared Dataset Field
+
+
+Procurement Spend
+
+ProcurementSpendFlag
+
+
+Vendor Type
+
+VendorExemptionCategory
+
+
+Category
+
+PurchaseCategory
+
+
+Sub-Category
+
+PurchaseCategory_HKMT
+
+
+Expenditure
+
+ExpenditureAccount
+
+
+Server
+
+Server_Raw
+
+ 
+
+Processing logic:
+
+Prepared Dataset
+
+↓
+
+Global Filters
+
+↓
+
+filtered_df
+
+↓
+
+KPIs + Charts
+
+ 
+
+ 
+
+
+KPI Data Sources
+
+
+KPI
+
+Fields Used
+
+
+Total Spend
+
+Spend
+
+
+Procurement Spend
+
+Spend, ProcurementSpendFlag
+
+
+Non-Procurement Spend
+
+Spend, ProcurementSpendFlag
+
+
+Transactions
+
+Row Count
+
+
+PO Spend %
+
+Spend, PO_flag
+
+
+Total Suppliers
+
+SupplierId
+
+ 
+
+ 
+
+
+Chart 1 – Monthly Spend by Server
+
+ 
+
+
+Purpose
+
+Field
+
+
+X-Axis
+
+MonthStart
+
+
+Y-Axis
+
+Spend
+
+
+Stack / Colour
+
+Server_Raw
+
+
+Tooltip
+
+Spend
+
+
+Tooltip
+
+SupplierId (Distinct Count)
+
+
+Tooltip
+
+Transaction Count (Row Count)
+
+ 
+
+ 
+
+
+Chart 2 – Category Spend Pareto
+
+ 
+
+
+Purpose
+
+Field
+
+
+Category Axis
+
+PurchaseCategory
+
+
+Spend Value
+
+Spend
+
+
+Tooltip
+
+SupplierId (Distinct Count)
+
+
+Tooltip
+
+Transaction Count (Row Count)
+
+ 
+
+ 
+
+
+Chart 3 – Spend Distribution by Expenditure Type
+
+ 
+
+
+Purpose
+
+Field
+
+
+Dimension
+
+ExpenditureAccount
+
+
+Value
+
+Spend
+
+
+Tooltip
+
+Transaction Count
+
+
+Tooltip
+
+Supplier Count
+
+ 
+
+ 
+
+
+Chart 4 – Top 10 Supplier by Category Heatmap
+
+ 
+
+
+Purpose
+
+Field
+
+
+Top 10 Ranking
+
+SupplierId / SupplierName
+
+
+Category Columns
+
+PurchaseCategory
+
+
+Cell Value
+
+Spend
+
+ 
+
+ 
+
+
+Chart 5 – Top 10 Supplier Analysis
+
+ 
+
+
+Purpose
+
+Field
+
+
+Supplier Ranking
+
+SupplierId, SupplierName
+
+
+Spend Value
+
+Spend
+
+
+Local Filter
+
+PurchaseCategory
+
+
+Local Filter
+
+ExpenditureAccount
+
+ 
+
+ 
+
+
+Data link
+
+I have updated the links and extended access rights to Howard and Jack
+
+            
+
+ 
+
+ 
+
+Best Regards,
+
+Frankie Chan
+
+Procurement
+
+E  :   <mailto:frankie.chan.wk@sime.com> frankie.chan.wk@sime.com
+
+T  :  (852) 2437 1674 (ext. 1674)
+
+ 
+
+ <https://simemotors.com.hk/>                                                           <https://simemotors.com.hk/>   <https://www.linkedin.com/company/sime-motors-hk-mo>   <https://www.facebook.com/simemotorshk> 
+
+
+
+Sime Darby Motor Services Limited
+
+163 Ma Tau Wai Road
+
+To Kwa Wan, Hong Kong
+
+ 
+
+T: +852 2416 2111 W: simemotors.com.hk
+
+ 
+
+ <https://simemotors.com.hk/> 
+
+ 
+
+From: Frankie Chan Wai Keung 
+Sent: Wednesday, September 2, 2026 5:20 PM
+To: Jescho Hong <jescho.hong@sime.com>
+Cc: Steve Choong Hor Long <choong.hor.long@sime.com>; William Au Kin Fan <william.au.kinfan@sime.com>; Candy Law Suet Yee <candy.law.suetyee@sime.com>
+Subject: Procurement Analytics Dashboard: Sample Dataset & Dashboard Reference
+
+ 
+
+Hi Jescho,
+
+ 
+
+Following our recent discussions on the procurement analytics dashboard initiative, my preliminary view is that the DT team can begin development by replicating my personal dashboard in Qlik Sense. As I built my current version was developed in Jupyter, I have included the dashboard settings and data preparation details below. Please treat the existing dashboard as a proof-of-concept for development purposes. Once the POC is successfully validated, it can serve as the baseline design for the next phase of development. We can then work together on more advanced data analytics capabilities and, more importantly, continue the necessary system enhancements in KUBE and GDMS respectively.
+
+ 
+
+As discussed during the meeting with Steve and William on 19-Aug, a key consideration is that this dashboard should evolve beyond a Hong Kong- or GDMS-specific reporting solution. The ultimate objective is to establish a common procurement analytics data model and a standardized dashboard that can be adopted across different DMS platforms while maintaining consistent management reporting. The future-state vision is to progressively transition from supplier-level categorization, which is currently maintained manually within the dataset by procurement, to system-maintained transaction-level attributes captured through procurement workflows such as PRPO form or Invoice Submission in KUBE and / or payment transactions in GDMS, supported by necessary enhancements.
+
+ 
+
+Please find the information below for your development reference. Let me know if any additional information or a walkthrough session would be helpful. Candy will be the dedicated procurement focal point supporting this POC development.
+
+ 
+
+
+Item
+
+Description
+
+Remark
+
+
+1.	Raw Data
+
+*	GDMS auditpayment report in txt, total 5 files for 5 servers; 
+*	Payment data, covering transactions with Document Dates between 1 July 2025 and 30 June 2026,  was extracted from GDMS on 6 July 2026.
+
+ 
+
+File:  <https://simedarbygroup.sharepoint.com/:f:/s/MotorsHK-Procurement/IgC5rgw4el3oTr5tNwkGGizOAYdaTXP-6TK9EePvxpPr4-w>  FY2526
+
+ 
+
+*	The current data is a payment-based dataset
+*	Spend records for SDIB and SDMA are not included, as these entities do not currently utilize GDMS.
+
+ 
+
+
+2.	Prepared Dataset
+
+*	Manual enrichment (add Purchase Category, Purchase Sub-category, Vendor Category, Procurement Spend labels) 
+*	Data cleansing (parse date values, covert numeric spend amounts PO numbers, handle NaN rows, and etc) processed in Jupyter environment
+
+ 
+
+File:  <https://simedarbygroup.sharepoint.com/:x:/s/MotorsHK-Procurement/IQD9fgr_nCZKSpOY_8bmHHDvAfJZq_w969vkiX3P6W5CmsE>  auditPayment_FY2526_consolidated_to DT.xlsx
+
+ 
+
+*	Classification is performed at supplier level rather than transaction level (i.e. vendor category rather than purchase category).
+*	Suppliers providing both procurement and non-procurement goods/services may be classified under a single category.
+*	Missing Procurement Attributes are Purchase Category, Purchase Category-HKMT, Expenditure Type, and Procurement Spend, which are identified through manual supplier-level classification and added in the dataset by myself, based on my assumptions and understanding of supplier scope, purchasing history, operational activity, historical purchasing patterns, and the current Vendor Exemption Matrix. This is time-consuming, difficult to scale and an interim response to data scarcity only.​
+
+ 
+
+
+3.	Dashboard Filters
+
+These are global filters applying for all charts
+
+
+
+
+4.	KPIs
+
+
+
+
+5.	Chart 1
+
+Stacked Bar Chart
+
+
+
+
+6.	Chart 2
+
+Pareto Chart
+
+
+
+
+7.	Chart 3
+
+Donut Chart
+
+
+
+
+8.	Chart 4
+
+Heat Map
+
+
+
+
+9.	Chart 5
+
+Bar chart with local filters
+
+ 
+
+
+
+ 
+
+
+
+ 
+
+System Enhancement Opportunity:
+
+*	Current KUBE workflows do not capture Purchase Category, Purchase Sub-Category, Procurement Spend Flag
+*	Current GDMS reports do not capture Purchase Category, Purchase Sub-Category, Expenditure Type, Procurement Spend Flag
+*	Current GDMS reports do not capture PO Line Item Unit Price, PO Line Item Qty, PO remaining amount
+*	Trade Purchases are not consistently categorized in KUBE or GDMS
+*	Trade Purchases are not implemented in KUBE workflows
+
+ 
+
+Best Regards,
+
+Frankie Chan
+
+Procurement
+
+E  :   <mailto:frankie.chan.wk@sime.com> frankie.chan.wk@sime.com
+
+T  :  (852) 2437 1674 (ext. 1674)
+
+ 
+
+ <https://simemotors.com.hk/>                                                           <https://simemotors.com.hk/>   <https://www.linkedin.com/company/sime-motors-hk-mo>   <https://www.facebook.com/simemotorshk> 
+
+
+
+Sime Darby Motor Services Limited
+
+163 Ma Tau Wai Road
+
+To Kwa Wan, Hong Kong
+
+ 
+
+T: +852 2416 2111 W: simemotors.com.hk
+
+ 
+
+ <https://simemotors.com.hk/> 
+
+ 
+

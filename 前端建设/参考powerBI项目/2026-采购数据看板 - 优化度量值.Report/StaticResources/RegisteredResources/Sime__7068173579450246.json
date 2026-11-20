@@ -1,0 +1,16 @@
+{
+  "name": "Sime主题",
+  "dataColors": [
+    "#0E385E",
+    "#FF6B12",
+    "#99D1E1",
+    "#DFDFDF",
+    "#5AB482",
+    "#7A4AA9",
+    "#F3AC00",
+    "#D64550"
+  ],
+  "maximum": "#83E8FF",
+  "bad": "#FF0000",
+  "good": "#00FF43"
+}

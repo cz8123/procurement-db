@@ -1,0 +1,220 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.7.0/schema.json",
+  "name": "6783f5d3acedec345e93",
+  "position": {
+    "x": 393.57142857142861,
+    "y": 0,
+    "z": 2000,
+    "height": 450.71428571428572,
+    "width": 537.14285714285722,
+    "tabOrder": 11000
+  },
+  "visual": {
+    "visualType": "ClusterMap1652434605854",
+    "query": {
+      "queryState": {
+        "ReferenceBucket": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "采购类别id"
+                    }
+                  },
+                  "Property": "Segmented by"
+                }
+              },
+              "queryRef": "采购类别id.Segmented by",
+              "nativeQueryRef": "Segmented by"
+            }
+          ]
+        },
+        "PersonaGroup": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "采购类别id"
+                    }
+                  },
+                  "Property": "Category ID"
+                }
+              },
+              "queryRef": "采购类别id.Category ID",
+              "nativeQueryRef": "Category ID"
+            }
+          ]
+        },
+        "ReferenceName": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "采购类别id"
+                    }
+                  },
+                  "Property": "Category name"
+                }
+              },
+              "queryRef": "采购类别id.Category name",
+              "nativeQueryRef": "Category name"
+            }
+          ]
+        },
+        "ReferenceCount": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "DAX表"
+                    }
+                  },
+                  "Property": "1_Total Amount"
+                }
+              },
+              "queryRef": "DAX表.1_Total Amount",
+              "nativeQueryRef": "1_Total Amount",
+              "format": "\"¥\"#,0;\"¥\"-#,0;\"¥\"#,0"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Measure": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "DAX表"
+                  }
+                },
+                "Property": "1_Total Amount"
+              }
+            },
+            "direction": "Descending"
+          }
+        ],
+        "isDefaultSort": true
+      }
+    },
+    "objects": {
+      "general": [
+        {
+          "properties": {
+            "displayBuildVersion": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "presentation": [
+        {
+          "properties": {
+            "imageCount": {
+              "expr": {
+                "Literal": {
+                  "Value": "6D"
+                }
+              }
+            },
+            "layout": {
+              "expr": {
+                "Literal": {
+                  "Value": "'orbital'"
+                }
+              }
+            },
+            "showNameLabels": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "initialCount": {
+              "expr": {
+                "Literal": {
+                  "Value": "19D"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "dataLoading": [
+        {
+          "properties": {
+            "maxDataRows": {
+              "expr": {
+                "Literal": {
+                  "Value": "20000D"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "background": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
+                }
+              }
+            },
+            "color": {
+              "solid": {
+                "color": {
+                  "expr": {
+                    "ThemeDataColor": {
+                      "ColorId": 1,
+                      "Percent": 0
+                    }
+                  }
+                }
+              }
+            },
+            "transparency": {
+              "expr": {
+                "Literal": {
+                  "Value": "30D"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

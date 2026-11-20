@@ -1,0 +1,156 @@
+table 框架协议前置审批_搜索提交
+	lineageTag: d1cde0e9-7a00-4d72-9bac-2f8aee4e70d1
+
+	column 序
+		dataType: int64
+		formatString: 0
+		lineageTag: 8cb57816-88fd-45a0-b1ef-36c58d3d99b1
+		summarizeBy: none
+		sourceColumn: 序
+
+		annotation SummarizationSetBy = User
+
+	column 参考编号
+		dataType: string
+		lineageTag: 96fb8f87-8ec5-4b7b-8b5b-9a49722f125a
+		summarizeBy: none
+		sourceColumn: 参考编号
+
+		annotation SummarizationSetBy = Automatic
+
+	column 提交者
+		dataType: string
+		lineageTag: 7ca19452-c3ca-4a44-801f-c6109c1a8ed7
+		summarizeBy: none
+		sourceColumn: 提交者
+
+		annotation SummarizationSetBy = Automatic
+
+	column 提交日期
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 8684fe2e-af3f-4326-b78e-6d8b9aab2519
+		summarizeBy: none
+		sourceColumn: 提交日期
+
+		variation 变体
+			isDefault
+			relationship: d4bd820a-f408-451f-b850-1f653aa4941a
+			defaultHierarchy: LocalDateTable_970d6c6b-6c2f-481e-b27a-56f716c0799e.日期层次结构
+
+		annotation SummarizationSetBy = Automatic
+
+	column 状态
+		dataType: string
+		lineageTag: 889cedd6-778f-4abf-bda4-d17970081e9e
+		summarizeBy: none
+		sourceColumn: 状态
+
+		annotation SummarizationSetBy = Automatic
+
+	column 表单类别
+		dataType: string
+		lineageTag: bfe7db20-6323-4047-aecc-30b12e2accb4
+		summarizeBy: none
+		sourceColumn: 表单类别
+
+		annotation SummarizationSetBy = Automatic
+
+	column 表单标题
+		dataType: string
+		lineageTag: 59da22fc-139c-4af8-a5cc-3f3b88e345a9
+		summarizeBy: none
+		sourceColumn: 表单标题
+
+		annotation SummarizationSetBy = Automatic
+
+	column 参考编号_1
+		dataType: string
+		lineageTag: affd7274-2a8a-4006-8601-7ba6f8161f55
+		summarizeBy: none
+		sourceColumn: 参考编号_1
+
+		annotation SummarizationSetBy = Automatic
+
+	column 业务单位
+		dataType: string
+		lineageTag: 61493d91-a079-4a27-99c8-316f21de293b
+		summarizeBy: none
+		sourceColumn: 业务单位
+
+		annotation SummarizationSetBy = Automatic
+
+	column 适用领域
+		dataType: string
+		lineageTag: f9ad8502-f3be-4241-ab70-3d1b344573e8
+		summarizeBy: none
+		sourceColumn: 适用领域
+
+		annotation SummarizationSetBy = Automatic
+
+	column 采购类别
+		dataType: string
+		lineageTag: 0e350759-8cff-44fa-b6ed-31215e613696
+		summarizeBy: none
+		sourceColumn: 采购类别
+
+		annotation SummarizationSetBy = Automatic
+
+	column 项目编号
+		dataType: string
+		lineageTag: 9781fe3c-e468-46f6-bf87-598b870fe08e
+		summarizeBy: none
+		sourceColumn: 项目编号
+
+		annotation SummarizationSetBy = Automatic
+
+	column 项目名称
+		dataType: string
+		lineageTag: c3ae070a-0af8-49cf-9c6a-dae82b480c27
+		summarizeBy: none
+		sourceColumn: 项目名称
+
+		annotation SummarizationSetBy = Automatic
+
+	column 预估项目金额
+		dataType: decimal
+		formatString: "¥"#,0.###############;"¥"-#,0.###############;"¥"#,0.###############
+		lineageTag: b29e9f2b-b909-4678-83d2-c47cd4a1c050
+		summarizeBy: none
+		sourceColumn: 预估项目金额
+
+		annotation SummarizationSetBy = User
+
+		annotation PBI_FormatHint = {"currencyCulture":"zh-CN"}
+
+	column 预估签署期限（单位：月）
+		dataType: int64
+		formatString: 0
+		lineageTag: b1e841c6-20b0-4c5f-962f-5dcf620e3496
+		summarizeBy: none
+		sourceColumn: 预估签署期限（单位：月）
+
+		annotation SummarizationSetBy = User
+
+	column 背景描述/业务必要性说明
+		dataType: string
+		lineageTag: b6985f0d-5bf5-4279-915a-c1b6685cc0cb
+		summarizeBy: none
+		sourceColumn: 背景描述/业务必要性说明
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 框架协议前置审批_搜索提交 = m
+		mode: import
+		source =
+				let
+				    源 = Csv.Document(File.Contents(OneDriveRoot{0}[Path] & "\数据表\框架协议前置审批_搜索提交.csv"),[Delimiter=",", Columns=16, Encoding=65001, QuoteStyle=QuoteStyle.None]),
+				    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true]),
+				    更改的类型 = Table.TransformColumnTypes(提升的标题,{{"序", Int64.Type}, {"参考编号", type text}, {"提交者", type text}, {"提交日期", type datetime}, {"状态", type text}, {"表单类别", type text}, {"表单标题", type text}, {"参考编号_1", type text}, {"业务单位", type text}, {"适用领域", type text}, {"采购类别", type text}, {"项目编号", type text}, {"项目名称", type text}, {"预估项目金额", Currency.Type}, {"预估签署期限（单位：月）", Int64.Type}, {"背景描述/业务必要性说明", type text}})
+				in
+				    更改的类型
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+

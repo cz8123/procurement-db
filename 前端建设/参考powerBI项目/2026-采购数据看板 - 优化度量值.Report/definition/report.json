@@ -1,0 +1,191 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/report/3.3.0/schema.json",
+  "themeCollection": {
+    "baseTheme": {
+      "name": "CY26SU02",
+      "reportVersionAtImport": {
+        "visual": "2.6.0",
+        "report": "3.1.0",
+        "page": "2.3.0"
+      },
+      "type": "SharedResources"
+    },
+    "customTheme": {
+      "name": "Sime__7068173579450246.json",
+      "reportVersionAtImport": {
+        "visual": "2.7.0",
+        "report": "3.2.0",
+        "page": "2.3.1"
+      },
+      "type": "RegisteredResources"
+    }
+  },
+  "objects": {
+    "section": [
+      {
+        "properties": {
+          "verticalAlignment": {
+            "expr": {
+              "Literal": {
+                "Value": "'Top'"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "outspacePane": [
+      {
+        "properties": {
+          "expanded": {
+            "expr": {
+              "Literal": {
+                "Value": "false"
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "publicCustomVisuals": [
+    "textSearchSlicerF85E2E78BE4A4D7D9F99ED75B5D71C85",
+    "multiLineChartA7F3AE9EF91E48C78A2807BCA25C2765",
+    "TornadoChart1452517688218",
+    "multipleAxesChartBC35C88E1D1A49DFA5A9240AFBB4E3BC",
+    "SunburstVizA96234ADB8D143D1837FEC426BB34781",
+    "performanceBubbleChartFBAAA829CB604E5CAB4F21729F233294",
+    "PBI_CV_EB3A4088_75C5_4746_9D8B_255A7B7ECD6D",
+    "htmlContent443BE3AD55E043BF878BED274D3A6855",
+    "ZebraBITablesBAE31B370F254F808553548EFB35BFA5",
+    "ChordChart1444757060245",
+    "BulletChart1443347686880",
+    "PBI_CV_9272D058_BEA0_476A_B090_A712545F92FA",
+    "geos_bi",
+    "powerKPI462CE5C2666F4EC8A8BDD7E5587320A3",
+    "powerKPIMatrixEB2381CC88A8425FBEB1B07FF57784E6",
+    "KPIColumn1823AB39DB23410928ADF752BCB2A457",
+    "PBI_CV_3C80B1F2_09AF_4123_8E99_C3CBC46B23E0",
+    "SimpleWaterfall",
+    "PBI_CV_0B9C9FBA_15A2_4A94_8AE4_8F778869B200",
+    "graphomatecharts",
+    "ZebraBITablesPlus3E6085701D7B426980C3859B16327993",
+    "InforiverCharts582F6C55AB6442EF8FA129089285CB47",
+    "mergedbarchartA4B50B148BA8BEB765A6D146EE4450D5",
+    "deneb7E15AEF80B9E4D4F8E12924291ECE89A",
+    "InforiverFilterF39DAE8D57A743EF89F5C3809DEE2B69",
+    "PowerSlicerA96234ADB8D143D1837FEC426BB34781",
+    "wishyoulizationbarchartrace",
+    "EnhancedScatterChart1443994985041",
+    "ForceGraph1449359463895",
+    "radarChart5F59D098BB90499F8C33EBEBCEE4FEBF",
+    "PBI_CV_73744D90_4DC9_4F18_8BA5_EE8FA5C98035",
+    "synopticPanelByOKVIZC365478550CD4DC0A2ED985DC3E23EED",
+    "heatmapF244EA9EE1F34E828A80CF19B41976F8",
+    "ClusterMap1652434605854",
+    "CardBrowser8D7CFFDA2E7E400C9474F41B9EDBBA58",
+    "Gantt1448688115699"
+  ],
+  "resourcePackages": [
+    {
+      "name": "SharedResources",
+      "type": "SharedResources",
+      "items": [
+        {
+          "name": "CY26SU02",
+          "path": "BaseThemes/CY26SU02.json",
+          "type": "BaseTheme"
+        }
+      ]
+    },
+    {
+      "name": "RegisteredResources",
+      "type": "RegisteredResources",
+      "items": [
+        {
+          "name": "__________6275711892338502.json",
+          "path": "__________6275711892338502.json",
+          "type": "ShapeMap"
+        },
+        {
+          "name": "____5781921382822179.png",
+          "path": "____5781921382822179.png",
+          "type": "Image"
+        },
+        {
+          "name": "__30649018434116807.jpg",
+          "path": "__30649018434116807.jpg",
+          "type": "Image"
+        },
+        {
+          "name": "__313523880500125474.jpg",
+          "path": "__313523880500125474.jpg",
+          "type": "Image"
+        },
+        {
+          "name": "__317104567009384475.jpg",
+          "path": "__317104567009384475.jpg",
+          "type": "Image"
+        },
+        {
+          "name": "__34698040341521962.jpg",
+          "path": "__34698040341521962.jpg",
+          "type": "Image"
+        },
+        {
+          "name": "__43418060200946442.jpg",
+          "path": "__43418060200946442.jpg",
+          "type": "Image"
+        },
+        {
+          "name": "__48066893185069134.jpg",
+          "path": "__48066893185069134.jpg",
+          "type": "Image"
+        },
+        {
+          "name": "__49936584528153445.jpg",
+          "path": "__49936584528153445.jpg",
+          "type": "Image"
+        },
+        {
+          "name": "_logo0024459638155500674.png",
+          "path": "_logo0024459638155500674.png",
+          "type": "Image"
+        },
+        {
+          "name": "Sime__7068173579450246.json",
+          "path": "Sime__7068173579450246.json",
+          "type": "CustomTheme"
+        },
+        {
+          "name": "Sime_wallpaper_desktop_option_5765537904336586.jpg",
+          "path": "Sime_wallpaper_desktop_option_5765537904336586.jpg",
+          "type": "Image"
+        }
+      ]
+    },
+    {
+      "name": "STANDALONEdeneb7E15AEF80B9E4D4F8E12924291ECE89A",
+      "type": "CustomVisual",
+      "items": [
+        {
+          "name": "STANDALONEdeneb7E15AEF80B9E4D4F8E12924291ECE89A.pbiviz.json",
+          "path": "STANDALONEdeneb7E15AEF80B9E4D4F8E12924291ECE89A.pbiviz.json",
+          "type": "CustomVisualMetadata"
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "useStylableVisualContainerHeader": true,
+    "exportDataMode": "AllowSummarized",
+    "defaultDrillFilterOtherVisuals": true,
+    "useCrossReportDrillthrough": true,
+    "allowChangeFilterTypes": true,
+    "useEnhancedTooltips": true,
+    "useDefaultAggregateDisplayName": true,
+    "queryLimitOption": "None",
+    "customMemoryLimit": "1048576",
+    "customTimeoutLimit": "225"
+  }
+}

@@ -1,0 +1,40 @@
+table 'Currency Param'
+	lineageTag: 380ff29e-bd40-46c1-b269-1248c7e2eeac
+
+	column Currency
+		dataType: string
+		lineageTag: f62d690a-cf29-490f-b81b-2059f5670c13
+		summarizeBy: none
+		sourceColumn: Currency
+
+		annotation SummarizationSetBy = Automatic
+
+	column Rate
+		dataType: double
+		lineageTag: c4eaad1e-f203-43d6-9825-be54faf8a710
+		summarizeBy: none
+		sourceColumn: Rate
+
+		annotation SummarizationSetBy = User
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	partition 'Currency Param' = m
+		mode: import
+		source =
+				let
+				    源 = Table.FromRows(Json.Document(Binary.Decompress(Binary.FromText("i45WCvJ1UtJRMlSK1QGxQUw9U6XYWAA=", BinaryEncoding.Base64), Compression.Deflate)), let _t = ((type nullable text) meta [Serialized.Text = true]) in type table [Currency = _t, Rate = _t]),
+				    更改的类型 = Table.TransformColumnTypes(源,{{"Currency", type text}, {"Rate", type number}}),
+				    替换的值 = Table.ReplaceValue(更改的类型,1,2,Replacer.ReplaceValue,{"Rate"}),
+				    替换的值1 = Table.ReplaceValue(替换的值,1.5,1,Replacer.ReplaceValue,{"Rate"}),
+				    替换的值2 = Table.ReplaceValue(替换的值1,2,1.5,Replacer.ReplaceValue,{"Rate"}),
+				    #"Replaced Value" = Table.ReplaceValue(替换的值2,1.5,2,Replacer.ReplaceValue,{"Rate"}),
+				    #"Replaced Value1" = Table.ReplaceValue(#"Replaced Value",1,1.5,Replacer.ReplaceValue,{"Rate"}),
+				    #"Replaced Value2" = Table.ReplaceValue(#"Replaced Value1",2,1,Replacer.ReplaceValue,{"Rate"})
+				in
+				    #"Replaced Value2"
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = 导航
+

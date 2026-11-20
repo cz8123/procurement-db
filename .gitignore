@@ -14,8 +14,19 @@ __pycache__/
 venv/
 .env
 
+# ===== 过程产物 / 临时备份（不入库）=====
+exports/
+_archive/
+.shot/
+.msg_attach/
+tests/backups/
+*_result.txt
+
 # ===== 工作助手内部状态 =====
-.workbuddy/
+.workbuddy/*
+# 例外：记忆与工作日志入库（项目决策的可追溯来源）
+!.workbuddy/memory/
+!.workbuddy/memory/**
 
 # ===== 系统 / 编辑器 =====
 Thumbs.db

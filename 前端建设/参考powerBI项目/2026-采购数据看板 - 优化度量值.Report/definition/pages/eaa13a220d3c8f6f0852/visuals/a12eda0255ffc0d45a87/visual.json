@@ -1,0 +1,16 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.6.0/schema.json",
+  "name": "a12eda0255ffc0d45a87",
+  "position": {
+    "x": 96.4946462881253,
+    "y": 447.67188359900751,
+    "z": 8000,
+    "height": 272.08326494356641,
+    "width": 585.295395518137,
+    "tabOrder": 8000
+  },
+  "visualGroup": {
+    "displayName": "豁免属性",
+    "groupMode": "ScaleMode"
+  }
+}

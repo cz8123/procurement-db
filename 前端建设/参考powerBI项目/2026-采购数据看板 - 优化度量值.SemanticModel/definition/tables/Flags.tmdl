@@ -1,0 +1,66 @@
+table Flags
+	lineageTag: 5af24d44-1a01-4d72-8b09-9cdce649bb01
+
+	column 'Country Code'
+		dataType: string
+		lineageTag: 4c1a8d1e-0e33-4b19-aee9-4164584ddb80
+		summarizeBy: none
+		sourceColumn: Country Code
+
+		annotation SummarizationSetBy = Automatic
+
+	column Country
+		dataType: string
+		lineageTag: 62eb1c83-040e-4727-8ccd-879d0c63e2fe
+		summarizeBy: none
+		sourceColumn: Country
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Images File Name'
+		dataType: string
+		lineageTag: 0c0a3770-885d-4fcd-bae6-7aa644b6af6d
+		summarizeBy: none
+		sourceColumn: Images File Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column ImageURL
+		dataType: string
+		lineageTag: 89473536-0e79-4dc6-b217-420e177f05ff
+		summarizeBy: none
+		sourceColumn: ImageURL
+
+		annotation SummarizationSetBy = Automatic
+
+	column 正态随机1-100小数 =
+			
+			VAR NormalRand = NORM.INV(RAND(), 50, 16)
+			VAR MinLimit = 1
+			VAR MaxLimit = 100
+			VAR FixLow = IF(NormalRand < MinLimit, MinLimit, NormalRand)
+			VAR FixHigh = IF(FixLow > MaxLimit, MaxLimit, FixLow)
+			RETURN
+			FixHigh
+		formatString: 0.00
+		lineageTag: ea1f034e-f339-4f62-8c53-debcfb8595ab
+		summarizeBy: sum
+
+		annotation SummarizationSetBy = Automatic
+
+	partition Flags = m
+		mode: import
+		source =
+				let
+				    Source = Excel.Workbook(File.Contents(OneDriveRoot{0}[Path] & "\数据表\世界地区.xlsx"), null, true),
+				    Flags_Sheet = Source{[Item="Flags",Kind="Sheet"]}[Data],
+				    #"Changed Type" = Table.TransformColumnTypes(Flags_Sheet,{{"Column1", type text}, {"Column2", type text}, {"Column3", type text}, {"Column4", type text}}),
+				    #"Promoted Headers" = Table.PromoteHeaders(#"Changed Type", [PromoteAllScalars=true]),
+				    #"Changed Type1" = Table.TransformColumnTypes(#"Promoted Headers",{{"Country Code", type text}, {"Country", type text}, {"Images File Name", type text}, {"ImageURL", type text}})
+				in
+				    #"Changed Type1"
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+

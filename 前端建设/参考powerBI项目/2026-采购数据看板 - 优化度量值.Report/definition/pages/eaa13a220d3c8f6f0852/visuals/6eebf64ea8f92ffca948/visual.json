@@ -1,0 +1,16 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.6.0/schema.json",
+  "name": "6eebf64ea8f92ffca948",
+  "position": {
+    "x": 685.744740424628,
+    "y": 447.67188359900751,
+    "z": 7000,
+    "height": 272.08326494356641,
+    "width": 584.50445579446387,
+    "tabOrder": 7000
+  },
+  "visualGroup": {
+    "displayName": "小额采购",
+    "groupMode": "ScaleMode"
+  }
+}
