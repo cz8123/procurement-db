@@ -10,7 +10,10 @@ import os
 import sys
 
 PROJ = os.path.dirname(os.path.abspath(__file__))
-PY = r"C:\Users\CONG ZHU\.workbuddy\binaries\python\envs\procurement\Scripts\python.exe"
+PY = os.path.join(
+    os.path.expanduser("~"),
+    ".workbuddy", "binaries", "python", "envs", "procurement", "Scripts", "python.exe",
+)   # 仅作记录/备用；快捷方式本身直接指向 bat，bat 会动态定位 Python
 CHROME = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 
 SHORTCUTS = [

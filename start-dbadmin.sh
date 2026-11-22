@@ -11,16 +11,24 @@
 # ====================================================================
 set -u
 
-PY="/c/Users/CONG ZHU/.workbuddy/binaries/python/envs/procurement/Scripts/python.exe"
-APP="/d/code/采购数据库建设/app.py"
+# 自动定位 Python：项目 .venv -> WorkBuddy 用户 venv -> PATH
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PY=""
+for cand in "$HERE/.venv/Scripts/python.exe" "$USERPROFILE/.workbuddy/binaries/python/envs/procurement/Scripts/python.exe"; do
+  if [ -x "$cand" ] && "$cand" -c "import flask" >/dev/null 2>&1; then PY="$cand"; break; fi
+done
+if [ -z "$PY" ]; then
+  for cand in $(where python 2>/dev/null | tr -d '\r'); do
+    if "$cand" -c "import flask" >/dev/null 2>&1; then PY="$cand"; break; fi
+  done
+fi
+APP="$HERE/app.py"
 PORT="${PORT:-5000}"
 HOST="${HOST:-0.0.0.0}"
 
-if [ ! -x "$PY" ]; then
-  echo "[错误] 未找到虚拟环境 python: $PY" >&2
-  echo "        请先创建虚拟环境：" >&2
-  echo "        C:/Users/CONG ZHU/.workbuddy/binaries/python/versions/3.13.12/python.exe -m venv C:/Users/CONG ZHU/.workbuddy/binaries/python/envs/procurement" >&2
-  echo "        再安装依赖： 该 python -m pip install flask" >&2
+if [ -z "$PY" ]; then
+  echo "[错误] 未找到带 Flask 的 Python。请先执行：" >&2
+  echo "        python -m venv .venv && .venv/Scripts/python.exe -m pip install flask openpyxl" >&2
   exit 1
 fi
 if [ ! -f "$APP" ]; then
