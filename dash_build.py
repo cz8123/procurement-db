@@ -49,6 +49,21 @@ def norm(s):
     return re.sub(r"[\s\-_（）()、/]+", "", (s or "")).lower()
 
 
+def to_amount(v):
+    """金额列兼容两种存储形态：老行是 '¥30,000.00' 文本，新导入行是数值。
+
+    直接 re.sub 到 float 会在数值行上抛 TypeError（2026-11-23 导入后实测）。
+    """
+    if v is None or v == "":
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    try:
+        return float(re.sub(r"[¥￥,\s]", "", str(v)))
+    except ValueError:
+        return None
+
+
 def rule_category(raw):
     n = norm(raw)
     for keys, cat in RULES:
@@ -205,9 +220,8 @@ def build_po(con):
             'AND COALESCE("采购状态",\'\')<>\'Cancelled\''):
         if not _ref:
             continue
-        try:
-            _v = float(re.sub(r"[¥￥,\s]", "", _amt or ""))
-        except ValueError:
+        _v = to_amount(_amt)
+        if _v is None:
             continue
         po_paid[_ref] = po_paid.get(_ref, 0.0) + _v
 
@@ -234,10 +248,7 @@ def build_po(con):
         d = (sub or "")[:10]
         c = comp.get(comp_raw) or (None,) * 7
         sup_cn, sup_en = split_supplier(sup)
-        try:
-            amt = float(re.sub(r"[¥￥,\s]", "", price or ""))
-        except ValueError:
-            amt = None
+        amt = to_amount(price)
         tt = None
         if appr and sub:
             try:

@@ -56,6 +56,76 @@ def con():
     return c
 
 
+# ---------------------------------------------------------------------------
+# 轻量缓存：以库文件的 (mtime_ns, size) 当版本号
+#   任何写入（导入、管理台改行、删表）都会改 mtime → 缓存自动失效，
+#   既不会读到旧数据，也不用手工清缓存。
+#   为什么需要：首屏要打 options/data/top/contracts 四个接口，每个都要扫
+#   dash_po（46k 行）或 vw_fa_analysis（视图，一次 ~80ms）；缓存的都是
+#   「与筛选无关或变化极慢」的部分（筛选项、协议 Type/日期边界）。
+# ---------------------------------------------------------------------------
+_CACHE = {}
+
+
+def _db_stamp():
+    """库版本号：(主库, -wal) 的 (mtime_ns, size)。
+    默认 journal_mode=delete，写入直接改主库 mtime；万一以后切到 WAL，
+    主库 mtime 可能长时间不变，所以把 -wal 也算进来，避免缓存看到旧数据。"""
+    out = []
+    for p in (DB, DB + "-wal"):
+        try:
+            s = os.stat(p)
+            out.append((s.st_mtime_ns, s.st_size))
+        except OSError:
+            out.append(None)
+    return tuple(out)
+
+
+def _cached(key, build):
+    stamp = _db_stamp()
+    hit = _CACHE.get(key)
+    if hit and hit[0] == stamp:
+        return hit[1]
+    val = build()
+    _CACHE[key] = (stamp, val)
+    return val
+
+
+# 整响应缓存：只缓存 GET 的只读聚合接口，命中条件同样是「库没被改过」。
+# 刷新一次页面会重复请求同一组参数（默认财年 + 无筛选），缓存后基本 0ms；
+# 一旦导入/改行改了 mtime，全部自动失效。
+_JSON_CACHE_PATHS = ("/api/board/data", "/api/board/top",
+                     "/api/board/contracts", "/api/board/options")
+_JSON_CACHE_MAX = 40
+
+
+def _arg_key():
+    return tuple(sorted((k, v) for k, v in request.args.items(multi=True)))
+
+
+@board_bp.before_request
+def _json_cache_hit():
+    if request.method != "GET" or request.path not in _JSON_CACHE_PATHS:
+        return None
+    hit = _CACHE.get(("resp", request.path) + _arg_key())
+    if hit and hit[0] == _db_stamp():
+        return Response(hit[1], mimetype="application/json")
+    return None
+
+
+@board_bp.after_request
+def _json_cache_store(resp):
+    if (request.method != "GET" or request.path not in _JSON_CACHE_PATHS
+            or resp.status_code != 200 or resp.direct_passthrough):
+        return resp
+    live = [k for k in _CACHE if isinstance(k, tuple) and k and k[0] == "resp"]
+    if len(live) >= _JSON_CACHE_MAX:
+        for k in live[:len(live) - _JSON_CACHE_MAX + 1]:
+            _CACHE.pop(k, None)
+    _CACHE[("resp", request.path) + _arg_key()] = (_db_stamp(), resp.get_data())
+    return resp
+
+
 def _id(name):
     return '"' + name.replace('"', '""') + '"'
 
@@ -177,6 +247,11 @@ def _median_days(c, where, params):
 # ------------------------------------------------------------------ options
 @board_bp.get("/options")
 def options():
+    regs = tuple(v for v in request.args.getlist("region") if v)
+    return jsonify(_cached(("options",) + regs, lambda: _build_options(regs)))
+
+
+def _build_options(regs=()):
     c = con()
     try:
         fys = _fy_list(c)
@@ -186,14 +261,22 @@ def options():
                "rows": c.execute('SELECT COUNT(*) FROM dash_po').fetchone()[0],
                "options": {}}
         for key, col in FILTERS.items():
-            if key in ("company", "supplier"):     # 61 / 4982 个值，前端用搜索式明细，不进筛选下拉
+            if key == "supplier":                  # 4982 个值，前端走抽屉搜索，不进筛选下拉
                 continue
+            extra, extra_p = [], []
+            # Company 是 Region 的下级：选中区域后只展示这些区域下的公司
+            if key == "company":
+                if regs:
+                    extra.append('%s IN (%s)' % (_id(FILTERS["region"]),
+                                                 ",".join("?" * len(regs))))
+                    extra_p.extend(regs)
             rows = c.execute(
                 'SELECT %s AS v, COUNT(*) AS n FROM dash_po WHERE %s IS NOT NULL '
-                'AND TRIM(%s)<>\'\' GROUP BY 1 ORDER BY n DESC'
-                % (_id(col), _id(col), _id(col))).fetchall()
+                'AND TRIM(%s)<>\'\' %s GROUP BY 1 ORDER BY n DESC'
+                % (_id(col), _id(col), _id(col),
+                   (' AND ' + " AND ".join(extra)) if extra else ''), extra_p).fetchall()
             out["options"][key] = [{"v": r["v"], "n": r["n"]} for r in rows]
-        return jsonify(out)
+        return out
     finally:
         c.close()
 
@@ -312,7 +395,8 @@ def data():
         # ---------------- Chart 2 类别帕累托（降序 + 累计）
         psql2 = ('SELECT COALESCE(NULLIF(TRIM(p."Category"),\'\'),\'Unassigned\') k, '
                  'SUM(p."Total Price") v, COUNT(p."No.") n, '
-                 'COUNT(DISTINCT p."Supplier_cn") sup ' + base +
+                 'COUNT(DISTINCT p."Supplier_cn") sup, '
+                 'SUM(COALESCE(p."PO Paid",0)) po_paid ' + base +
                  ' GROUP BY 1 ORDER BY v DESC')
         spec["pareto"] = psql2
         prow = [dict(r) for r in c.execute(psql2, params)]
@@ -322,7 +406,23 @@ def data():
             acc += r["v"] or 0
             r["cum"] = round(acc / tot, 4) if tot else None
             r["share"] = round((r["v"] or 0) / tot, 4) if tot else None
-        pareto = {"rows": prow, "total": round(tot, 2)}
+        # 每个类别下的采购子类别（Table - 采购子类别 → dash_po."Sub-Category"）
+        # subMap = 金额最高的那一条（表格折叠态显示）；subsMap = 全部明细（展开时显示）
+        ssql = ('SELECT COALESCE(NULLIF(TRIM(p."Category"),\'\'),\'Unassigned\') cat, '
+                'COALESCE(NULLIF(TRIM(p."Sub-Category"),\'\'),\'Unassigned\') sub, '
+                'SUM(p."Total Price") v, COUNT(p."No.") n, '
+                'SUM(COALESCE(p."PO Paid",0)) po_paid ' + base +
+                ' GROUP BY 1,2 ORDER BY 1,3 DESC')
+        spec["subs"] = ssql
+        sub_map, subs_map = {}, {}
+        for r in c.execute(ssql, params):
+            it = {"k": r["sub"], "v": round(r["v"] or 0, 2),
+                  "n": r["n"] or 0, "po": round(r["po_paid"] or 0, 2)}
+            subs_map.setdefault(r["cat"], []).append(it)
+            if r["cat"] not in sub_map and r["sub"] != "Unassigned":
+                sub_map[r["cat"]] = r["sub"]
+        pareto = {"rows": prow, "total": round(tot, 2),
+                  "subMap": sub_map, "subsMap": subs_map}
 
         # ---------------- Chart 3 支出类型环形
         dsql = ('SELECT COALESCE(NULLIF(TRIM(p."Expense Type"),\'\'),\'Unclassified\') k, '
@@ -382,7 +482,7 @@ def data():
                 "fy": fy, "prevFy": pfy, "cur": cur, "rate": rate,
                 "where": where, "values": [str(x) for x in params],
                 "filters": {k: request.args.getlist(k) for k in
-                            ("brand", "category", "expense", "supplier_attr", "region")
+                            ("brand", "category", "expense", "supplier_attr", "region", "company")
                             if request.args.getlist(k)},
                 "cpMethods": list(CP_METHODS),
             },
@@ -402,7 +502,8 @@ def top_suppliers():
         where, params = _scope(request.args, fy)
         tsql = ('SELECT COALESCE(NULLIF(TRIM(p."Supplier_cn"),\'\'),\'Unassigned\') k, '
                 'SUM(p."Total Price") v, COUNT(p."No.") n, '
-                'COUNT(DISTINCT p."Category") cats '
+                'COUNT(DISTINCT p."Category") cats, '
+                'SUM(COALESCE(p."PO Paid",0)) po_paid '
                 'FROM dash_po p JOIN dash_calendar c ON p."Date"=c."Date" WHERE ' + where +
                 ' GROUP BY 1 ORDER BY v DESC LIMIT 10')
         rows = _with_en([dict(r) for r in c.execute(tsql, params)], c)
@@ -418,6 +519,7 @@ _SORTS = {
     "date": 'p."Date"', "amount": 'p."Total Price"', "days": 'p."Time Taken"',
     "supplier": 'p."Supplier_cn"', "company": 'p."Company_cn"',
     "category": 'p."Category"', "no": 'p."No."', "expense": 'p."Expense Type"',
+    "poPaid": 'p."PO Paid"',
 }
 
 _ROWS_SELECT = (
@@ -425,11 +527,12 @@ _ROWS_SELECT = (
     'p."Brand" brand, p."Department" dept, p."Category" category, '
     'p."Expense Type" expense, p."Procurement Method" method, '
     'p."Supplier_cn" supplier, p."Total Price" amount, p."Time Taken" days, '
-    'p."Budget Type" budget, p."Supplier Category" level'
+    'p."Budget Type" budget, p."Supplier Category" level, '
+    'p."PO Paid" poPaid'
 )
 
 
-def _rows_where(args, fy):
+def _rows_where(args, fy, agg=False):
     where, params = _scope(args, fy)
     # 财月（1=7 月）：月度图点柱子时下钻用
     fm = (args.get("fm") or "").strip()
@@ -439,10 +542,16 @@ def _rows_where(args, fy):
     q = (args.get("q") or "").strip()
     if q:
         like = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-        where += (' AND (p."No." LIKE ? ESCAPE "\\" OR p."Supplier_cn" LIKE ? ESCAPE "\\" '
-                  'OR p."Company_cn" LIKE ? ESCAPE "\\" OR p."Category" LIKE ? ESCAPE "\\" '
-                  'OR p."Department" LIKE ? ESCAPE "\\" OR p."Brand" LIKE ? ESCAPE "\\")')
-        params += [like] * 6
+        if agg:
+            # 按月/公司聚合时搜的是「公司/区域」，不能拿单号去筛行（否则只统计到那一行，金额偏低）
+            where += (' AND (p."Company_cn" LIKE ? ESCAPE "\\" '
+                      'OR p."Region_cn" LIKE ? ESCAPE "\\")')
+            params += [like, like]
+        else:
+            where += (' AND (p."No." LIKE ? ESCAPE "\\" OR p."Supplier_cn" LIKE ? ESCAPE "\\" '
+                      'OR p."Company_cn" LIKE ? ESCAPE "\\" OR p."Category" LIKE ? ESCAPE "\\" '
+                      'OR p."Department" LIKE ? ESCAPE "\\" OR p."Brand" LIKE ? ESCAPE "\\")')
+            params += [like] * 6
     return where, params
 
 
@@ -454,19 +563,53 @@ def rows():
         fy = request.args.get("fy") or (fys[-1] if fys else None)
         page = max(int(request.args.get("page", 1) or 1), 1)
         size = min(max(int(request.args.get("size", 50) or 50), 10), 200)
+        by_company = (request.args.get("by") or "").strip().lower() == "company"
+        where, params = _rows_where(request.args, fy, agg=by_company)
+        base = 'FROM dash_po p JOIN dash_calendar c ON p."Date"=c."Date" WHERE ' + where
+        # by=company：抽屉按公司聚合（一行一家公司），不再逐单列出
+        if by_company:
+            return jsonify(_company_rows(c, base, params, page, size, request.args))
         sort = _SORTS.get(request.args.get("sort", "date"), 'p."Date"')
         dirn = "ASC" if request.args.get("dir") == "asc" else "DESC"
-        where, params = _rows_where(request.args, fy)
-        base = 'FROM dash_po p JOIN dash_calendar c ON p."Date"=c."Date" WHERE ' + where
         total = c.execute("SELECT COUNT(*) " + base, params).fetchone()[0]
         amt = c.execute('SELECT SUM(p."Total Price") ' + base, params).fetchone()[0]
+        paid = c.execute('SELECT SUM(COALESCE(p."PO Paid",0)) ' + base, params).fetchone()[0]
         sql = ('SELECT ' + _ROWS_SELECT + ' ' + base +
                ' ORDER BY %s %s, p."No." ASC LIMIT ? OFFSET ?' % (sort, dirn))
         data = [dict(r) for r in c.execute(sql, params + [size, (page - 1) * size])]
         return jsonify({"total": total, "page": page, "size": size,
-                        "amount": _num(amt), "rows": data})
+                        "amount": _num(amt), "poPaid": _num(paid), "rows": data})
     finally:
         c.close()
+
+
+# 公司聚合视图可排序列（别名 → SQL 表达式），days = 平均处理天数
+_AG_SORTS = {"amount": "amount", "poPaid": "paid", "n": "n", "days": "days",
+             "sup": "sup", "company": "company", "region": "region"}
+
+
+def _company_rows(c, base, params, page, size, args):
+    """按公司聚合的下钻：公司 / 区域 / 单数 / 供应商数 / 采购额 / PO Paid / 平均周期"""
+    grp = ('SELECT p."Company_cn" company, '
+           'COALESCE(NULLIF(TRIM(p."Region_cn"),\'\'),\'—\') region, '
+           'COUNT(*) n, COUNT(DISTINCT p."Supplier_cn") sup, '
+           'SUM(p."Total Price") amount, SUM(COALESCE(p."PO Paid",0)) paid, '
+           'AVG(p."Time Taken") days ' + base + ' GROUP BY 1,2')
+    sk = _AG_SORTS.get(args.get("sort") or "amount", "amount")
+    dirn = "ASC" if args.get("dir") == "asc" else "DESC"
+    total, amt, paid = c.execute(
+        'SELECT COUNT(*), SUM(amount), SUM(paid) FROM (' + grp + ')', params).fetchone()
+    data = []
+    for r in c.execute(grp + ' ORDER BY %s %s, company ASC LIMIT ? OFFSET ?' % (sk, dirn),
+                       params + [size, (page - 1) * size]):
+        d = dict(r)
+        d["poPaid"] = d.pop("paid")       # 前端沿用 poPaid 键
+        d["days"] = round(d["days"], 1) if d["days"] is not None else None
+        d["amount"] = _num(d["amount"])
+        d["poPaid"] = _num(d["poPaid"])
+        data.append(d)
+    return {"total": total or 0, "page": page, "size": size, "by": "company",
+            "amount": _num(amt), "poPaid": _num(paid), "rows": data}
 
 
 @board_bp.get("/export.csv")
@@ -491,7 +634,8 @@ def export_csv():
                 w = csv.writer(buf)
                 w.writerow(["No.", "Date", "Company", "Region", "Brand", "Department",
                             "Category", "Expense Type", "Procurement Method", "Supplier",
-                            "Amount (%s)" % cur, "Days", "Budget Type", "Supplier Category"])
+                            "Amount (%s)" % cur, "PO Paid (%s)" % cur, "Days",
+                            "Budget Type", "Supplier Category"])
                 yield "\ufeff" + buf.getvalue()
                 buf.seek(0)
                 buf.truncate(0)
@@ -502,6 +646,7 @@ def export_csv():
                                 r["dept"], r["category"], r["expense"], r["method"],
                                 r["supplier"],
                                 round(amt / rate, 2) if amt is not None else "",
+                                round((r["poPaid"] or 0) / rate, 2),
                                 r["days"], r["budget"], r["level"]])
                     n += 1
                     if n % 800 == 0:
@@ -581,38 +726,64 @@ def contracts():
         sort = CONTRACT_SORTS.get(request.args.get("sort", "start"), '"开始日期"')
         dirn = "ASC" if request.args.get("dir") == "asc" else "DESC"
 
-        summary = dict(c.execute(
-            'SELECT COUNT(*) n, SUM("预估金额_可加") cv, SUM("实际采购额") pa, '
-            'SUM(CASE WHEN "剩余天数" < 0 THEN 1 ELSE 0 END) expired, '
-            'SUM(CASE WHEN "剩余天数" BETWEEN 0 AND 90 THEN 1 ELSE 0 END) expiring, '
-            'SUM(CASE WHEN "执行率" > 1 THEN 1 ELSE 0 END) overrun '
-            'FROM vw_fa_analysis WHERE ' + where, params).fetchone())
+        # vw_fa_analysis 是视图（每次求值 ~80ms）。以前 summary / rows / types / bounds
+        # 各扫一遍 = 4 次 ≈ 330ms；现在窗口函数把汇总并进取数那一次（OVER () 在
+        # WHERE 之后、LIMIT 之前算，正好是「筛选后的全集」），types/bounds 走缓存。
+        rows_sql = (
+            'SELECT ' + CONTRACT_COLS +
+            ', COUNT(*) OVER () AS _n'
+            ', SUM("预估金额_可加") OVER () AS _cv'
+            ', SUM("实际采购额") OVER () AS _pa'
+            ', SUM(CASE WHEN "剩余天数" < 0 THEN 1 ELSE 0 END) OVER () AS _expired'
+            ', SUM(CASE WHEN "剩余天数" BETWEEN 0 AND 90 THEN 1 ELSE 0 END) OVER () AS _expiring'
+            ', SUM(CASE WHEN "执行率" > 1 THEN 1 ELSE 0 END) OVER () AS _overrun'
+            ' FROM vw_fa_analysis WHERE ' + where +
+            ' ORDER BY %s %s LIMIT ? OFFSET ?' % (sort, dirn))
+        raw = [dict(r) for r in c.execute(rows_sql, params + [size, (page - 1) * size])]
+        if raw:
+            h = raw[0]
+            summary = {"n": int(h["_n"] or 0), "cv": h["_cv"], "pa": h["_pa"],
+                       "expired": int(h["_expired"] or 0),
+                       "expiring": int(h["_expiring"] or 0),
+                       "overrun": int(h["_overrun"] or 0)}
+            rows = [{k: v for k, v in r.items() if not k.startswith("_")} for r in raw]
+        else:
+            # 页码越界（当前筛选下一页为空）：退回单查汇总，保证分页器数字正确
+            summary = dict(c.execute(
+                'SELECT COUNT(*) n, SUM("预估金额_可加") cv, SUM("实际采购额") pa, '
+                'SUM(CASE WHEN "剩余天数" < 0 THEN 1 ELSE 0 END) expired, '
+                'SUM(CASE WHEN "剩余天数" BETWEEN 0 AND 90 THEN 1 ELSE 0 END) expiring, '
+                'SUM(CASE WHEN "执行率" > 1 THEN 1 ELSE 0 END) overrun '
+                'FROM vw_fa_analysis WHERE ' + where, params).fetchone())
+            rows = []
         cv, pa = summary.get("cv") or 0, summary.get("pa") or 0
         summary["cv"] = round(cv, 2)
         summary["pa"] = round(pa, 2)
         summary["usage"] = round(pa / cv, 4) if cv else None
         for k in ("n", "expired", "expiring", "overrun"):
             summary[k] = int(summary.get(k) or 0)
-
-        rows_sql = ('SELECT ' + CONTRACT_COLS + ' FROM vw_fa_analysis WHERE ' + where +
-                    ' ORDER BY %s %s LIMIT ? OFFSET ?' % (sort, dirn))
-        rows = [dict(r) for r in c.execute(rows_sql, params + [size, (page - 1) * size])]
         smap = supplier_en_map(c)
         variants = english_variants(c)
         for r in rows:
             # 前端显示英文名（已补空格）；hover 用原 supplier（全称）
             r["supplier_en"] = clean_en(
                 smap.get(r.get("supplier")) or split_en(r.get("supplier")), variants)
-        types = [dict(r) for r in c.execute(
-            'SELECT "适用领域" k, COUNT(*) n FROM vw_fa_analysis GROUP BY 1 ORDER BY n DESC')]
-        bounds = dict(c.execute(
-            'SELECT MIN("开始日期") mn, MAX("开始日期") mx FROM vw_fa_analysis').fetchone())
+        # Type 选项与日期边界跟筛选无关（不随 where 变），按库版本缓存
+        meta = _cached("fa_meta", lambda: {
+            "types": [dict(r) for r in c.execute(
+                'SELECT "适用领域" k, COUNT(*) n FROM vw_fa_analysis '
+                'GROUP BY 1 ORDER BY n DESC')],
+            "bounds": dict(c.execute(
+                'SELECT MIN("开始日期") mn, MAX("开始日期") mx '
+                'FROM vw_fa_analysis').fetchone()),
+        })
+        types, bounds = meta["types"], meta["bounds"]
         return jsonify({"total": summary["n"], "page": page, "size": size,
                         "summary": summary, "types": types, "bounds": bounds,
                         "rows": rows,
                         "spec": {
-                            "summary": ('SELECT COUNT(*) n, SUM("预估金额_可加") cv, '
-                                        'SUM("实际采购额") pa, ... '
+                            "summary": ('COUNT(*)/SUM(...) 与取数同一次扫描：'
+                                        'COUNT(*) OVER (), SUM(...) OVER () '
                                         'FROM vw_fa_analysis WHERE ' + where),
                             "rows": rows_sql,
                             "params": [str(x) for x in params] + [str(size), str((page - 1) * size)],

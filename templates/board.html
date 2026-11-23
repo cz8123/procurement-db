@@ -41,16 +41,17 @@
   <div class="fbar-in" id="fbar"></div>
   <div class="fbar-r">
     <button class="spec-btn" data-spec="global" title="How the whole dashboard is calculated">?</button>
+    <!-- 已选筛选：放在筛选条右侧（Reset 左边），不再单独占一行 -->
+    <div class="chips" id="chips"></div>
     <button class="btn ghost" id="btnReset">Reset Filters</button>
   </div>
 </section>
-<div class="chips" id="chips"></div>
 
 </div><!-- /.sticky-head -->
 
 <!-- 主区 -->
 <main class="grid">
-  <section class="card g8">
+  <section class="card g9">
     <div class="card-h">
       <h2 id="mTitle">Monthly Spend by Region</h2>
       <div class="card-tools">
@@ -59,17 +60,27 @@
           <button type="button" data-m="pair">Total vs Framework</button>
         </div>
         <button class="spec-btn" data-spec="monthly" title="View calculation logic">?</button>
-        <span class="lg" id="mLegend"></span>
+        <span class="v-slot"><button type="button" class="v-back" data-clear="region" hidden
+                aria-label="Back" title="Back"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+               stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+               aria-hidden="true"><path d="M9 6 3 12l6 6"/><path d="M3 12h9.5a5.5 5.5 0 0 1 5.5 5.5V20"/></svg></button></span>
       </div>
+    </div>
+    <div class="lg-row">
+      <span class="lg" id="mLegend"></span>
     </div>
     <div class="chart" id="chMonthly" data-empty="No monthly data"></div>
   </section>
 
-  <section class="card g4">
+  <section class="card g3">
     <div class="card-h">
       <h2>Spend by Expense Type</h2>
       <div class="card-tools">
         <button class="spec-btn" data-spec="donut" title="View calculation logic">?</button>
+        <button type="button" class="v-back" data-clear="expense" hidden
+                aria-label="Back" title="Back"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+               stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+               aria-hidden="true"><path d="M9 6 3 12l6 6"/><path d="M3 12h9.5a5.5 5.5 0 0 1 5.5 5.5V20"/></svg></button>
       </div>
     </div>
     <div class="chart" id="chDonut" data-empty="No expense type data"></div>
@@ -82,6 +93,10 @@
       <div class="card-tools">
         <button class="spec-btn" data-spec="pareto" title="View calculation logic">?</button>
         <span class="hint">Bars = spend · line = cumulative %</span>
+        <button type="button" class="v-back" data-clear="category" hidden
+                aria-label="Back" title="Back"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+               stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+               aria-hidden="true"><path d="M9 6 3 12l6 6"/><path d="M3 12h9.5a5.5 5.5 0 0 1 5.5 5.5V20"/></svg></button>
       </div>
     </div>
     <div class="chart" id="chPareto" data-empty="No category data"></div>
@@ -99,17 +114,22 @@
     <div class="chart" id="chTop" data-empty="No supplier data"></div>
   </section>
 
-  <section class="card g5" id="catCard">
+  <section class="card g6" id="catCard">
     <div class="card-h">
       <h2>Category Details <span class="card-note">· click a row to cross-filter</span></h2>
       <div class="card-tools">
+        <input id="catQ" class="mini-inp" type="search" placeholder="Search category" title="Filter categories by name">
         <button class="spec-btn" data-spec="catdetail" title="View calculation logic">?</button>
+        <button type="button" class="v-back" data-clear="category" hidden
+                aria-label="Back" title="Back"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+               stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+               aria-hidden="true"><path d="M9 6 3 12l6 6"/><path d="M3 12h9.5a5.5 5.5 0 0 1 5.5 5.5V20"/></svg></button>
       </div>
     </div>
     <div class="cd-wrap" id="chCat"></div>
   </section>
 
-  <section class="card g7">
+  <section class="card g6" id="heatCard">
     <div class="card-h">
       <h2>Top 10 Suppliers × Category</h2>
       <div class="card-tools">
@@ -165,11 +185,11 @@
   </div>
   <div class="drawer-b">
     <div class="drawer-tools">
-      <input id="drawerQ" class="mini-inp" type="search" placeholder="Search…">
+      <input id="drawerQ" class="mini-inp" type="search" placeholder="Search company…">
       <select id="drawerSize" class="mini-sel">
-        <option value="50">50 rows</option>
-        <option value="100">100 rows</option>
-        <option value="200">200 rows</option>
+        <option value="50">50 companies</option>
+        <option value="100">100 companies</option>
+        <option value="200">200 companies</option>
       </select>
     </div>
     <div class="tbl-wrap">

@@ -54,14 +54,33 @@ async function waitFor(pg, fn, timeout, label) {
     await page.goto(BASE + '/dash?t=' + Date.now(), { waitUntil: 'networkidle0' });
     await waitFor(page, () => document.querySelectorAll('#fcTbl tbody tr').length > 0, 9000, 'contract rows');
 
+    /* 期望值从 API 现场取，不写死金额/单据数：新数据导入后这些数字本来就会变。
+       仍校验页面显示与后端口径严格一致（格式化规则同 board.js 的 money/nf）。 */
+    const BD = await page.evaluate(() => fetch('/api/board/data?fy=FY2627').then(r => r.json()));
+    const kv = k => (BD.kpi || []).find(x => x.k === k) || {};
+    const fmtM = v => v == null ? '—' : '¥' + Number(v / 1e6).toFixed(1) + 'M';
+    const fmtI = v => v == null ? '—' : Number(v).toLocaleString('en-US');
+    const AMT0 = fmtM(kv('amount').v);
+    await page.evaluate(v => { window.__AMT0 = v; }, AMT0);  // waitFor 回调在浏览器上下文执行，取不到 Node 变量
+    const CT = await page.evaluate(() => fetch('/api/board/contracts?limit=5').then(r => r.json()));
+    const CTQ = await page.evaluate(() => fetch('/api/board/contracts?q=' +
+      encodeURIComponent('代驾') + '&limit=5').then(r => r.json()));
+    await page.evaluate(o => {
+      window.__FCT = o.t; window.__FCQ = o.q; window.__FCCP = o.cp; window.__FCE = o.e;
+    }, { t: CT.total, q: CTQ.total, cp: (CT.types.find(x => x.k === 'CP') || {}).n,
+         e: CT.summary.expired });
+
     chk('7 张 KPI 卡', await count('.kpi') === 7, await count('.kpi'));
     chk('含 PO 实付金额卡', await count('.kpi[data-k=poSpend]') === 1);
     const poTxt = await num('.kpi[data-k=poSpend] .k-val');
     /* PO 实付金额 = PO 表「总支付总额」按 PRPO 单号汇总（Cancelled 不计），
-       FY2627 = ¥69.2 M，与 PO Paid 口径一致 */
+       与 PO Paid 同源；期望值现场从 API 取，避免每次导入新数据都要改测试 */
     chk('PO 实付金额显示为金额', /^[¥R]/.test(poTxt || ''), poTxt);
-    chk('PO 实付金额 = ¥69.2 M', /69\.2M/.test(poTxt || ''), poTxt);
-    chk('5 组筛选下拉', await count('.fdrop') === 5, await count('.fdrop'));
+    chk('PO 实付金额与库一致', poTxt === fmtM(kv('poSpend').v), poTxt + ' / ' + fmtM(kv('poSpend').v));
+    chk('5 组筛选下拉（公司收在 Region 内）', await count('.fdrop') === 5, await count('.fdrop'));
+    chk('Region 下拉含公司一段',
+      await count('.fdrop[data-k=region] .fsec') === 2,
+      await count('.fdrop[data-k=region] .fsec'));
     chk('月度堆叠柱 > 0', await count('#chMonthly rect.seg') > 0);
     chk('月度画满 12 个财月', (await page.$eval('#chMonthly svg',
       e => (e.textContent.match(/Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/g) || []).length)) >= 12);
@@ -71,7 +90,7 @@ async function waitFor(pg, fn, timeout, label) {
     chk('Top10 供应商 10 条', await count('#chTop .trow') === 10, await count('#chTop .trow'));
     chk('协议表默认 50 行', await count('#fcTbl tbody tr') === 50, await count('#fcTbl tbody tr'));
     chk('默认财年 FY2627', await page.$eval('#fySel', e => e.value) === 'FY2627');
-    chk('副标题含 4,869 PRs', /4,869\s*PRs/.test(await num('.hd-sub') || ''));
+    chk('副标题含当前 PR 数', new RegExp(fmtI(kv('txn').v) + '\\s*PRs').test(await num('.hd-sub') || ''));
     chk('标题用原版 Procurement Data Dashboard',
       await num('h1') === 'Procurement Data Dashboard', await num('h1'));
     chk('logo 用原素材 logo-sime.png 且已加载',
@@ -84,10 +103,10 @@ async function waitFor(pg, fn, timeout, label) {
       document.querySelectorAll('.kpi').forEach(e => { o[e.dataset.k] = e.querySelector('.k-val').textContent; });
       return o;
     });
-    chk('采购总额 ¥184.7M', k0.amount === '¥184.7M', k0);
-    chk('集采金额 ¥138.7M', k0.cp === '¥138.7M', k0.cp);
-    chk('单据 4,869', k0.txn === '4,869', k0.txn);
-    chk('供应商 974', k0.suppliers === '974', k0.suppliers);
+    chk('采购总额与库一致', k0.amount === AMT0, k0);
+    chk('集采金额与库一致', k0.cp === fmtM(kv('cp').v), k0.cp + ' / ' + fmtM(kv('cp').v));
+    chk('单据数与库一致', k0.txn === fmtI(kv('txn').v), k0.txn + ' / ' + fmtI(kv('txn').v));
+    chk('供应商数与库一致', k0.suppliers === fmtI(kv('suppliers').v), k0.suppliers + ' / ' + fmtI(kv('suppliers').v));
     chk('中位周期按天展示', /\bd$/.test(k0.days || ''), k0.days);
 
     console.log('=== 3. 支出类型（dash_build 字段错位修复） ===');
@@ -99,13 +118,13 @@ async function waitFor(pg, fn, timeout, label) {
       fetch('/api/board/data?fy=FY2627').then(r => r.json()).then(d =>
         d.donut.reduce((s, x) => s + x.v, 0)));
     chk('4 类合计 = 总额',
-      Math.abs(expSum - 184739366.91) < 10, expSum);
+      Math.abs(expSum - kv('amount').v) < 10, expSum + ' / ' + kv('amount').v);
 
     console.log('=== 4. 交叉筛选 ===');
     await page.evaluate(() => document.querySelector('#chMonthly rect.seg').dispatchEvent(
       new MouseEvent('click', { bubbles: true })));
     await waitFor(page, () => document.querySelectorAll('.chip').length === 1 &&
-      document.querySelector('.kpi[data-k=amount] .k-val').textContent !== '¥184.7M',
+      document.querySelector('.kpi[data-k=amount] .k-val').textContent !== window.__AMT0,
       8000, 'region chip + amount');
     const a1 = await num('.kpi[data-k=amount] .k-val');
     chk('点区域柱 → 1 个 chip', await count('.chip') === 1);
@@ -119,7 +138,7 @@ async function waitFor(pg, fn, timeout, label) {
 
     await page.click('#btnReset');
     await waitFor(page, () => document.querySelectorAll('.chip').length === 0 &&
-      document.querySelector('.kpi[data-k=amount] .k-val').textContent === '¥184.7M',
+      document.querySelector('.kpi[data-k=amount] .k-val').textContent === window.__AMT0,
       8000, 'reset');
     chk('重置 → chip 清空', await count('.chip') === 0);
     chk('重置 → 金额复原', await num('.kpi[data-k=amount] .k-val') === k0.amount);
@@ -143,7 +162,7 @@ async function waitFor(pg, fn, timeout, label) {
     if (pt) {
       await page.mouse.click(pt.x, pt.y);
       await waitFor(page, () => document.querySelectorAll('.chip').length === 1 &&
-        document.querySelector('.kpi[data-k=amount] .k-val').textContent !== '¥184.7M',
+        document.querySelector('.kpi[data-k=amount] .k-val').textContent !== window.__AMT0,
         8000, 'exp chip + amount');
       chk('点扇区 → Expense Type chip', /Expense Type/.test(await num('.chip') || ''));
       chk('点扇区 → 金额变化', (await num('.kpi[data-k=amount] .k-val')) !== k0.amount);
@@ -165,27 +184,46 @@ async function waitFor(pg, fn, timeout, label) {
     await sleep(150);
     await page.click('.chip button');
     await waitFor(page, () => document.querySelectorAll('.chip').length === 0 &&
-      document.querySelector('.kpi[data-k=amount] .k-val').textContent === '¥184.7M',
+      document.querySelector('.kpi[data-k=amount] .k-val').textContent === window.__AMT0,
       8000, 'chip remove');
     chk('点 chip × → 撤销筛选', await num('.kpi[data-k=amount] .k-val') === k0.amount);
     await page.keyboard.press('Escape');
+
+    /* 公司是 Region 的下级（收在同一个下拉的第二段）：选区域后 Company 选项收窄 */
+    const coSel = '.fdrop[data-k=region] .fsec[data-k=company] .fpop-b label';
+    await page.click('.fdrop[data-k=region] .fd-btn');
+    await waitFor(page, () => document.querySelectorAll('.fdrop[data-k=region] .fsec[data-k=company] .fpop-b label').length > 20,
+      8000, 'company list');
+    const coAll = await count(coSel);
+    await page.evaluate(n => { window.__COALL = n; }, coAll);
+    await page.click('.fdrop[data-k=region] .fsec[data-k=region] .fpop-b label');
+    await waitFor(page, () => document.querySelectorAll('.fdrop[data-k=region] .fsec[data-k=company] .fpop-b label').length < window.__COALL,
+      8000, 'company cascade');
+    const coFew = await count(coSel);
+    chk('Region → Company 级联收窄', coAll > 20 && coFew > 0 && coFew < coAll, [coAll, coFew]);
+    await page.keyboard.press('Escape');
+    await page.click('#btnReset');
+    await waitFor(page, () => document.querySelectorAll('.fdrop[data-k=region] .fsec[data-k=company] .fpop-b label').length === window.__COALL,
+      8000, 'company reset');
 
     console.log('=== 7. 货币 / 财年 ===');
     await page.click('#curSeg button[data-cur=RM]');
     await waitFor(page, () => /^RM /.test(document.querySelector('.kpi[data-k=amount] .k-val').textContent), 6000, 'RM');
     const rmAmt = await num('.kpi[data-k=amount] .k-val');
     chk('切 RM 符号正确', /^RM /.test(rmAmt), rmAmt);
-    chk('RM = RMB / 1.5', Math.abs(parseFloat(rmAmt.replace(/[^\d.]/g, '')) - 184.7 / 1.5) < 0.6, rmAmt);
+    chk('RM = RMB / 1.5',
+      Math.abs(parseFloat(rmAmt.replace(/[^\d.]/g, '')) - Number(kv('amount').v) / 1e6 / 1.5) < 0.6,
+      rmAmt + ' / ' + Number(kv('amount').v) / 1e6 / 1.5);
     await page.click('#curSeg button[data-cur=RMB]');
     await waitFor(page, () => /^¥/.test(document.querySelector('.kpi[data-k=amount] .k-val').textContent), 6000, 'RMB');
     chk('切回 RMB', await num('.kpi[data-k=amount] .k-val') === k0.amount);
 
     await page.select('#fySel', 'FY2526');
-    await waitFor(page, () => document.querySelector('.kpi[data-k=amount] .k-val').textContent !== '¥184.7M', 8000, 'FY2526');
+    await waitFor(page, () => document.querySelector('.kpi[data-k=amount] .k-val').textContent !== window.__AMT0, 8000, 'FY2526');
     chk('切财年 → FY2526 金额', (await num('.kpi[data-k=amount] .k-val')).indexOf('698') >= 0,
       await num('.kpi[data-k=amount] .k-val'));
     await page.select('#fySel', 'FY2627');
-    await waitFor(page, () => document.querySelector('.kpi[data-k=amount] .k-val').textContent === '¥184.7M', 8000, 'FY2627');
+    await waitFor(page, () => document.querySelector('.kpi[data-k=amount] .k-val').textContent === window.__AMT0, 8000, 'FY2627');
 
     console.log('=== 8. 明细钻取抽屉 ===');
     await waitFor(page, () => document.querySelectorAll('#chTop .trow').length === 10, 8000, 'top10');
@@ -198,9 +236,50 @@ async function waitFor(pg, fn, timeout, label) {
     chk('抽屉标题是供应商', (await num('#drawerTitle') || '').length > 2 &&
       (await num('#drawerTitle')) !== 'Details', await num('#drawerTitle'));
     chk('抽屉有合计', /total/.test(await num('#drawerSub') || ''));
+    chk('抽屉补充 PO Paid 列',
+      (await page.$$eval('#drawerTbl thead th', a => a.map(e => e.textContent.trim())))
+        .indexOf('PO Paid') >= 0);
+    const dHeads = await page.$$eval('#drawerTbl thead th', a => a.map(e => e.textContent.trim()));
+    chk('抽屉按公司聚合（表头）', dHeads[0] === 'Company' && dHeads.indexOf('Avg Days') >= 0, dHeads);
+    chk('抽屉不显示 PRPO 单号', dHeads.indexOf('PR No.') < 0 &&
+      dHeads.indexOf('No.') < 0 && dHeads.indexOf('Date') < 0, dHeads);
+    chk('抽屉表头 7 列', dHeads.length === 7, dHeads);
+    const firstRow = await page.$$eval('#drawerTbl tbody tr:first-child td',
+      a => a.map(e => e.textContent.trim()));
+    chk('抽屉一行一家公司', firstRow.length === 7 && firstRow[0].length > 1, firstRow);
+    chk('公司行有单数与金额', /^\d+$/.test(firstRow[2] || '') && /[¥R]/.test(firstRow[4] || ''), firstRow);
+    chk('抽屉小标题写 companies',
+      /companies/.test(await num('#drawerSub') || ''), await num('#drawerSub'));
+    chk('抽屉打开时背景不滚动',
+      await page.evaluate(() => getComputedStyle(document.body).overflow === 'hidden'));
+    chk('抽屉无横向滚动条', await page.evaluate(() => {
+      const e = document.querySelector('.drawer .tbl-wrap');
+      return e.scrollWidth - e.clientWidth <= 1;
+    }));
+    const dp0 = await num('#drawerPager');
+    await page.evaluate(s => { window.__DP0 = s; }, dp0);
+    const canNext = await page.evaluate(() => Array.from(
+      document.querySelectorAll('#drawerPager button[data-pg]'))
+      .some(b => /Next/.test(b.textContent) && !b.disabled));
+    if (canNext) {
+      await page.evaluate(() => Array.from(document.querySelectorAll('#drawerPager button[data-pg]'))
+        .find(b => /Next/.test(b.textContent)).click());
+      await waitFor(page, () => document.querySelector('#drawerPager').textContent !== window.__DP0,
+        8000, 'drawer next');
+      chk('抽屉 Next 翻页生效', (await num('#drawerPager')) !== dp0);
+    } else {
+      /* 按公司聚合后，单个供应商下的公司数常常不足一页，此时 Next 应当被禁用 */
+      chk('公司数不足一页时 Next 禁用', await page.evaluate(() => {
+        const b = Array.from(document.querySelectorAll('#drawerPager button[data-pg]'))
+          .find(x => /Next/.test(x.textContent));
+        return !b || b.disabled;
+      }));
+    }
     await page.keyboard.press('Escape');
     await sleep(300);
     chk('Esc 关闭抽屉', !(await page.$eval('#drawer', e => e.classList.contains('on'))));
+    chk('关闭后背景滚动恢复',
+      await page.evaluate(() => getComputedStyle(document.body).overflow !== 'hidden'));
 
     await page.evaluate(() => document.querySelector('#chHeat .hcell').dispatchEvent(
       new MouseEvent('click', { bubbles: true })));
@@ -305,6 +384,16 @@ async function waitFor(pg, fn, timeout, label) {
         a => a.every(e => e.scrollWidth <= e.clientWidth + 1)));
     const cdFirst = await num('#chCat .cd-row');
     chk('首行是金额最高的类别', /Administration/.test(cdFirst), cdFirst);
+    chk('明细表含 Sub-Category / PO Paid 列',
+      (await page.$$eval('#chCat thead th', a => a.map(e => e.textContent.trim())))
+        .filter(t => t === 'Sub-Category' || t === 'PO Paid').length === 2);
+    await page.type('#catQ', 'Administration');
+    await waitFor(page, () => document.querySelectorAll('#chCat .cd-row').length === 1,
+      5000, 'category search');
+    chk('类别搜索框只筛表格行', (await count('#chCat .cd-row')) === 1);
+    await page.$eval('#catQ', e => { e.value = ''; e.dispatchEvent(new Event('input', { bubbles: true })); });
+    await waitFor(page, () => document.querySelectorAll('#chCat .cd-row').length === 11,
+      5000, 'category search clear');
 
     await page.evaluate(() => document.querySelector('#chCat .cd-row').click());
     await waitFor(page, () => document.querySelectorAll('.chip').length === 1 &&
@@ -328,6 +417,22 @@ async function waitFor(pg, fn, timeout, label) {
       await num('#mTitle'));
     const regionSegs = await count('#chMonthly rect.seg');
     chk('区域堆叠有柱子', regionSegs > 10, regionSegs);
+    /* 切换前后「柱宽 / 基线 / 图高 / 图在卡片里的纵向位置」必须完全一致 */
+    const geoOf = sel => page.evaluate(s => {
+      const svg = document.querySelector('#chMonthly svg');
+      const rs = [...svg.querySelectorAll(s)];
+      const line = svg.querySelector('line');
+      const card = svg.closest('.card');
+      return {
+        barW: rs.length ? +rs[0].getAttribute('width') : 0,
+        baseY: line ? +line.getAttribute('y1') : 0,
+        relTop: Math.round(svg.getBoundingClientRect().top - card.getBoundingClientRect().top),
+        h: Math.round(svg.getBoundingClientRect().height),
+        money: [...svg.querySelectorAll('text')].filter(t => /^¥/.test(t.textContent)).length
+      };
+    }, sel);
+    const geoR = await geoOf('rect.seg');
+    chk('区域柱内也有金额', geoR.money > 0, geoR.money);
 
     const mData = await page.evaluate(() => fetch('/api/board/data?fy=FY2627&cur=RMB')
       .then(r => r.json()).then(d => d.monthly));
@@ -338,22 +443,32 @@ async function waitFor(pg, fn, timeout, label) {
     const pb = await page.evaluate(() => ({
       title: document.querySelector('#mTitle').textContent.trim(),
       bars: document.querySelectorAll('#chMonthly rect.pseg').length,
+      months: new Set([...document.querySelectorAll('#chMonthly rect.pseg')]
+        .map(r => r.dataset.m)).size,
       caps: [...document.querySelectorAll('#chMonthly text')]
         .map(t => t.textContent).filter(t => /^¥/.test(t)),
       legend: document.querySelector('#mLegend').textContent,
       longMonths: [...document.querySelectorAll('#chMonthly text')].map(t => t.textContent)
         .filter(t => /^(July|August|September|October|November|December|January|February|March|April|May|June)$/.test(t))
     }));
-    chk('切到双柱改标题', /Total vs Framework/.test(pb.title), pb.title);
-    chk('双柱数量 = 有效月份 × 2', pb.bars === activeM * 2, [pb.bars, activeM]);
-    chk('每根柱顶一个胶囊', pb.caps.length === pb.bars, pb.caps.length);
-    chk('胶囊金额与接口一致',
-      pb.caps[0] && pb.caps[0].replace(/[^\d.]/g, '') ===
-        (mData.total[0] / 1e6).toFixed(1),
-      [pb.caps[0], mData.total[0]]);
-    chk('图例换成 Total / Framework',
-      /Total Amount/.test(pb.legend) && /Framework Contract/.test(pb.legend), pb.legend);
-    chk('月份改用全称', pb.longMonths.length === activeM, pb.longMonths);
+    chk('切到堆叠改标题', /Total vs Framework/.test(pb.title), pb.title);
+    chk('每月一根柱、按框架/非框架堆叠',
+      pb.months >= activeM && pb.bars >= activeM && pb.bars <= activeM * 2,
+      [pb.bars, pb.months, activeM]);
+    chk('金额写在柱内（不再有柱顶胶囊）', pb.caps.length >= activeM, pb.caps.length);
+    chk('首段金额与接口一致',
+      pb.caps.some(c => c.replace(/[^\d.]/g, '') === (mData.frame[0] / 1e6).toFixed(1) ||
+        c.replace(/[^\d.]/g, '') === ((mData.total[0] - mData.frame[0]) / 1e6).toFixed(1)),
+      [pb.caps.slice(0, 3), mData.total[0], mData.frame[0]]);
+    chk('图例换成 Framework / Non-framework',
+      /Framework Contract/.test(pb.legend) && /Non-framework/.test(pb.legend), pb.legend);
+    const geoP = await geoOf('rect.pseg');
+    chk('切换前后柱宽一致', geoP.barW === geoR.barW && geoP.barW > 0, [geoR.barW, geoP.barW]);
+    chk('切换前后基线/图高/位置一致',
+      geoP.baseY === geoR.baseY && geoP.h === geoR.h && geoP.relTop === geoR.relTop,
+      [geoR, geoP]);
+    /* 双柱与区域视图一致，横轴固定 12 个财月 */
+    chk('月份改用全称并显示 12 个月', pb.longMonths.length === 12, pb.longMonths);
 
     await page.evaluate(() => document.querySelector('#chMonthly rect.pseg').dispatchEvent(
       new MouseEvent('click', { bubbles: true })));
@@ -380,10 +495,14 @@ async function waitFor(pg, fn, timeout, label) {
     chk('摘要 6 项', await count('.fc-summary .fs') === 6, await count('.fc-summary .fs'));
     const fs = await page.evaluate(() =>
       [...document.querySelectorAll('.fc-summary .fs')].map(e => e.textContent.trim()));
-    chk('协议数 190', fs[0] === 'Agreements190', fs[0]);
-    chk('可加预估 ¥583.0 M', fs[1].indexOf('¥583.0 M') >= 0, fs[1]);
-    chk('整体执行率 38.6%', fs[3].indexOf('38.6%') >= 0, fs[3]);
-    chk('执行率>100% 17 / 已过期 71', /17/.test(fs[4]) && /71/.test(fs[5]), [fs[4], fs[5]]);
+    const usagePct = (CT.summary.usage * 100).toFixed(1) + '%';
+    chk('协议数与库一致', fs[0] === 'Agreements' + CT.total, fs[0] + ' / ' + CT.total);
+    chk('可加预估与库一致',
+      fs[1].indexOf('¥' + Number(CT.summary.cv / 1e6).toFixed(1) + ' M') >= 0, fs[1]);
+    chk('整体执行率与库一致', fs[3].indexOf(usagePct) >= 0, fs[3] + ' / ' + usagePct);
+    chk('执行率>100% / 已过期与库一致',
+      fs[4].indexOf(String(CT.summary.overrun)) >= 0 && fs[5].indexOf(String(CT.summary.expired)) >= 0,
+      [fs[4], fs[5], CT.summary.overrun, CT.summary.expired]);
     // 口径：PA 只统计「框架协议方式申请」的采购单（视图 agg 里限定 Exception Reason）
     const faSql = await new Promise(resolve => {
       const { execFileSync } = require('child_process');
@@ -399,33 +518,45 @@ async function waitFor(pg, fn, timeout, label) {
       await page.$eval('#fcCard .card-note', e => e.textContent)));
     chk('Usage 列有口径提示', /framework-contract POs only/.test(
       await page.$eval('#fcTbl th[data-sort=usage]', e => e.getAttribute('title') || '')));
-    chk('类型下拉 CP/AAP/DT',
+    const typeOpts = ['All types'].concat(CT.types.map(t => t.k + ' (' + t.n + ')'));
+    chk('类型下拉 CP/AAP/DT 与库一致',
       JSON.stringify(await page.$$eval('#fcType option', a => a.map(e => e.textContent))) ===
-      JSON.stringify(['All types', 'CP (103)', 'AAP (66)', 'DT (21)']));
-    chk('Usage 有超 100% 橙标', await count('#fcTbl .usage.hi') > 0);
+      JSON.stringify(typeOpts), typeOpts);
+    /* 超 100% 的协议未必落在默认第一页 50 行里，改为库级断言 + 页面已渲染状态列 */
+    chk('Usage 有超 100% 的记录（库级）', CT.summary.overrun > 0, CT.summary.overrun);
+    chk('Usage 列已渲染数据条', await count('#fcTbl td.u-cell .u-bar') > 0);
+    chk('Usage 数据条宽度有差异', await page.evaluate(() => {
+      const w = [...document.querySelectorAll('#fcTbl td.u-cell .u-bar')]
+        .map(e => parseFloat(e.style.width) || 0);
+      return new Set(w).size > 1;
+    }));
     chk('Remain Days 有红/黄/绿状态',
       await count('#fcTbl .remain.bad') > 0 && await count('#fcTbl .remain.ok') > 0);
+    chk('Remain Days 带状态圆点', await count('#fcTbl .remain i') > 0);
 
     // 合同名搜索：'代驾' 命中 3 份
     await page.type('#fcQ', '代驾');
-    await waitFor(page, () => /\b3\s*rows/.test(document.querySelector('#fcPager').textContent), 8000, 'fc search');
-    chk('搜索「代驾」→ 3 份协议', /\b3\s*rows/.test(await num('#fcPager') || ''));
+    await waitFor(page, () => new RegExp('\\b' + window.__FCQ + '\\s*rows').test(document.querySelector('#fcPager').textContent), 8000, 'fc search');
+    chk('搜索「代驾」命中数与库一致',
+      new RegExp('\\b' + CTQ.total + '\\s*rows').test(await num('#fcPager') || ''));
     await page.$eval('#fcQ', e => { e.value = ''; e.dispatchEvent(new Event('input', { bubbles: true })); });
-    await waitFor(page, () => /\b190\s*rows/.test(document.querySelector('#fcPager').textContent), 8000, 'fc clear');
+    await waitFor(page, () => new RegExp('\\b' + window.__FCT + '\\s*rows').test(document.querySelector('#fcPager').textContent), 8000, 'fc clear');
 
     // 类型筛选（CP=103）
     await page.select('#fcType', 'CP');
-    await waitFor(page, () => /\b103\s*rows/.test(document.querySelector('#fcPager').textContent), 8000, 'fc type');
-    chk('筛 CP → 103 份', /103/.test(await num('#fcPager') || ''));
+    await waitFor(page, () => new RegExp('\\b' + window.__FCCP + '\\s*rows').test(document.querySelector('#fcPager').textContent), 8000, 'fc type');
+    chk('筛 CP 与库一致',
+      new RegExp('\\b' + (CT.types.find(x => x.k === 'CP') || {}).n + '\\b').test(await num('#fcPager') || ''));
     await page.select('#fcType', '');
-    await waitFor(page, () => /\b190\s*rows/.test(document.querySelector('#fcPager').textContent), 8000, 'fc type clear');
+    await waitFor(page, () => new RegExp('\\b' + window.__FCT + '\\s*rows').test(document.querySelector('#fcPager').textContent), 8000, 'fc type clear');
 
     // 状态筛选（已过期=71）
     await page.select('#fcStatus', 'expired');
-    await waitFor(page, () => /\b71\s*rows/.test(document.querySelector('#fcPager').textContent), 8000, 'fc status');
-    chk('筛已过期 → 71 份', /71/.test(await num('#fcPager') || ''));
+    await waitFor(page, () => new RegExp('\\b' + window.__FCE + '\\s*rows').test(document.querySelector('#fcPager').textContent), 8000, 'fc status');
+    chk('筛已过期与库一致',
+      new RegExp('\\b' + CT.summary.expired + '\\b').test(await num('#fcPager') || ''));
     await page.click('#fcReset');
-    await waitFor(page, () => /\b190\s*rows/.test(document.querySelector('#fcPager').textContent), 8000, 'fc reset');
+    await waitFor(page, () => new RegExp('\\b' + window.__FCT + '\\s*rows').test(document.querySelector('#fcPager').textContent), 8000, 'fc reset');
 
     // 按 CV 降序 + 翻页
     await page.click('#fcTbl thead th[data-sort=cv]');
@@ -459,12 +590,14 @@ async function waitFor(pg, fn, timeout, label) {
     const exp = await csvOf('/api/board/contracts.csv?cur=RMB');
     chk('协议导出 CSV 200', exp.s === 200, exp);
     chk('导出类型 text/csv', /text\/csv/.test(exp.ct || ''), exp.ct);
-    chk('协议 CSV 190 份 + 表头', exp.lines.length === 191, exp.lines.length);
+    chk('协议 CSV 行数 + 表头与库一致',
+      exp.lines.length === CT.total + 1, exp.lines.length + ' / ' + (CT.total + 1));
 
     /* 顶栏「导出当前视图」= 当前财年 + 全局筛选下的采购申请明细 */
     const viewAll = await csvOf('/api/board/export.csv?fy=FY2627&cur=RMB&sort=date&dir=desc');
     chk('明细 CSV 200', viewAll.s === 200, viewAll.s);
-    chk('明细 CSV 4,869 行 + 表头', viewAll.lines.length === 4870, viewAll.lines.length);
+    chk('明细 CSV 行数 + 表头与库一致',
+      viewAll.lines.length === Number(kv('txn').v) + 1, viewAll.lines.length + ' / ' + (Number(kv('txn').v) + 1));
     chk('明细 CSV 表头含 No./Supplier/Amount', /No\./.test(viewAll.head) &&
       /Supplier/.test(viewAll.head) && /Amount/.test(viewAll.head), viewAll.head);
 
@@ -562,7 +695,7 @@ async function waitFor(pg, fn, timeout, label) {
     await sleep(220);
     await page.evaluate(() => document.querySelector('.fdrop[data-k=category] .fpop-b label').click());
     await waitFor(page, () => document.querySelectorAll('.chip').length === 1 &&
-      document.querySelector('.kpi[data-k=amount] .k-val').textContent !== '¥184.7M',
+      document.querySelector('.kpi[data-k=amount] .k-val').textContent !== window.__AMT0,
       8000, 'filter applied');
     await page.evaluate(() => document.querySelector('.spec-btn[data-spec=global]').click());
     await sleep(400);

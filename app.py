@@ -23,8 +23,10 @@ import io
 import hmac
 import json
 import time
+import sys
 import shutil
 import datetime
+import subprocess
 import threading
 import webbrowser
 import sqlite3
@@ -587,6 +589,122 @@ def favicon():
     if os.path.exists(icon_path):
         return send_file(icon_path, mimetype="image/x-icon")
     return ("", 204)
+
+
+# ---------------------------------------------------------------------------
+# 离线看板快照（单文件 HTML）—— 按需点击导出，不在每次改前端后自动重跑
+#   POST /api/board/export          起后台线程跑 `python board_export.py`
+#   GET  /api/board/export/status   轮询进度 + exports/ 下的历史文件
+#   GET  /api/board/export/download 下载导出的文件（只允许 exports/ 下的 .html）
+#
+# 为什么用子进程而不是 import board_export：
+#   `python app.py` 启动时本模块叫 __main__，board_export 里的 `from app import app`
+#   会把 app.py 再完整加载一遍（第二个 Flask 实例 + 重新初始化元数据），
+#   子进程既避免二次加载，也不会把导出耗时卡在 Web 线程里。
+# ---------------------------------------------------------------------------
+_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+EXPORT_DIR = os.path.join(_APP_DIR, "exports")
+_EXPORT_JOB = {
+    "state": "idle",      # idle / running / done / error
+    "started": 0.0, "ended": 0.0,
+    "name": "", "path": "", "size": 0, "rows": 0, "agreements": 0,
+    "error": "", "tail": "",
+}
+_EXPORT_LOCK = threading.Lock()
+
+
+def _export_files(limit=8):
+    """exports/ 目录下最近的单文件看板（新 → 旧）。"""
+    try:
+        names = [n for n in os.listdir(EXPORT_DIR)
+                 if n.lower().endswith(".html") and not n.startswith(".")]
+    except OSError:
+        return []
+    items = []
+    for n in names:
+        p = os.path.join(EXPORT_DIR, n)
+        try:
+            st = os.stat(p)
+        except OSError:
+            continue
+        items.append({"name": n, "size": st.st_size,
+                      "mtime": int(st.st_mtime)})
+    items.sort(key=lambda x: x["mtime"], reverse=True)
+    return items[:limit]
+
+
+def _export_job_view():
+    j = dict(_EXPORT_JOB)
+    j["elapsed"] = round((j["ended"] or time.time()) - j["started"], 1) \
+        if j["started"] else 0
+    return j
+
+
+def _run_board_export():
+    """后台线程：子进程跑 board_export.py，把结果写回 _EXPORT_JOB。"""
+    global _EXPORT_JOB
+    env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUNBUFFERED="1")
+    try:
+        proc = subprocess.run(
+            [sys.executable, "board_export.py"],
+            cwd=_APP_DIR, env=env, timeout=900,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        )
+        out = (proc.stdout or b"").decode("utf-8", "replace")
+        if proc.returncode != 0:
+            raise RuntimeError("board_export.py 退出码 %s" % proc.returncode)
+        m_rows = re.search(r"rows\s+([\d,]+)\s*/\s*agreements\s+(\d+)", out)
+        if not m_rows:
+            raise RuntimeError("导出输出里没有行数信息，请检查脚本")
+        # 输出行形如：输出：D:\...\exports\采购看板_单文件_20261123.html  4.68 MB
+        m_out = re.search(r"输出：(.+?\.html)", out)
+        path = m_out.group(1).strip() if m_out else ""
+        if not (path and os.path.exists(path)):
+            newest = _export_files(1)
+            path = os.path.join(EXPORT_DIR, newest[0]["name"]) if newest else ""
+        if not (path and os.path.exists(path)):
+            raise RuntimeError("导出脚本执行完毕但没找到产出文件")
+        st = os.stat(path)
+        with _EXPORT_LOCK:
+            _EXPORT_JOB.update(
+                state="done", ended=time.time(),
+                name=os.path.basename(path), path=path, size=st.st_size,
+                rows=int(m_rows.group(1).replace(",", "")),
+                agreements=int(m_rows.group(2)),
+                error="", tail=out.strip().splitlines()[-1] if out.strip() else "",
+            )
+    except Exception as exc:  # noqa: BLE001 —— 任何失败都要落成界面可读的状态
+        with _EXPORT_LOCK:
+            _EXPORT_JOB.update(state="error", ended=time.time(),
+                               error=str(exc)[:500], path="", name="", size=0)
+
+
+@app.route("/api/board/export", methods=["POST"])
+def api_board_export():
+    with _EXPORT_LOCK:
+        if _EXPORT_JOB["state"] == "running":
+            return jsonify({"error": "已有导出任务在进行中，请稍候"}), 409
+        _EXPORT_JOB.update(state="running", started=time.time(), ended=0.0,
+                           name="", path="", size=0, rows=0, agreements=0,
+                           error="", tail="")
+    threading.Thread(target=_run_board_export, daemon=True).start()
+    return jsonify({"ok": True, "job": _export_job_view()})
+
+
+@app.route("/api/board/export/status")
+def api_board_export_status():
+    return jsonify({"job": _export_job_view(), "files": _export_files(),
+                    "dir": EXPORT_DIR})
+
+
+@app.route("/api/board/export/download")
+def api_board_export_download():
+    name = os.path.basename((request.args.get("f") or _EXPORT_JOB.get("name") or "").strip())
+    path = os.path.join(EXPORT_DIR, name)
+    if not name.lower().endswith(".html") or not os.path.isfile(path):
+        return jsonify({"error": "文件不存在：%s" % name}), 404
+    return send_file(path, as_attachment=True, download_name=name,
+                     mimetype="text/html")
 
 
 # ---------------------------------------------------------------------------

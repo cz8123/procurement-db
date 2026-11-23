@@ -117,26 +117,37 @@
   }
 
   function paretoOf(list) {
-    var m = {}, total = 0, sups = {};
+    var m = {}, total = 0, sups = {}, subs = {};
     list.forEach(function (r) {
       var k = r.category == null || r.category === '' ? 'Unassigned' : r.category;
-      if (!m[k]) { m[k] = { k: k, v: 0, n: 0 }; sups[k] = {}; }
+      if (!m[k]) { m[k] = { k: k, v: 0, n: 0, po_paid: 0 }; sups[k] = {}; subs[k] = {}; }
       m[k].v += (r.amount || 0);
+      m[k].po_paid += (r.poPaid || 0);
       if (r.no != null) m[k].n++;
       if (r.supplier != null) sups[k][r.supplier] = 1;
+      var sk = r.sub == null || r.sub === '' ? 'Unassigned' : r.sub;
+      var s = subs[k][sk] || (subs[k][sk] = { k: sk, v: 0, n: 0, po: 0 });
+      s.v += (r.amount || 0); s.po += (r.poPaid || 0);
+      if (r.no != null) s.n++;
       total += (r.amount || 0);
     });
     var out = Object.keys(m).map(function (k) { return m[k]; })
       .sort(function (a, b) { return b.v - a.v || (a.k < b.k ? -1 : 1); });
-    var acc = 0;
+    var acc = 0, subMap = {}, subsMap = {};
     out.forEach(function (r) {
       acc += r.v;
       r.sup = Object.keys(sups[r.k] || {}).length;
       r.cum = total ? Math.round((acc / total) * 10000) / 10000 : null;
       r.share = total ? Math.round((r.v / total) * 10000) / 10000 : null;
+      var sl = Object.keys(subs[r.k] || {}).map(function (s) { return subs[r.k][s]; })
+        .sort(function (a, b) { return b.v - a.v || (a.k < b.k ? -1 : 1); })
+        .map(function (s) { return { k: s.k, v: r2(s.v), n: s.n, po: r2(s.po) }; });
+      subsMap[r.k] = sl;
+      if (sl.length && sl[0].k !== 'Unassigned') subMap[r.k] = sl[0].k;
       r.v = r2(r.v);
+      r.po_paid = r2(m[r.k].po_paid);
     });
-    return { rows: out, total: r2(total) };
+    return { rows: out, total: r2(total), subMap: subMap, subsMap: subsMap };
   }
 
   function donutOf(list) {
@@ -279,14 +290,16 @@
     date: 'date', amount: 'amount', days: 'days', supplier: 'supplier',
     company: 'company', category: 'category', no: 'no', expense: 'expense'
   };
-  function rowsWhere(sp, fy) {
+  function rowsWhere(sp, fy, agg) {
     var f = readFilters(sp);
     var q = (sp.get('q') || '').trim().toLowerCase();
     var out = rows.filter(function (r) {
       if (r.fy !== fy) return false;
       if (!pass(r, f)) return false;
       if (!q) return true;
-      var hay = [r.no, r.supplier, r.company, r.category, r.dept, r.brand];
+      /* 公司聚合时只按公司/区域搜，不能拿单号筛行 */
+      var hay = agg ? [r.company, r.region]
+        : [r.no, r.supplier, r.company, r.category, r.dept, r.brand];
       for (var i = 0; i < hay.length; i++) {
         if (hay[i] && String(hay[i]).toLowerCase().indexOf(q) >= 0) return true;
       }
@@ -300,7 +313,47 @@
     var size = Math.min(Math.max(parseInt(sp.get('size') || '50', 10) || 50, 10), 200);
     var sk = SORT_COL[sp.get('sort') || 'date'] || 'date';
     var dir = sp.get('dir') === 'asc' ? 1 : -1;
-    var list = rowsWhere(sp, fy).slice();
+    var byCompany = (sp.get('by') || '') === 'company';
+    var list = rowsWhere(sp, fy, byCompany).slice();
+
+    /* by=company：与后端 /api/board/rows 一致，按「公司 + 区域」聚合 */
+    if (byCompany) {
+      var m = {}, seqK = [], totA = 0, totP = 0;
+      list.forEach(function (r) {
+        var cn = r.company == null || r.company === '' ? '—' : r.company;
+        var rg = r.region == null || r.region === '' ? '—' : r.region;
+        var key = cn + '\u0001' + rg, g = m[key];
+        if (!g) {
+          g = m[key] = { company: cn, region: rg, n: 0, sup: {},
+                         amount: 0, poPaid: 0, dsum: 0, dn: 0 };
+          seqK.push(key);
+        }
+        g.n++;
+        if (r.supplier) g.sup[r.supplier] = 1;
+        g.amount += r.amount || 0;
+        g.poPaid += r.poPaid || 0;
+        if (r.days != null) { g.dsum += r.days; g.dn++; }
+        totA += r.amount || 0;
+        totP += r.poPaid || 0;
+      });
+      var ag = seqK.map(function (k) {
+        var g = m[k];
+        return {
+          company: g.company, region: g.region, n: g.n,
+          sup: Object.keys(g.sup).length,
+          amount: r2(g.amount), poPaid: r2(g.poPaid),
+          days: g.dn ? Math.round((g.dsum / g.dn) * 10) / 10 : null
+        };
+      }).sort(function (a, b) {
+        return (b.amount - a.amount) || (a.company < b.company ? -1 : 1);
+      });
+      return {
+        total: ag.length, page: page, size: size, by: 'company',
+        amount: r2(totA), poPaid: r2(totP),
+        rows: ag.slice((page - 1) * size, page * size)
+      };
+    }
+
     list.sort(function (a, b) {
       var x = a[sk], y = b[sk];
       if (x == null && y == null) return cmpNo(a, b);
@@ -320,10 +373,12 @@
         no: r.no, date: r.date, company: r.company, region: r.region,
         brand: r.brand, dept: r.dept, category: r.category, expense: r.expense,
         method: r.method, supplier: r.supplier, amount: r.amount,
-        days: r.days, budget: r.budget, level: r.level
+        days: r.days, budget: r.budget, level: r.level, poPaid: r.poPaid
       };
     });
-    return { total: list.length, page: page, size: size, amount: r2(amount), rows: slice };
+    return { total: list.length, page: page, size: size, amount: r2(amount),
+             poPaid: r2(list.reduce(function (s, r) { return s + (r.poPaid || 0); }, 0)),
+             rows: slice };
   }
 
   /* ---------- /api/board/contracts ---------- */

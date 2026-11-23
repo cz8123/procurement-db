@@ -35,7 +35,7 @@ OUT_DIR = os.path.join(APP_DIR, "exports")
 
 # 行级数据列（顺序即 JSON 数组里的顺序）
 ROW_COLS = [
-    "no", "date", "fy", "company", "region", "brand", "dept", "category",
+    "no", "date", "fy", "company", "region", "brand", "dept", "category", "sub",
     "expense", "method", "supplier", "amount", "days", "budget", "level",
     "poPaid", "month", "exc",
 ]
@@ -44,8 +44,8 @@ NUM_COLS = {"amount", "days", "poPaid", "month"}
 
 ROW_SQL = """
 SELECT "No.","Date","FY","Company_cn","Region_cn","Brand","Department","Category",
-       "Expense Type","Procurement Method","Supplier_cn","Total Price","Time Taken",
-       "Budget Type","Supplier Category","PO Paid","Exception Reason"
+       "Sub-Category","Expense Type","Procurement Method","Supplier_cn","Total Price",
+       "Time Taken","Budget Type","Supplier Category","PO Paid","Exception Reason"
 FROM dash_po
 """
 
@@ -67,10 +67,10 @@ def build_rows(con):
     data, dicts = [], {}
     cols = ROW_COLS
     for row in con.execute(ROW_SQL):
-        (no, date, fy, company, region, brand, dept, category,
+        (no, date, fy, company, region, brand, dept, category, sub,
          expense, method, supplier, amount, days, budget, level, po_paid,
          exc) = row
-        vals = [no, date, fy, company, region, brand, dept, category,
+        vals = [no, date, fy, company, region, brand, dept, category, sub,
                 expense, method, supplier, amount, days, budget, level, po_paid,
                 cal.get(date), exc]
         data.append(vals)

@@ -50,11 +50,15 @@ function chk(name, cond, extra) {
   const base = await page.evaluate(async c => {
     const r = await fetch("/api/tables/fct_prpo/rows?page=1&size=1");
     const d = await r.json();
-    return { sum: d.aggregates[c] && d.aggregates[c].sum, count: d.aggregates[c] && d.aggregates[c].count };
+    const a = d.aggregates[c] || {};
+    return { sum: a.sum, count: a.count, avg: a.avg };
   }, Q);
   chk("后端合计非空", base.sum != null, String(base.sum));
   chk("后端合计不等于 0", Math.abs(base.sum) > 0.01, String(base.sum));
-  chk("后端合计 = 1,595,319,937.32", Math.abs(base.sum - 1595319937.32) < 0.01, String(base.sum));
+  /* 不写死金额（每次导入都会变）：用「合计 ≈ 平均值 × 非空行数」校验口径自洽 */
+  chk("后端合计 = 平均值 × 行数", base.avg != null &&
+      Math.abs(base.sum - base.avg * base.count) < Math.max(1, base.sum * 1e-9),
+      JSON.stringify([base.sum, base.avg, base.count]));
 
   log("=== 4. 金额列右对齐 ===");
   chk("单元格带 num 类", await page.evaluate(c => {
@@ -92,14 +96,30 @@ function chk(name, cond, extra) {
   chk("降序首行是 ¥7,938,000.00", descFirst === "¥7,938,000.00", descFirst);
 
   log("=== 6. 按金额筛选（>100万）===");
+  /* 期望值不写死金额：数据每次导入都会变，这里校验「合计口径 == 逐行金额之和」，
+     再顺带确认筛选确实命中（这正是 grID 底部合计容易出错的地方） */
   const n = await page.evaluate(async c => {
-    const r = await fetch(`/api/tables/fct_prpo/rows?page=1&size=1&filters=` +
-      encodeURIComponent(JSON.stringify([{col: c, op: "gt", val: "1000000"}])));
-    const d = await r.json();
-    return { total: d.total, sum: d.aggregates[c].sum };
+    const f = encodeURIComponent(JSON.stringify([{ col: c, op: "gt", val: "1000000" }]));
+    const head = await (await fetch(`/api/tables/fct_prpo/rows?page=1&size=1&filters=` + f)).json();
+    const all = await (await fetch(`/api/tables/fct_prpo/rows?page=1&size=200&filters=` + f)).json();
+    const num = v => {
+      if (v == null || v === "") return 0;
+      const x = Number(String(v).replace(/[^0-9.\-]/g, ""));
+      return isNaN(x) ? 0 : x;
+    };
+    const rows = all.rows || [];
+    return {
+      total: head.total,
+      sum: head.aggregates[c].sum,
+      nRows: rows.length,
+      rowsSum: rows.reduce((a, r) => a + num(r[c]), 0),
+      covered: rows.length === head.total
+    };
   }, Q);
-  chk("筛选行数 132", n.total === 132, String(n.total));
-  chk("筛选后合计 ≈ 224,755,237.65", Math.abs(n.sum - 224755237.65) < 0.01, String(n.sum));
+  chk("筛选有结果", n.total > 0, String(n.total));
+  chk("合计 = 逐行金额之和（口径一致）", Math.abs(n.sum - n.rowsSum) < 0.01,
+      JSON.stringify([n.sum, n.rowsSum]));
+  chk("命中行数可在单页内逐行核对（≤200）", n.covered, String(n.total));
 
   log("=== 7. 无 JS 报错 ===");
   chk("无 pageerror / console error", errs.length === 0, errs.join(" | ").slice(0, 300));

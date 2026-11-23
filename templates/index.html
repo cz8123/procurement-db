@@ -437,6 +437,32 @@
     gap:8px;align-items:center;flex:0 0 auto;background:var(--panel-2);border-radius:0 0 var(--r) var(--r);}
   .modal .foot .sp{margin-right:auto;font-size:11.5px;color:var(--muted);}
 
+  /* ---------------- 导出离线看板（单文件快照） ---------------- */
+  .bem-row{display:flex;gap:10px;align-items:baseline;font-size:12.5px;margin-bottom:6px;}
+  .bem-k{color:var(--muted);font-size:11.5px;flex:0 0 auto;min-width:56px;}
+  .bem-v{color:var(--text);font-weight:500;word-break:break-all;line-height:1.6;}
+  .bem-v i{color:var(--muted);font-style:normal;font-weight:400;}
+  .bem-status{margin:11px 0 0;padding:9px 12px;border-radius:7px;font-size:12.5px;line-height:1.75;
+    background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);}
+  .bem-status.run{border-color:#c9dcf3;color:var(--link);}
+  .bem-status.ok{border-color:#cdeee0;color:#0a7f58;}
+  .bem-status.err{border-color:#f8d5d1;color:#b8352a;}
+  [data-theme="dark"] .bem-status.ok{color:#5fd3a3;border-color:#1d5947;}
+  [data-theme="dark"] .bem-status.err{color:#ff9a90;border-color:#6b3430;}
+  .bem-status .spin{display:inline-block;width:9px;height:9px;margin-right:6px;border-radius:50%;
+    border:2px solid currentColor;border-right-color:transparent;vertical-align:middle;
+    animation:bemSpin .8s linear infinite;}
+  @keyframes bemSpin{to{transform:rotate(360deg)}}
+  .bem-list{margin-top:13px;border-top:1px solid var(--border);padding-top:9px;}
+  .bem-list .hd{font-size:11.5px;color:var(--muted);margin-bottom:4px;}
+  .bem-file{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:6px;
+    font-size:12px;color:var(--text-2);cursor:pointer;transition:background .12s;}
+  .bem-file:hover{background:var(--surface-2);color:var(--brand-d);}
+  .bem-file .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .bem-file .sz{color:var(--muted);font-size:11.5px;flex:0 0 auto;}
+  .bem-file .tm{color:var(--muted);font-size:11px;flex:0 0 auto;min-width:112px;text-align:right;}
+  .bem-empty{font-size:12px;color:var(--muted);padding:6px 8px;}
+
   /* ---------------- 表单 ---------------- */
   .field{margin-bottom:12px;}
   .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 18px;}
@@ -1157,6 +1183,14 @@
       <div class="navtab" id="navTransform" onclick="showView('transform')">数据转换</div>
     </nav>
     <span class="spacer"></span>
+    <button class="btn ghost" onclick="openBoardExport()"
+            title="把看板连同库里的数据打包成一个可离线分享的 HTML 文件（只读，不改库）">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z"/>
+        <path d="M13 3v6h6"/><path d="M12 12.5v5"/><path d="m9.6 15.2 2.4 2.4 2.4-2.4"/>
+      </svg>导出看板
+    </button>
     <a class="btn ghost dash-entry" href="/dash" target="_blank" rel="noopener"
        title="打开采购分析看板（Power BI 首页复刻版，新窗口）">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1412,6 +1446,36 @@
   </div>
 </div>
 
+<!-- 导出离线看板（单文件 HTML 快照，按需点击，不在每次改动后自动跑） -->
+<div class="mask" id="bemMask">
+  <div class="modal" style="width:620px">
+    <h3>导出离线看板
+      <span class="x" onclick="closeMask('bemMask')">×</span>
+    </h3>
+    <div class="body">
+      <div class="form-tip" style="margin-bottom:13px;">
+        把 <b>/dash</b> 页面连同库里的行级数据、框架协议全表打包成<b>一个 HTML 文件</b>（约 4–5 MB）。
+        双击即可离线打开，财年切换 / 筛选 / 下钻 / CSV 导出全部照旧，不依赖本服务。
+        <br>只读数据库，不改任何表；建议在<b>导入数据后</b>或<b>看板前端改动后</b>再导出一次。
+      </div>
+      <div class="bem-row">
+        <span class="bem-k">上次导出</span>
+        <span class="bem-v" id="bemLast">—</span>
+      </div>
+      <div class="bem-status" id="bemStatus">就绪。点右下角「开始导出」生成最新快照。</div>
+      <div class="bem-list">
+        <div class="hd">历史文件（点一行下载）</div>
+        <div id="bemFiles"></div>
+      </div>
+    </div>
+    <div class="foot">
+      <span class="sp" id="bemDir"></span>
+      <button class="btn ghost" id="bemDl" onclick="bemDownload()" disabled>下载</button>
+      <button class="btn" id="bemRun" onclick="bemRun()">开始导出</button>
+    </div>
+  </div>
+</div>
+
 <!-- 映射编辑器 模态框（Power BI 风格：左右两表面板 + 基数选择） -->
 <div class="mask" id="mapEditorMask">
   <div class="modal">
@@ -1530,6 +1594,122 @@ document.querySelectorAll(".mask").forEach(m=>m.addEventListener("click",e=>{
   if(gSuppressMaskClose) return;
   if(e.target===m) m.classList.remove("show");
 }));
+
+/* ============ 导出离线看板（单文件快照） ============
+   POST /api/board/export 起后台任务 → 每 0.7s 轮询状态 → 完成后可下载。
+   导出是可选动作：平时改前端/导数据都不再自动跑 board_export.py。 */
+let bemTimer = null, bemSel = "", bemFiles = [], bemDirPath = "", bemSeq = 0;
+const bemMB = b => (b ? (b / 1048576).toFixed(2) + " MB" : "—");
+function bemTime(ts){
+  if(!ts) return "—";
+  const d = new Date(ts * 1000), p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth()+1) + "-" + p(d.getDate()) +
+         " " + p(d.getHours()) + ":" + p(d.getMinutes());
+}
+function openBoardExport(){
+  openMask("bemMask");
+  bemPoll();
+}
+function bemPoll(){
+  /* 只让「最后发出的那次请求」落地：点开始导出前发出的轮询可能带着上一轮
+     的 done 结果晚到，会盖掉新任务并把按钮卡在「导出中…」 */
+  const seq = ++bemSeq;
+  api("/api/board/export/status").then(r=>{
+    if(seq !== bemSeq) return;
+    bemRender(r);
+  }).catch(e=>{
+    if(seq !== bemSeq) return;
+    const s = document.getElementById("bemStatus");
+    if(s){ s.className = "bem-status err"; s.textContent = "读取导出状态失败：" + e.message; }
+  });
+}
+function bemRender(r){
+  const job = (r && r.job) || {}, files = (r && r.files) || [];
+  bemFiles = files;
+  bemDirPath = (r && r.dir) || "";
+  const st  = document.getElementById("bemStatus");
+  const run = document.getElementById("bemRun");
+  const dl  = document.getElementById("bemDl");
+
+  // 轮询只在导出中开启
+  if(job.state === "running"){
+    if(!bemTimer) bemTimer = setInterval(bemPoll, 700);
+  } else if(bemTimer){ clearInterval(bemTimer); bemTimer = null; }
+
+  if(job.state === "running"){
+    st.className = "bem-status run";
+    st.innerHTML = '<span class="spin"></span>正在导出… 已用 ' +
+      (job.elapsed || 0).toFixed(1) + 's（打包 4 万多行数据，约 10 秒，请勿关闭页面）';
+  } else if(job.state === "done"){
+    st.className = "bem-status ok";
+    st.textContent = "✔ 导出完成：" + job.name + " · " + bemMB(job.size) +
+      " · " + fmt(job.rows) + " 行 / " + fmt(job.agreements) + " 张协议 · 用时 " +
+      (job.elapsed || 0).toFixed(1) + "s";
+    bemSel = job.name;
+  } else if(job.state === "error"){
+    st.className = "bem-status err";
+    st.textContent = "✖ 导出失败：" + (job.error || "未知错误");
+    bemSel = "";
+  } else {
+    st.className = "bem-status";
+    st.textContent = "就绪。点右下角「开始导出」生成最新快照。";
+    bemSel = files.length ? files[0].name : "";
+  }
+
+  run.disabled = (job.state === "running");
+  run.textContent = (job.state === "running") ? "导出中…" : "开始导出";
+  dl.disabled = !bemSel;
+
+  // 上次导出（取最新文件，不受本次任务状态影响）
+  const last = files[0];
+  document.getElementById("bemLast").innerHTML = last
+    ? esc(last.name) + ' <i>· ' + bemMB(last.size) + " · " + bemTime(last.mtime) + "</i>"
+    : '<i>还没有导出过</i>';
+
+  const dirEl = document.getElementById("bemDir");
+  dirEl.textContent = bemDirPath ? "exports/ · 点击复制完整路径" : "";
+  dirEl.title = bemDirPath;
+  dirEl.style.cssText = "cursor:pointer;text-decoration:underline dotted;font-size:11px;";
+  dirEl.onclick = () => {
+    if(!bemDirPath) return;
+    (navigator.clipboard ? navigator.clipboard.writeText(bemDirPath) : Promise.reject())
+      .then(()=>toast("已复制导出目录路径")).catch(()=>toast(bemDirPath));
+  };
+
+  document.getElementById("bemFiles").innerHTML = files.length
+    ? files.map(f =>
+        '<div class="bem-file" data-f="' + esc(f.name) + '" title="点击下载 ' + esc(f.name) + '">' +
+        '<span class="nm">' + esc(f.name) + '</span>' +
+        '<span class="sz">' + bemMB(f.size) + '</span>' +
+        '<span class="tm">' + bemTime(f.mtime) + '</span></div>').join("")
+    : '<div class="bem-empty">exports/ 下还没有文件</div>';
+}
+function bemRun(){
+  const run = document.getElementById("bemRun");
+  const st  = document.getElementById("bemStatus");
+  run.disabled = true; run.textContent = "导出中…";
+  /* 立刻给反馈：POST 到第一次轮询返回之间有约 100ms，别让界面停在旧结论上 */
+  st.className = "bem-status run";
+  st.innerHTML = '<span class="spin"></span>正在启动导出…';
+  bemSeq++;                       // 作废此前在途的轮询响应（它们属于上一轮任务）
+  api("/api/board/export", {method: "POST"})
+    .then(()=>bemPoll())
+    .catch(e=>{
+      run.disabled = false; run.textContent = "开始导出";
+      st.className = "bem-status err";
+      st.textContent = "启动导出失败：" + e.message;
+    });
+}
+function bemDownload(){
+  if(!bemSel) return;
+  window.location.href = "/api/board/export/download?f=" + encodeURIComponent(bemSel);
+}
+document.getElementById("bemFiles").addEventListener("click", e=>{
+  const row = e.target.closest(".bem-file");
+  if(!row) return;
+  const f = row.dataset.f;
+  if(f) window.location.href = "/api/board/export/download?f=" + encodeURIComponent(f);
+});
 
 /* ============ 弹窗拖动 + 缩放 ============ */
 function initModalDrag(){

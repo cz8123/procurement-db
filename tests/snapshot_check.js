@@ -81,8 +81,22 @@ async function waitFor(pg, fn, timeout, label) {
     chk('首屏无对外网络请求', net.length === 0, net.slice(0, 3));
     chk('数据已内嵌', await page.evaluate(() =>
       !!(window.__SNAP__ && window.__SNAP__.rows && window.__SNAP__.rows.data.length > 1000)));
-    chk('内嵌行数 = 44,987', await page.evaluate(() =>
-      window.__SNAP__.rows.data.length) === 44987);
+    /* 期望值现场取在线接口；服务没起时退回快照自己的 API 垫片。
+       不再写死金额/行数——新数据导入后这些数字本来就会变。 */
+    const LD = await liveJson('/api/board/data?fy=FY2627&cur=RMB')
+      .catch(() => page.evaluate(() => fetch('/api/board/data?fy=FY2627&cur=RMB').then(r => r.json())));
+    const LO = await liveJson('/api/board/options')
+      .catch(() => page.evaluate(() => fetch('/api/board/options').then(r => r.json())));
+    const LC = await liveJson('/api/board/contracts?limit=5')
+      .catch(() => page.evaluate(() => fetch('/api/board/contracts?limit=5').then(r => r.json())));
+    const kv = k => (LD.kpi || []).find(x => x.k === k) || {};
+    const fmtM = v => v == null ? '—' : '¥' + Number(v / 1e6).toFixed(1) + 'M';
+    const fmtI = v => v == null ? '—' : Number(v).toLocaleString('en-US');
+    const AMT0 = fmtM(kv('amount').v);
+    await page.evaluate(v => { window.__AMT0 = v; }, AMT0);
+    chk('内嵌行数与库一致', await page.evaluate(() =>
+      window.__SNAP__.rows.data.length) === LO.rows,
+      [await page.evaluate(() => window.__SNAP__.rows.data.length), LO.rows]);
 
     console.log('=== 2. 默认视图数字 ===');
     const k0 = await page.evaluate(() => {
@@ -90,11 +104,11 @@ async function waitFor(pg, fn, timeout, label) {
       document.querySelectorAll('.kpi').forEach(e => { o[e.dataset.k] = e.querySelector('.k-val').textContent; });
       return o;
     });
-    chk('采购总额 ¥184.7M', k0.amount === '¥184.7M', k0.amount);
-    chk('集采金额 ¥138.7M', k0.cp === '¥138.7M', k0.cp);
-    chk('PO 实付 ¥69.2M', k0.poSpend === '¥69.2M', k0.poSpend);
-    chk('单据 4,869', k0.txn === '4,869', k0.txn);
-    chk('供应商 974', k0.suppliers === '974', k0.suppliers);
+    chk('采购总额与库一致', k0.amount === AMT0, k0.amount + ' / ' + AMT0);
+    chk('集采金额与库一致', k0.cp === fmtM(kv('cp').v), k0.cp);
+    chk('PO 实付与库一致', k0.poSpend === fmtM(kv('poSpend').v), k0.poSpend);
+    chk('单据数与库一致', k0.txn === fmtI(kv('txn').v), k0.txn);
+    chk('供应商数与库一致', k0.suppliers === fmtI(kv('suppliers').v), k0.suppliers);
     chk('门店 52', k0.stores === '52', k0.stores);
     chk('中位周期按天', /\bd$/.test(k0.days || ''), k0.days);
     chk('帕累托 11 类', await count('#chPareto rect.pbar') === 11, await count('#chPareto rect.pbar'));
@@ -104,9 +118,11 @@ async function waitFor(pg, fn, timeout, label) {
     chk('协议表默认 50 行', await count('#fcTbl tbody tr') === 50, await count('#fcTbl tbody tr'));
     const fs2 = await page.evaluate(() =>
       [...document.querySelectorAll('.fc-summary .fs')].map(e => e.textContent.trim()));
-    chk('协议数 190', fs2[0] === 'Agreements190', fs2[0]);
-    chk('可加预估 ¥583.0 M', fs2[1].indexOf('¥583.0 M') >= 0, fs2[1]);
-    chk('整体执行率 38.6%', fs2[3].indexOf('38.6%') >= 0, fs2[3]);
+    chk('协议数与库一致', fs2[0] === 'Agreements' + LC.total, fs2[0] + ' / ' + LC.total);
+    chk('可加预估与库一致',
+      fs2[1].indexOf('¥' + Number(LC.summary.cv / 1e6).toFixed(1) + ' M') >= 0, fs2[1]);
+    chk('整体执行率与库一致',
+      fs2[3].indexOf((LC.summary.usage * 100).toFixed(1) + '%') >= 0, fs2[3]);
 
     console.log('=== 3. 前端复算 vs 服务端（同参数比对） ===');
     const cases = [
@@ -194,22 +210,22 @@ async function waitFor(pg, fn, timeout, label) {
     await sleep(200);
     await page.click('.fdrop[data-k=category] .fpop-b label');
     await waitFor(page, () => document.querySelectorAll('.chip').length === 1 &&
-      document.querySelector('.kpi[data-k=amount] .k-val').textContent !== '¥184.7M',
+      document.querySelector('.kpi[data-k=amount] .k-val').textContent !== window.__AMT0,
       9000, '筛选生效');
     chk('勾选类别 → chip 出现', /Category/.test(await num('.chip') || ''));
     const a1 = await num('.kpi[data-k=amount] .k-val');
-    chk('勾选类别 → 金额变化', a1 !== '¥184.7M', a1);
+    chk('勾选类别 → 金额变化', a1 !== AMT0, a1);
     await page.keyboard.press('Escape');
     await page.click('#btnReset');
     await waitFor(page, () => document.querySelectorAll('.chip').length === 0, 8000, '重置');
-    chk('重置回到全量', (await num('.kpi[data-k=amount] .k-val')) === '¥184.7M');
+    chk('重置回到全量', (await num('.kpi[data-k=amount] .k-val')) === AMT0);
 
     await page.select('#fySel', 'FY2526');
     await waitFor(page, () => /698/.test(document.querySelector('.kpi[data-k=amount] .k-val').textContent),
       9000, '切财年');
     chk('切 FY2526 金额变化', /698/.test(await num('.kpi[data-k=amount] .k-val')));
     await page.select('#fySel', 'FY2627');
-    await waitFor(page, () => document.querySelector('.kpi[data-k=amount] .k-val').textContent === '¥184.7M',
+    await waitFor(page, () => document.querySelector('.kpi[data-k=amount] .k-val').textContent === window.__AMT0,
       9000, '切回');
 
     await page.evaluate(() => document.querySelector('#chTop .trow').dispatchEvent(
@@ -238,21 +254,26 @@ async function waitFor(pg, fn, timeout, label) {
       .then(b => Array.from(new Uint8Array(b).slice(0, 3))));
     chk('明细 CSV 带 UTF-8 BOM', JSON.stringify(head3) === '[239,187,191]', head3);
     chk('明细 CSV 表头英文', /^No\.,Date,Company/.test(csv1), csv1.slice(0, 40));
-    chk('明细 CSV 行数 = 4,869 + 表头', csv1.trim().split('\r\n').length === 4870,
-      csv1.trim().split('\r\n').length);
+    /* 导出的是当前财年视图，不是全库行数 */
+    chk('明细 CSV 行数 + 表头与库一致',
+      csv1.trim().split('\r\n').length === Number(kv('txn').v) + 1,
+      [csv1.trim().split('\r\n').length, Number(kv('txn').v) + 1]);
     await page.evaluate(() => { window.__csv = null; });
     await page.click('#fcExport');
     await waitFor(page, () => !!window.__csv, 9000, '协议 CSV');
     const csv2 = await page.evaluate(() => window.__csv);
-    chk('协议 CSV 行数 = 190 + 表头', csv2.trim().split('\r\n').length === 191,
-      csv2.trim().split('\r\n').length);
+    chk('协议 CSV 行数 + 表头与库一致',
+      csv2.trim().split('\r\n').length === LC.total + 1,
+      [csv2.trim().split('\r\n').length, LC.total + 1]);
     chk('协议 CSV 表头英文', /Contract,Supplier/.test(csv2), csv2.slice(0, 40));
 
     console.log('=== 6. 运行期错误 ===');
     chk('全程 0 JS 报错', errs.length === 0, errs.slice(0, 3));
     chk('全程 0 对外请求', net.length === 0, net.slice(0, 3));
 
-    await page.screenshot({ path: '.shot/snap_full.png', fullPage: false });
+    /* .shot/ 是过程目录（gitignore），清理后可能不存在；写截图前先建，避免测试尾部抛 ENOENT */
+    fs.mkdirSync(path.join(ROOT, '.shot'), { recursive: true });
+    await page.screenshot({ path: path.join(ROOT, '.shot', 'snap_full.png'), fullPage: false });
     console.log('\n结果：' + pass + ' 通过 / ' + fail + ' 失败');
   } catch (e) {
     console.log('EXCEPTION: ' + e.message);

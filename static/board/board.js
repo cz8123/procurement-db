@@ -16,18 +16,19 @@
     { k: 'category', name: 'Category' },
     { k: 'expense', name: 'Expense Type' },
     { k: 'level', name: 'Supplier Category' },
-    { k: 'region', name: 'Region' }
+    { k: 'region', name: 'Region' },
+    /* Company 是 Region 的下级：不再单独占一格，收在 Region 下拉的第二段 */
+    { k: 'company', name: 'Company', parent: 'region' }
   ];
-  var COLS = [
-    { k: 'date', t: 'Date', w: 82 },
-    { k: 'no', t: 'PR No.' },
-    { k: 'company', t: 'Company' },
-    { k: 'region', t: 'Region', w: 66 },
-    { k: 'category', t: 'Category' },
-    { k: 'expense', t: 'Expense Type', w: 74 },
-    { k: 'supplier', t: 'Supplier' },
-    { k: 'amount', t: 'Amount', num: 1 },
-    { k: 'days', t: 'Days', num: 1, w: 78 }
+  /* 抽屉 = 按公司聚合（用户要求）：一行一家公司，不列 PRPO 单号、不逐单展开 */
+  var AG_COLS = [
+    { k: 'company', t: 'Company', w: 230 },
+    { k: 'region', t: 'Region', w: 84 },
+    { k: 'n', t: 'PRs', num: 1, w: 68 },
+    { k: 'sup', t: 'Suppliers', num: 1, w: 88 },
+    { k: 'amount', t: 'Spend', num: 1, w: 108 },
+    { k: 'poPaid', t: 'PO Paid', num: 1, w: 108 },
+    { k: 'days', t: 'Avg Days', num: 1, w: 82 }
   ];
 
   var S = {
@@ -36,6 +37,7 @@
     options: {},
     data: null,
     topLocal: { category: '', method: '' },
+    catSub: {},               // 类别明细里已展开子类别的类别名（默认全部折叠）
     mMode: 'region',          // 月度图：region=区域堆叠 / pair=Total vs Framework
     // 框架协议统计（独立数据源 vw_fa_analysis，不吃 PRPO 全局筛选）
     fc: { page: 1, size: 50, sort: 'start', dir: 'desc',
@@ -105,11 +107,12 @@
     return (v * 100).toFixed(d == null ? 1 : d) + '%';
   }
   function days(v) { return v == null ? '—' : Number(v).toFixed(1) + ' d'; }
-  function qs(extra) {
+  function qs(extra, skip) {
     var p = new URLSearchParams();
     if (S.fy) p.set('fy', S.fy);
     p.set('cur', S.cur);
     Object.keys(S.sel).forEach(function (k) {
+      if (skip && skip.indexOf(k) >= 0) return;
       (S.sel[k] || []).forEach(function (v) { p.append(k, v); });
     });
     if (extra) Object.keys(extra).forEach(function (k) {
@@ -259,8 +262,6 @@
         '<button class="spec-btn kpi-spec" data-spec="kpi_' + k.k + '" ' +
         'title="How ' + esc(k.label) + ' is calculated">?</button>' +
         '<div class="k-top">' +
-        '<span class="k-ico"><svg viewBox="0 0 24 24" aria-hidden="true">' +
-        (KPI_ICONS[k.k] || KPI_ICONS.amount) + '</svg></span>' +
         '<span class="k-label">' + esc(k.label) + '</span>' +
         '<span class="k-fy">(' + esc(fy) + ')</span></div>' +
         '<div class="k-val">' + kpiVal(k, k.v) + '</div>' +
@@ -276,29 +277,61 @@
   }
 
   /* ================================================ 筛选 */
+  /** 某个筛选（或它的下级筛选）是否有选中值 —— 有下级时按钮也要高亮 */
+  function hasAny(k) {
+    if ((S.sel[k] || []).length) return true;
+    return FDEFS.some(function (x) {
+      return x.parent === k && (S.sel[x.k] || []).length;
+    });
+  }
+  /** 按钮上的取值文字；Region 有下级 Company 时附上公司计数 */
+  function fdText(f) {
+    var sel = S.sel[f.k] || [];
+    var txt = sel.length === 0 ? 'All' : (sel.length === 1 ? sel[0] : sel.length + ' selected');
+    var kids = FDEFS.filter(function (x) { return x.parent === f.k; });
+    if (kids.length) {
+      var n = kids.reduce(function (a, x) { return a + (S.sel[x.k] || []).length; }, 0);
+      if (n) txt += ' · ' + n + ' ' + kids[0].name.toLowerCase() + (n > 1 ? 's' : '');
+    }
+    return txt;
+  }
+  function optBody(k) {
+    var opts = S.options[k] || [], sel = S.sel[k] || [];
+    var body = opts.map(function (o) {
+      return '<label><input type="checkbox" value="' + esc(o.v) + '"' +
+        (sel.indexOf(o.v) >= 0 ? ' checked' : '') + '><span>' + esc(o.v) +
+        '</span><span class="cnt">' + nf(o.n, 0) + '</span></label>';
+    }).join('');
+    return body || '<div class="fempty">No options</div>';
+  }
+  /** 下拉里的一段：表头 + 取值列表，各自带 data-k 供勾选/清空定位 */
+  function fsec(f, note) {
+    return '<div class="fsec" data-k="' + f.k + '">' +
+      '<div class="fpop-h"><span>' + f.name +
+      (note ? '<i class="fh-note">' + note + '</i>' : '') + '</span>' +
+      '<a data-act="none">Clear</a></div>' +
+      '<div class="fpop-b">' + optBody(f.k) + '</div></div>';
+  }
+
   function renderFilters() {
-    var bar = $('#fbar');
-    bar.innerHTML = FDEFS.map(function (f) {
-      var opts = (S.options[f.k] || []);
-      var sel = S.sel[f.k] || [];
-      var txt = sel.length === 0 ? 'All'
-        : sel.length === 1 ? sel[0] : sel.length + ' selected';
-      var body = opts.map(function (o) {
-        return '<label><input type="checkbox" value="' + esc(o.v) + '"' +
-          (sel.indexOf(o.v) >= 0 ? ' checked' : '') + '><span>' + esc(o.v) +
-          '</span><span class="cnt">' + nf(o.n, 0) + '</span></label>';
-      }).join('');
-      return '<div class="fdrop' + (sel.length ? ' has' : '') + '" data-k="' + f.k + '">' +
+    var bar = $('#fbar'), tops = [], kids = {};
+    FDEFS.forEach(function (f) {
+      if (f.parent) (kids[f.parent] = kids[f.parent] || []).push(f);
+      else tops.push(f);
+    });
+    bar.innerHTML = tops.map(function (f) {
+      var sub = kids[f.k] || [];
+      return '<div class="fdrop' + (hasAny(f.k) ? ' has' : '') +
+        '" data-k="' + f.k + '">' +
         '<div class="fd-row">' +
         '<button type="button" class="fd-btn"><span class="fd-name">' + f.name + '</span>' +
-        '<span class="fd-val">' + esc(txt) + '</span><span class="fd-caret">▾</span></button>' +
+        '<span class="fd-val">' + esc(fdText(f)) + '</span><span class="fd-caret">▾</span></button>' +
         '<button class="spec-btn fdrop-spec" data-spec="filter_' + f.k + '" ' +
         'title="Where ' + esc(f.name) + ' values come from">?</button>' +
         '</div>' +
-        '<div class="fpop"><div class="fpop-h"><span>' + f.name + '</span>' +
-        '<span><a data-act="none">Clear</a></span></div>' +
-        '<div class="fpop-b">' + (body || '<div style="padding:8px 11px;color:#8695A8">No options</div>') +
-        '</div></div></div>';
+        '<div class="fpop">' + fsec(f) +
+        sub.map(function (c) { return fsec(c, 'within ' + f.name.toLowerCase()); }).join('') +
+        '</div></div>';
     }).join('');
     renderChips();
   }
@@ -308,13 +341,32 @@
     FDEFS.forEach(function (f) {
       var drop = $('.fdrop[data-k="' + f.k + '"]');
       if (!drop) return;
-      var sel = S.sel[f.k] || [];
-      var txt = sel.length === 0 ? 'All' : (sel.length === 1 ? sel[0] : sel.length + ' selected');
       var el = $('.fd-val', drop);
-      if (el) el.textContent = txt;
-      drop.classList.toggle('has', sel.length > 0);
+      if (el) el.textContent = fdText(f);
+      drop.classList.toggle('has', hasAny(f.k));
     });
     renderChips();
+  }
+
+  /* ---------------- 视觉对象级「返回」（Power BI 式下钻返回） ----------------
+     每张图只对自己造成的那个维度负责：点了环形图扇区 → 卡片头部右上角出现
+     一个小返回图标（悬浮提示写明清哪个维度），点它回到全量视图。
+     控件是图标不是文字胶囊 —— 文字版挤占头部，也和 PBI 的视觉对象头部不一致。 */
+  var BACK_LABEL = { region: 'Region', expense: 'Expense type', category: 'Category',
+    method: 'Procurement method', supplier: 'Supplier', company: 'Company' };
+  function updateBacks() {
+    $$('.v-back').forEach(function (el) {
+      var k = el.dataset.clear, vals = (S.sel && S.sel[k]) || [];
+      if (!vals.length) {
+        el.hidden = true;
+        el.title = 'Back';
+        return;
+      }
+      el.hidden = false;
+      var txt = 'Back — clear ' + (BACK_LABEL[k] || k) + ': ' + vals.join(', ');
+      el.title = txt;
+      el.setAttribute('aria-label', txt);
+    });
   }
 
   function renderChips() {
@@ -326,6 +378,7 @@
       });
     });
     box.innerHTML = out.join('');
+    updateBacks();
   }
 
   function setSel(k, vals) {
@@ -341,18 +394,46 @@
                 点柱下钻该月明细）
      ------------------------------------------------------------------ */
   var M_TOT = '#1E2F4B';      // Total：主题藏青
-  var M_FC  = '#E66C37';      // Framework Contract：对比橙
+  var M_FC  = '#3B5E96';      // Framework Contract：同色系中蓝（不用橙色）
 
   function mTitle(t) { var h = $('#mTitle'); if (h) h.textContent = t; }
 
   /* 柱顶金额胶囊（深藏青底白字，宽按字数估） */
-  function mCap(cx, bottomY, text) {
-    var w = text.length * 5.0 + 11, h = 15;
-    var x = cx - w / 2, y = bottomY - 4 - h;
-    return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + w.toFixed(1) +
-      '" height="' + h + '" rx="' + (h / 2) + '" fill="#1E2F4B"/>' +
-      '<text x="' + cx.toFixed(1) + '" y="' + (y + h / 2 + 3.4).toFixed(1) +
-      '" text-anchor="middle" font-size="9" font-weight="600" fill="#fff">' + esc(text) + '</text>';
+  /* 柱宽：两种月度视图共用 —— 切换时柱子的位置、宽度、基线完全一致 */
+  function barW(slot) { return Math.min(52, slot * 0.62); }
+
+  /* 段内数字：段太矮或柱太窄就不显示；文字颜色按底色明暗自适应 */
+  function segLabel(cx, yTop, h, w, v, fill) {
+    if (!(v > 0) || h < 17) return '';
+    var txt = money(v, 1).replace(/ ([KMB])$/, '$1');
+    if (txt.length * 6.9 > w - 8) return '';
+    return '<text x="' + cx.toFixed(1) + '" y="' + (yTop + h / 2 + 4).toFixed(1) +
+      '" text-anchor="middle" font-size="10" font-weight="600" pointer-events="none" fill="' +
+      (isLight(fill) ? '#1E2F4B' : '#FFFFFF') + '">' + esc(txt) + '</text>';
+  }
+
+  /* 两种图示共用同一套坐标与 scale：切换时刻度、基线不移动 */
+  function monthlyGeom(d) {
+    var W = chartW('chMonthly', 760), H = 290;
+    var L = 58, R = 14, T = 42, B = 42;
+    var vals = [0].concat(d.prev || [], d.total || [], d.frame || []);
+    (d.series || []).forEach(function (s) { vals = vals.concat(s.vals || []); });
+    return { W: W, H: H, L: L, R: R, T: T, B: B,
+      iw: W - L - R, ih: H - T - B,
+      ymax: niceMax(Math.max.apply(null, vals) * 1.12) };
+  }
+  function monthLabels(d) {
+    return d.labelsLong && d.labelsLong.length ? d.labelsLong : (d.labels || []);
+  }
+  function yAxisText(L, T, ih, W, R, ymax) {
+    var g = '';
+    for (var t = 0; t <= 4; t++) {
+      var y = T + ih - ih * t / 4;
+      g += '<text x="' + (L - 8) + '" y="' + (y + 3.5).toFixed(1) +
+        '" text-anchor="end" font-size="10" font-weight="600" fill="#3B3A39">' +
+        axisMoney(ymax * t / 4) + '</text>';
+    }
+    return g;
   }
 
   function renderMonthly() {
@@ -367,9 +448,9 @@
     if (!d || !d.series || !d.series.length) {
       emptyBox('chMonthly', 'No data for the current filters'); return;
     }
-    var W = chartW('chMonthly', 760), H = 300;
-    var L = 58, R = 14, T = 14, B = 42;
-    var iw = W - L - R, ih = H - T - B;
+    var G = monthlyGeom(d), W = G.W, H = G.H, L = G.L, R = G.R,
+      T = G.T, B = G.B, iw = G.iw, ih = G.ih;
+    var mLbl = monthLabels(d);
 
     // 画满 12 个财月（未到的月份留空，体现财年进度），但柱身不跟着月份数变宽
     var idx = d.labels.map(function (_, i) { return i; });
@@ -379,25 +460,24 @@
     if (!totals.some(function (v) { return v > 0; })) {
       emptyBox('chMonthly', 'No data for the current filters'); return;
     }
-    var pmax = Math.max.apply(null, totals.concat(d.prev || []));
-    var ymax = niceMax(pmax * 1.12);
+    var ymax = G.ymax;
 
-    var n = idx.length, slot = iw / n, bw = Math.min(52, slot * 0.62);
+    var n = idx.length, slot = iw / n, bw = barW(slot);
 
-    var g = '';
-    for (var t = 0; t <= 4; t++) {
-      var y = T + ih - ih * t / 4, v = ymax * t / 4;
-      g += '<line x1="' + L + '" y1="' + y.toFixed(1) + '" x2="' + (W - R) + '" y2="' + y.toFixed(1) +
-        '" stroke="#E4E4E4" stroke-width="1"/>' +
-        '<text x="' + (L - 8) + '" y="' + (y + 3.5).toFixed(1) +
-        '" text-anchor="end" font-size="9" font-weight="600" fill="#3B3A39">' + axisMoney(v) + '</text>';
-    }
+    /* 无背景横向网格线：只保留刻度文字 + 零轴，位置与堆叠视图完全一致 */
+    var g = yAxisText(L, T, ih, W, R, ymax) +
+      '<line x1="' + L + '" y1="' + (T + ih).toFixed(1) + '" x2="' + (W - R) + '" y2="' +
+      (T + ih).toFixed(1) + '" stroke="#D9D9D9" stroke-width="1"/>';
 
+    var segMax = Math.max.apply(null,
+      d.series.reduce(function (a, s) { return a.concat(s.vals || []); }, [0])) || 1;
     var bars = '', prevPts = [];
     idx.forEach(function (mi, j) {
       var x = L + j * slot + (slot - bw) / 2, acc = 0;
       var segs = d.series.map(function (s, si) {
-        return { v: s.vals[mi] || 0, c: PALETTE[si % PALETTE.length], k: s.k, si: si };
+        return { v: s.vals[mi] || 0,
+          c: ramp(s.vals[mi] || 0, segMax, '#F2F5F9', PALETTE[si % PALETTE.length], 0.32),
+          k: s.k, si: si };
       }).filter(function (z) { return z.v > 0; });
       segs.forEach(function (z, zi) {
         var h = z.v / ymax * ih;
@@ -406,13 +486,14 @@
         bars += '<rect class="seg" data-reg="' + esc(z.k) + '" data-m="' + mi +
           '" x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) +
           '" height="' + hh.toFixed(1) + '" fill="' + z.c + '" rx="0"/>';
+        bars += segLabel(x + bw / 2, y, hh, bw, z.v, z.c);
         acc += h;
       });
       var pv = (d.prev || [])[mi] || 0;
       if (pv > 0) prevPts.push([x + bw / 2, T + ih - pv / ymax * ih]);
       bars += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - B + 16) +
-        '" text-anchor="middle" font-size="9" font-weight="600" fill="#3B3A39">' +
-        esc(d.labels[mi]) + '</text>';
+        '" text-anchor="middle" font-size="10" font-weight="600" fill="#3B3A39">' +
+        esc(truncPx(mLbl[mi] || '', slot - 4, 12)) + '</text>';
     });
 
     var prevLine = '';
@@ -431,88 +512,73 @@
 
     box.innerHTML = svg(W, H, g + bars + prevLine +
       '<text x="' + (L + iw / 2) + '" y="' + (H - 4) +
-      '" text-anchor="middle" font-size="9" fill="#605E5C">Fiscal month</text>');
+      '" class="t-note" text-anchor="middle" font-size="10.5" fill="#605E5C">Fiscal month</text>');
   }
 
-  /* ---------------- 参考样式：Total vs Framework Contract 双柱 ---------------- */
+  /* ---------------- 参考样式：Total 由 Framework + Non-framework 堆叠而成 ---------------- */
   function renderMonthlyPair() {
     var d = S.data.monthly, box = $('#chMonthly');
     mTitle('Total vs Framework Contract');
     if (!d || !d.total) { emptyBox('chMonthly', 'No monthly data'); return; }
     var tot = d.total, frm = d.frame || [];
-    var lbl = d.labelsLong || d.labels || [];
+    var lbl = monthLabels(d);
     if (!tot.some(function (v) { return v > 0; })) {
       emptyBox('chMonthly', 'No data for the current filters'); return;
     }
 
-    var W = chartW('chMonthly', 760), H = 300;
-    var L = 14, R = 12, T = 42, B = 40;       // 顶部留白给胶囊
-    var iw = W - L - R, ih = H - T - B;
-    var peak = Math.max.apply(null, tot.concat(frm));
-    /* 这张图没有 y 轴刻度，不必凑整刻度；只留 22% 给柱顶胶囊，柱子才够高 */
-    var ymax = peak * 1.22 || 1;
+    var G = monthlyGeom(d), W = G.W, H = G.H, L = G.L, R = G.R,
+      T = G.T, B = G.B, iw = G.iw, ih = G.ih;
+    var ymax = G.ymax;
 
-    /* 只画到「最后一个有数的月份」：财年进行中时右侧不留一大片空白
-       （区域堆叠视图仍画满 12 个月体现实进度，两种图示各自成立） */
-    var last = 0;
-    for (var i0 = 0; i0 < 12; i0++) {
-      if ((tot[i0] || 0) > 0 || (frm[i0] || 0) > 0) last = i0;
-    }
-    var n = Math.max(last + 1, 3);
-    var slot = iw / n;
-    var gap = Math.max(4, Math.min(9, slot * 0.10));
-    var bw = Math.max(10, Math.min(30, (slot * 0.52 - gap) / 2));
+    /* 与区域视图共用同一套坐标、柱宽、基线：切换时整图完全不动 */
+    var n = Math.max(lbl.length || 0, 12);
+    var slot = iw / n, bw = barW(slot);
 
-    var g = '';
-    for (var t = 1; t <= 4; t++) {
-      var y = T + ih - ih * t / 4;
-      g += '<line x1="' + L + '" y1="' + y.toFixed(1) + '" x2="' + (W - R) + '" y2="' + y.toFixed(1) +
-        '" stroke="#F0F0F0" stroke-width="1"/>';
-    }
-    g += '<line x1="' + L + '" y1="' + (T + ih).toFixed(1) + '" x2="' + (W - R) + '" y2="' +
+    var g = yAxisText(L, T, ih, W, R, ymax) +
+      '<line x1="' + L + '" y1="' + (T + ih).toFixed(1) + '" x2="' + (W - R) + '" y2="' +
       (T + ih).toFixed(1) + '" stroke="#D9D9D9" stroke-width="1"/>';
 
-    /* 胶囊防重叠：按月先 Total 后 Frame，撞上就跳过（参考图靠柱高差错开） */
-    var placed = [];
-    function capTry(cx, topY, text) {
-      var w = text.length * 5.0 + 11, h = 15;
-      var bx = cx - w / 2, by = topY - 4 - h;
-      for (var i = 0; i < placed.length; i++) {
-        var p = placed[i];
-        if (bx < p.x + p.w && bx + w > p.x && by < p.y + p.h && by + h > p.y) return '';
-      }
-      placed.push({ x: bx, y: by, w: w, h: h });
-      return mCap(cx, topY, text);
-    }
+    /* 一根柱堆叠：底段 = 框架协议，上段 = 其余采购，柱顶 = 当月总额 */
+    var fMax = Math.max.apply(null, frm.concat([0])) || 1;
+    var oMax = Math.max.apply(null, tot.map(function (t, i) {
+      return Math.max(0, (t || 0) - (frm[i] || 0));
+    }).concat([0])) || 1;
 
-    var bars = '', caps = '';
+    var bars = '';
     for (var i = 0; i < n; i++) {
-      var cx = L + i * slot + slot / 2;
-      var x0 = cx - bw - gap / 2, x1 = cx + gap / 2;
-      var pair = [
-        { v: tot[i] || 0, x: x0, c: M_TOT, s: 'tot' },
-        { v: frm[i] || 0, x: x1, c: M_FC, s: 'frm' }
-      ];
-      for (var q = 0; q < 2; q++) {
-        var z = pair[q];
-        if (!(z.v > 0)) continue;
-        var h = z.v / ymax * ih, topY = T + ih - h;
-        bars += '<rect class="pseg" data-m="' + i + '" data-s="' + z.s +
-          '" data-v="' + z.v + '" x="' + z.x.toFixed(1) + '" y="' + topY.toFixed(1) +
-          '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) +
-          '" fill="' + z.c + '" rx="0"/>';
-        caps += capTry(z.x + bw / 2, topY, money(z.v, 1).replace(/ ([KMB])$/, '$1'));
+      var t = tot[i] || 0, f = Math.min(frm[i] || 0, t);
+      var cx2 = L + i * slot + slot / 2;
+      var x = L + i * slot + (slot - bw) / 2;
+      if (t > 0) {
+        var hAll = t / ymax * ih, hF = f / ymax * ih;
+        var yTop = T + ih - hAll, other = t - f, hO = hAll - hF;
+        if (hO > 0.4) {
+          var cO = ramp(other, oMax, '#E3EDF9', '#8FB3D9', 0.4);
+          bars += '<rect class="pseg" data-m="' + i + '" data-s="other" data-v="' + other +
+            '" x="' + x.toFixed(1) + '" y="' + yTop.toFixed(1) + '" width="' + bw.toFixed(1) +
+            '" height="' + hO.toFixed(1) + '" fill="' + cO + '" rx="0"/>';
+          bars += segLabel(cx2, yTop, hO, bw, other, cO);
+        }
+        if (hF > 0.4) {
+          var cF = ramp(f, fMax, '#C9D9EC', '#1E3A63', 0.4);
+          bars += '<rect class="pseg" data-m="' + i + '" data-s="frm" data-v="' + f +
+            '" x="' + x.toFixed(1) + '" y="' + (yTop + hO).toFixed(1) + '" width="' + bw.toFixed(1) +
+            '" height="' + hF.toFixed(1) + '" fill="' + cF + '" rx="0"/>';
+          bars += segLabel(cx2, yTop + hO, hF, bw, f, cF);
+        }
       }
-      bars += '<text x="' + cx.toFixed(1) + '" y="' + (H - B + 18) +
-        '" text-anchor="middle" font-size="9" font-weight="600" fill="#3B3A39">' +
-        esc(lbl[i] || '') + '</text>';
+      bars += '<text x="' + cx2.toFixed(1) + '" y="' + (H - B + 16) +
+        '" text-anchor="middle" font-size="10" font-weight="600" fill="#3B3A39">' +
+        esc(truncPx(lbl[i] || '', slot - 4, 12)) + '</text>';
     }
 
     $('#mLegend').innerHTML =
-      '<span><i style="background:' + M_TOT + '"></i>Total Amount</span>' +
-      '<span><i style="background:' + M_FC + '"></i>Framework Contract</span>';
+      '<span><i style="background:#1E3A63"></i>Framework Contract</span>' +
+      '<span><i style="background:#8FB3D9"></i>Non-framework</span>';
 
-    box.innerHTML = svg(W, H, g + bars + caps);
+    box.innerHTML = svg(W, H, g + bars +
+      '<text x="' + (L + iw / 2) + '" y="' + (H - 4) +
+      '" class="t-note" text-anchor="middle" font-size="10.5" fill="#605E5C">Fiscal month</text>');
   }
 
   /* ================================================ Chart 2 帕累托 */
@@ -520,57 +586,55 @@
     var rows = (S.data.pareto && S.data.pareto.rows) || [];
     var box = $('#chPareto');
     if (!rows.length) { emptyBox('chPareto', 'No categories for the current filters'); return; }
-    var W = chartW('chPareto', 660), H = 320;
+    var W = chartW('chPareto', 660), H = 310;
     var L = 62, R = 52, T = 22, B = 76;
     var iw = W - L - R, ih = H - T - B;
     var ymax = niceMax(Math.max.apply(null, rows.map(function (r) { return r.v || 0; })) * 1.08);
 
     var n = rows.length, slot = iw / n, bw = Math.min(58, slot * 0.56);
 
+    /* 只留左右刻度文字；80% 参考线是业务判据，不是背景网格，予以保留 */
     var g = '';
     for (var t = 0; t <= 4; t++) {
       var y = T + ih - ih * t / 4;
-      g += '<line x1="' + L + '" y1="' + y.toFixed(1) + '" x2="' + (W - R) + '" y2="' + y.toFixed(1) +
-        '" stroke="#E4E4E4"/>' +
-        '<text x="' + (L - 8) + '" y="' + (y + 3.5).toFixed(1) +
-        '" text-anchor="end" font-size="9" font-weight="600" fill="#3B3A39">' + axisMoney(ymax * t / 4) + '</text>' +
+      g += '<text x="' + (L - 8) + '" y="' + (y + 3.5).toFixed(1) +
+        '" text-anchor="end" font-size="10" font-weight="600" fill="#3B3A39">' + axisMoney(ymax * t / 4) + '</text>' +
         '<text x="' + (W - R + 8) + '" y="' + (y + 3.5).toFixed(1) +
-        '" font-size="9" font-weight="600" fill="#3B3A39">' + Math.round(t * 25) + '%</text>';
+        '" font-size="10" font-weight="600" fill="#3B3A39">' + Math.round(t * 25) + '%</text>';
     }
     // 80% 参考线
     var y80 = T + ih - ih * 0.8;
     g += '<line x1="' + L + '" y1="' + y80.toFixed(1) + '" x2="' + (W - R) + '" y2="' + y80.toFixed(1) +
       '" stroke="#EA1313" stroke-width="1.2" stroke-dasharray="6 4"/>' +
       '<text x="' + (L + 6) + '" y="' + (y80 - 5).toFixed(1) +
-      '" font-size="9" fill="#EA1313">80%</text>';
+      '" font-size="10" fill="#EA1313">80%</text>';
 
     var mx = Math.max.apply(null, rows.map(function (r) { return r.v || 0; })) || 1;
     var bars = '', pts = [];
     rows.forEach(function (r, i) {
       var h = (r.v || 0) / ymax * ih;
       var x = L + i * slot + (slot - bw) / 2, y = T + ih - h;
-      // PBI 单系列列图用统一主题色，不做深浅渐变
-      var col = PALETTE[1];
+      // 柱身按金额做蓝色深浅色阶
+      var col = ramp(r.v || 0, mx, '#A0D1FF', PALETTE[1], 0.3);
       bars += '<rect class="pbar" data-cat="' + esc(r.k) + '" x="' + x.toFixed(1) + '" y="' + y.toFixed(1) +
         '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, h).toFixed(1) + '" fill="' + col + '" rx="0"/>';
       pts.push([x + bw / 2, T + ih - (r.cum || 0) * ih]);
 
-      var nm = truncPx(r.k, Math.max(46, slot * 2.1), 8.5);
+      var nm = truncPx(r.k, Math.max(46, slot * 2.1), 12);
       bars += '<text transform="translate(' + (x + bw / 2).toFixed(1) + ',' + (T + ih + 8) +
-        ') rotate(-40)" text-anchor="end" font-size="8.5" font-weight="600" fill="#3B3A39">' + esc(nm) + '</text>';
+        ') rotate(-40)" text-anchor="end" font-size="10" font-weight="600" fill="#3B3A39">' + esc(nm) + '</text>';
     });
 
     var line = '<polyline points="' + pts.map(function (p) {
       return p[0].toFixed(1) + ',' + p[1].toFixed(1);
-    }).join(' ') + '" fill="none" stroke="#1E2F4B" stroke-width="1.8"/>';
+    }).join(' ') + '" fill="none" stroke="#E66C37" stroke-width="1.8"/>';
     var dots = pts.map(function (p) {
       return '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) +
-        '" r="2.6" fill="#1E2F4B"/>';
+        '" r="2.6" fill="#E66C37"/>';
     }).join('');
 
-    box.innerHTML = svg(W, H, g + bars + line + dots +
-      '<text x="' + (L + iw / 2) + '" y="' + (H - 12) +
-      '" text-anchor="middle" font-size="9" fill="#605E5C">Category</text>');
+    /* 类别名本身已经说明维度，X 轴标题省掉——字号放大后它会和旋转标签压在一起 */
+    box.innerHTML = svg(W, H, g + bars + line + dots);
   }
 
   /* ================================================ 类别明细表
@@ -583,38 +647,87 @@
       box.innerHTML = '<div class="no-data">No categories for the current filters</div>';
       return;
     }
-    var tot = d.total || 0, sel = S.sel.category || [], MAXB = 0.55;
-    /* 条形按「占最大类别的比例」缩放（PBI 数据条默认就是比最大值），
-       直接按 100% 缩放的话 11 个类别最长也只有 20%，会全缩成小方块。 */
+    var q = ($('#catQ') ? $('#catQ').value : '').trim().toLowerCase();
+    var subsMap = d.subsMap || {};
+    var rows = q ? d.rows.filter(function (r) {
+      return (r.k || '').toLowerCase().indexOf(q) >= 0 ||
+        ((subsMap[r.k] || []).some(function (s) {
+          return (s.k || '').toLowerCase().indexOf(q) >= 0;
+        }));
+    }) : d.rows;
+    var tot = d.total || 0, sel = S.sel.category || [], MAXB = 0.68;
+    var paidTot = d.rows.reduce(function (s, r) { return s + (r.po_paid || 0); }, 0);
+    /* 条形按「占最大类别的比例」缩放（PBI 数据条默认就是比最大值） */
     var maxShare = tot ? (d.rows[0].v || 0) / tot : 1;
-    var body = d.rows.map(function (r) {
+    var subOpen = S.catSub || {};
+    var body = rows.map(function (r) {
       var share = tot ? (r.v || 0) / tot : 0;
       var on = sel.indexOf(r.k) >= 0;
-      return '<tr class="cd-row' + (on ? ' on' : '') + '" data-cat="' + esc(r.k) + '">' +
+      var sl = subsMap[r.k] || [];
+      var sub = (d.subMap || {})[r.k] || '—';
+      /* 子类别一多就折起来：默认只显示金额最高的一条，点 +N 展开全部 */
+      var more = Math.max(0, sl.length - 1);
+      var open = !!subOpen[r.k];
+      var cell = '<td class="cd-sub" title="' + esc(sub) + '"><div class="cs-line">' +
+        '<span class="cs-main">' + esc(sub) + '</span>' +
+        (more ? '<button type="button" class="cs-tog' + (open ? ' on' : '') +
+          '" data-sub="' + esc(r.k) + '" title="' +
+          (open ? 'Collapse' : more + ' more sub-categories') + '">' +
+          (open ? '−' : '+' + more) + '</button>' : '') +
+        '</div></td>';
+      var tr = '<tr class="cd-row' + (on ? ' on' : '') + '" data-cat="' + esc(r.k) + '">' +
         '<td class="cd-cat" title="' + esc(r.k) + '"><span>' + esc(r.k) + '</span></td>' +
+        cell +
         '<td class="num">' + nf(r.sup, 0) + '</td>' +
         '<td class="num">' + nf(r.n, 0) + '</td>' +
         '<td class="num cd-money">' + money(r.v, 1) + '</td>' +
+        '<td class="num">' + money(r.po_paid, 1) + '</td>' +
         '<td class="cd-share"><i style="width:' +
-          ((maxShare ? share / maxShare : 0) * MAXB * 100).toFixed(1) + '%"></i>' +
+          ((maxShare ? share / maxShare : 0) * MAXB * 100).toFixed(1) + '%;background:' +
+          ramp(share, maxShare, '#A0D1FF', '#1E2F4B', 0.35) + '"></i>' +
         '<b>' + pct(share) + '</b></td></tr>';
+      if (!open || !sl.length) return tr;
+      var smax = sl[0].v || 1;
+      var items = sl.map(function (s) {
+        var ss = r.v ? (s.v || 0) / r.v : 0;
+        return '<li><span class="cs-k" title="' + esc(s.k) + '">' + esc(s.k) + '</span>' +
+          '<i class="cs-bar"><b style="width:' + Math.max(2, (s.v / smax) * 100).toFixed(1) +
+          '%;background:' + ramp(s.v, smax, '#BBD4F2', '#1E2F4B', 0.35) + '"></b></i>' +
+          '<span class="cs-v">' + money(s.v, 1) + '</span>' +
+          '<span class="cs-p">' + money(s.po, 1) + '</span>' +
+          '<span class="cs-n">' + nf(s.n, 0) + ' PRs · ' + pct(ss) + '</span></li>';
+      }).join('');
+      return tr + '<tr class="cd-subrow" data-cat="' + esc(r.k) + '"><td colspan="7">' +
+        '<div class="cs-wrap"><div class="cs-h">' + esc(r.k) + ' · Sub-categories' +
+        '<span>' + sl.length + ' items</span></div><ul class="cs-list">' +
+        '<li class="cs-head"><span>Sub-category</span><span></span>' +
+        '<span>Spend</span><span>PO Paid</span><span>PRs</span></li>' + items +
+        '</ul></div></td></tr>';
     }).join('');
+    if (!body) body = '<tr><td class="empty" colspan="7">No matching categories</td></tr>';
 
     var st = S.data.status || {};
     var total = '<tr class="cd-total">' +
-      '<td class="cd-cat"><span>Total</span></td>' +
+      '<td class="cd-cat"><span>Total</span></td><td class="cd-sub"></td>' +
       '<td class="num">' + nf(st.suppliers, 0) + '</td>' +
       '<td class="num">' + nf(st.txn, 0) + '</td>' +
       '<td class="num cd-money">' + money(tot, 1) + '</td>' +
-      '<td class="cd-share"><i style="width:' + (MAXB * 100) + '%"></i>' +
+      '<td class="num">' + money(paidTot, 1) + '</td>' +
+      '<td class="cd-share"><i style="width:' + (MAXB * 100) + '%;background:var(--navy)"></i>' +
       '<b>' + pct(1) + '</b></td></tr>';
 
     box.innerHTML = '<table class="cd-tbl"><thead><tr>' +
-      '<th class="cd-cat">Category</th><th class="num">Suppliers</th>' +
-      '<th class="num">PRs</th><th class="num">Spend</th><th>Share</th></tr></thead>' +
-      '<tbody>' + body + total + '</tbody></table>';
+      '<th class="cd-cat">Category</th><th class="cd-sub">Sub-Category</th>' +
+      '<th class="num">Suppliers</th><th class="num">PRs</th>' +
+      '<th class="num">Spend</th><th class="num">PO Paid</th><th>Share</th></tr></thead>' +
+      '<tbody>' + body + (q ? '' : total) + '</tbody></table>';
   }
 
+  /** 数值色阶：柱形按 v/max 从浅色渐变到主题深色，小值也保留最低可见强度 */
+  function ramp(v, max, light, dark, minK) {
+    var k = max > 0 ? Math.max(minK || 0.3, Math.min(1, v / max)) : (minK || 0.3);
+    return mix(light, dark, k);
+  }
   function mix(a, b, k) {
     var pa = hex(a), pb = hex(b);
     var r = Math.round(pa[0] + (pb[0] - pa[0]) * k);
@@ -627,7 +740,8 @@
   }
   /** 浅色块上用深字（浅天蓝扇区里的百分比标签不能是白的） */
   function isLight(h) {
-    var p = hex(h);
+    var p = h.charAt(0) === '#' ? hex(h)
+      : (h.match(/\d+/g) || [255, 255, 255]).map(Number);
     return (0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2]) / 255 > 0.62;
   }
 
@@ -635,8 +749,8 @@
   function renderDonut() {
     var rows = S.data.donut || [];
     if (!rows.length) { emptyBox('chDonut', 'No data for the current filters'); $('#donutLegend').innerHTML = ''; return; }
-    var W = chartW('chDonut', 340), H = 250;
-    var cx = W / 2, cy = H / 2 + 2, R = Math.min(W, H) * 0.38, r0 = R * 0.58;
+    var W = chartW('chDonut', 340), H = 230;
+    var cx = W / 2, cy = H / 2 + 2, R = Math.min(W, H) * 0.44, r0 = R * 0.58;
     var tot = rows.reduce(function (s, x) { return s + (x.v || 0); }, 0) || 1;
 
     var a0 = -Math.PI / 2, paths = '', labels = '';
@@ -645,8 +759,11 @@
       var a1 = a0 + frac * Math.PI * 2;
       var col = PALETTE[i % PALETTE.length];
       if (frac > 0.9999) {
-        paths += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r0) / 2) +
-          '" fill="none" stroke="' + col + '" stroke-width="' + (R - r0) + '"/>';
+        /* 单值满环：也要带 class/data-exp —— 否则筛到一个类型后这一圈点不动，
+           用户会卡在「只剩一个扇区、点哪都回不去」的状态 */
+        paths += '<circle class="dseg" data-exp="' + esc(x.k) + '" cx="' + cx + '" cy="' + cy +
+          '" r="' + ((R + r0) / 2) + '" fill="none" stroke="' + col +
+          '" stroke-width="' + (R - r0) + '"/>';
       } else {
         paths += '<path class="dseg" data-exp="' + esc(x.k) + '" d="' + arc(cx, cy, R, r0, a0, a1) +
           '" fill="' + col + '" stroke="#fff" stroke-width="2"/>';
@@ -661,9 +778,9 @@
       a0 = a1;
     });
 
-    var center = '<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" font-size="9" ' +
+    var center = '<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" font-size="10" ' +
       'fill="#3B3A39">Total</text>' +
-      '<text x="' + cx + '" y="' + (cy + 17) + '" text-anchor="middle" font-size="15" ' +
+      '<text x="' + cx + '" y="' + (cy + 17) + '" class="t-big" text-anchor="middle" font-size="17" ' +
       'font-weight="600" fill="#000000">' + money(tot, 1) + '</text>';
 
     $('#chDonut').innerHTML = svg(W, H, paths + labels + center);
@@ -687,7 +804,7 @@
     var rows = S.data.top || [];
     if (!rows.length) { emptyBox('chTop', 'No suppliers for the current filters'); return; }
     var W = chartW('chTop', 480), H = Math.max(240, rows.length * 27 + 34);
-    var L = Math.min(200, Math.max(120, W * 0.36)), R = 64, T = 8, B = 26;
+    var L = Math.min(236, Math.max(130, W * 0.38)), R = 64, T = 8, B = 26;
     var iw = W - L - R;
     var mx = Math.max.apply(null, rows.map(function (r) { return r.v || 0; })) || 1;
 
@@ -697,22 +814,30 @@
     for (var t = 0; t <= 4; t++) {
       var x = L + iw * t / 4;
       g += '<text x="' + x.toFixed(1) + '" y="' + (H - B + 14) +
-        '" text-anchor="middle" font-size="9" font-weight="600" fill="#3B3A39">' + axisMoney(mx * t / 4) + '</text>';
+        '" text-anchor="middle" font-size="10" font-weight="600" fill="#3B3A39">' + axisMoney(mx * t / 4) + '</text>';
     }
 
     var rowsHtml = '';
     rows.forEach(function (r, i) {
-      var y = T + i * 27, bh = 17;
+      var y = T + i * 27, bh = 18;
       var w = Math.max(2, (r.v || 0) / mx * iw);
-      var col = PALETTE[1];
+      var col = ramp(r.v || 0, mx, '#A0D1FF', '#1E2F4B', 0.3);
+      var label = money(r.v, 1);
+      /* 条够长就把金额写进条内右端（浅条用深字），不够才放到条外 */
+      var inside = w > label.length * 6.8 + 14;
       rowsHtml += '<g class="trow" data-sup="' + esc(r.k) + '">' +
         '<rect x="0" y="' + y + '" width="' + W + '" height="' + 27 + '" fill="transparent"/>' +
-        '<text x="' + (L - 8) + '" y="' + (y + 13) + '" text-anchor="end" font-size="9.5" ' +
-        'fill="#3B3A39">' + esc(truncPx(r.en || supEn(r.k), L - 18, 9.5)) + '</text>' +
-        '<rect x="' + L + '" y="' + (y + 2) + '" width="' + w.toFixed(1) + '" height="' + bh +
-        '" fill="' + col + '" rx="1"/>' +
-        '<text x="' + (L + w + 6).toFixed(1) + '" y="' + (y + 13) + '" font-size="9.5" ' +
-        'fill="#333333">' + money(r.v, 1) + '</text></g>';
+        '<text x="' + (L - 8) + '" y="' + (y + 14) + '" text-anchor="end" font-size="10" ' +
+        'fill="#3B3A39">' + esc(truncPx(r.en || supEn(r.k), L - 18, 12)) + '</text>' +
+        '<rect class="tbar" x="' + L + '" y="' + (y + 2) + '" width="' + w.toFixed(1) + '" height="' + bh +
+        '" fill="' + col + '" rx="0"/>' +
+        (inside
+          ? '<text x="' + (L + w - 7).toFixed(1) + '" y="' + (y + 14) + '" text-anchor="end" ' +
+            'font-size="10" font-weight="600" fill="' + (isLight(col) ? '#10304F' : '#FFFFFF') + '">' +
+            label + '</text>'
+          : '<text x="' + (L + w + 6).toFixed(1) + '" y="' + (y + 14) + '" font-size="10" ' +
+            'fill="#333333">' + label + '</text>') +
+        '</g>';
     });
 
     $('#chTop').innerHTML = svg(W, H, g + rowsHtml);
@@ -723,32 +848,32 @@
     var h = S.data.heat;
     if (!h || !h.rows.length) { emptyBox('chHeat', 'No cross data for the current filters'); return; }
     var W = chartW('chHeat', 1100);
-    var L = Math.min(250, Math.max(160, W * 0.21)), R = 76, T = 108, B = 34;
+    var L = Math.min(260, Math.max(170, W * 0.22)), R = 96, T = 88, B = 30;
     var cols = h.cols, rows = h.rows, mx = h.max || 1;
-    var cw = (W - L - R) / cols.length, ch = 30;
+    var cw = (W - L - R) / cols.length, ch = 40;
     var H = T + rows.length * ch + B;
 
     var g = '';
     cols.forEach(function (c, i) {
       var x = L + i * cw + cw / 2;
       g += '<text transform="translate(' + x.toFixed(1) + ',' + (T - 8) + ') rotate(-38)" ' +
-        'text-anchor="start" font-size="9" font-weight="600" fill="#3B3A39">' + esc(truncPx(c, 92, 9)) + '</text>';
+        'text-anchor="start" font-size="10" font-weight="600" fill="#3B3A39">' + esc(truncPx(c, 92, 12)) + '</text>';
     });
 
     rows.forEach(function (r, ri) {
       var y = T + ri * ch;
       g += '<text x="' + (L - 12) + '" y="' + (y + ch / 2 + 3.5) + '" text-anchor="end" ' +
-        'font-size="9.5" font-weight="600" fill="#3B3A39">' + esc(truncPx(r.en || supEn(r.k), L - 28, 9.5)) + '</text>';
+        'font-size="10" font-weight="600" fill="#3B3A39">' + esc(truncPx(r.en || supEn(r.k), L - 28, 12)) + '</text>';
       r.vals.forEach(function (v, ci) {
         var x = L + ci * cw;
         var k = v > 0 ? 0.08 + 0.92 * Math.pow(v / mx, 0.55) : 0;
-        var fill = v > 0 ? mix('#B1BFD5', '#1E2F4B', k) : '#FFFFFF';
+        var fill = v > 0 ? mix('#E8F1FE', '#1E2F4B', k) : '#F7FAFF';
         g += '<rect class="hcell" data-sup="' + esc(r.k) + '" data-cat="' + esc(cols[ci]) +
           '" x="' + (x + 1).toFixed(1) + '" y="' + (y + 1) + '" width="' + (cw - 2).toFixed(1) +
-          '" height="' + (ch - 2) + '" fill="' + fill + '" stroke="#E4E4E4" rx="0"/>';
+          '" height="' + (ch - 2) + '" fill="' + fill + '" stroke="none" rx="0"/>';
         if (v > 0 && cw > 52) {
           g += '<text x="' + (x + cw / 2).toFixed(1) + '" y="' + (y + ch / 2 + 3.5) +
-            '" text-anchor="middle" font-size="9" pointer-events="none" fill="' +
+            '" text-anchor="middle" font-size="10" pointer-events="none" fill="' +
             (k > 0.45 ? '#fff' : '#000000') + '">' + cellMoney(v) + '</text>';
         }
       });
@@ -757,18 +882,18 @@
     // 右侧色阶
     var bx = W - R + 18, by = T, bh = Math.min(140, rows.length * ch - 10), bw = 11;
     var grad = '<defs><linearGradient id="hg" x1="0" y1="1" x2="0" y2="0">' +
-      '<stop offset="0" stop-color="#B1BFD5"/><stop offset="1" stop-color="#1E2F4B"/>' +
+      '<stop offset="0" stop-color="#E8F1FE"/><stop offset="1" stop-color="#1E2F4B"/>' +
       '</linearGradient></defs>';
     g += grad + '<rect x="' + bx + '" y="' + by + '" width="' + bw + '" height="' + bh +
-      '" fill="url(#hg)" stroke="#E4E4E4"/>';
+      '" fill="url(#hg)" stroke="none" rx="0"/>';
     [0, 0.5, 1].forEach(function (kk) {
       var y = by + bh - bh * kk;
       g += '<text x="' + (bx + bw + 5) + '" y="' + (y + 3.5) +
-        '" font-size="9" fill="#3B3A39">' + axisMoney(mx * kk) + '</text>';
+        '" font-size="10" fill="#3B3A39">' + axisMoney(mx * kk) + '</text>';
     });
-    g += '<text x="' + bx + '" y="' + (by - 8) + '" font-size="9" fill="#3B3A39">Amount</text>';
+    g += '<text x="' + bx + '" y="' + (by - 8) + '" class="t-note" font-size="10.5" fill="#3B3A39">Amount</text>';
     g += '<text x="' + (L + (W - L - R) / 2) + '" y="' + (H - 4) +
-      '" text-anchor="middle" font-size="9" fill="#605E5C">Category</text>';
+      '" class="t-note" text-anchor="middle" font-size="10.5" fill="#605E5C">Category</text>';
 
     $('#chHeat').innerHTML = svg(W, H, g);
   }
@@ -782,21 +907,25 @@
     }).join('') + '</tr>';
   }
   function rowsHtml(rows) {
-    if (!rows.length) return '<tr><td class="empty" colspan="' + COLS.length + '">No matching records</td></tr>';
+    if (!rows.length) {
+      return '<tr><td class="empty" colspan="' + AG_COLS.length + '">No companies for this selection</td></tr>';
+    }
     return rows.map(function (r) {
-      return '<tr>' + COLS.map(function (c) {
-        if (c.k === 'amount') return '<td class="num">' + money(r.amount, 1) + '</td>';
-        if (c.k === 'days') return '<td class="num">' + (r.days == null ? '—' : Number(r.days).toFixed(1)) + '</td>';
-        if (c.k === 'no') return '<td class="strong">' + esc(r.no) + '</td>';
-        if (c.k === 'date') return '<td>' + esc((r.date || '').slice(5)) + '</td>';
-        return '<td title="' + esc(r[c.k]) + '">' + esc(r[c.k] || '—') + '</td>';
-      }).join('') + '</tr>';
+      return '<tr>' +
+        '<td class="strong" title="' + esc(r.company) + '">' + esc(r.company || '—') + '</td>' +
+        '<td>' + esc(r.region || '—') + '</td>' +
+        '<td class="num">' + nf(r.n, 0) + '</td>' +
+        '<td class="num">' + nf(r.sup, 0) + '</td>' +
+        '<td class="num">' + money(r.amount, 1) + '</td>' +
+        '<td class="num">' + money(r.poPaid, 1) + '</td>' +
+        '<td class="num">' + (r.days == null ? '—' : Number(r.days).toFixed(1)) + '</td>' +
+        '</tr>';
     }).join('');
   }
-  function pagerHtml(total, page, size) {
+  function pagerHtml(total, page, size, unit) {
     var pages = Math.max(1, Math.ceil(total / size));
     var from = total ? (page - 1) * size + 1 : 0, to = Math.min(total, page * size);
-    return '<span><b>' + nf(total, 0) + '</b> rows · ' + from + '–' + to +
+    return '<span><b>' + nf(total, 0) + '</b> ' + (unit || 'rows') + ' · ' + from + '–' + to +
       ' · page ' + page + '/' + pages + '</span>' +
       '<span class="pg-btns">' +
       '<button data-pg="1"' + (page <= 1 ? ' disabled' : '') + '>First</button>' +
@@ -807,16 +936,19 @@
   }
 
   /* ================================================ 框架协议统计表 */
+  /* 列宽不再写死 px：卡片是全宽，写死会让 Contract/Supplier 吃掉整张表、
+     右侧金额与日期挤成一团。改为 CSS 里的百分比列宽（table-layout:fixed），
+     见 board.css 的 .fc-tbl th:nth-child(n)。 */
   var FC_COLS = [
     { k: 'contract', t: 'Contract' },
     { k: 'supplier', t: 'Supplier' },
     { k: 'cv', t: 'CV', num: 1 },
     { k: 'pa', t: 'PA', num: 1 },
-    { k: 'usage', t: 'Usage', num: 1, w: 96, tip: 'PA counts framework-contract POs only' },
-    { k: 'start', t: 'Start Date', w: 92 },
-    { k: 'expiry', t: 'Expiry Date', w: 92 },
-    { k: 'remain', t: 'Remain Days', num: 1, w: 96 },
-    { k: 'type', t: 'Type', w: 54 }
+    { k: 'usage', t: 'Usage', num: 1, tip: 'PA counts framework-contract POs only' },
+    { k: 'start', t: 'Start Date' },
+    { k: 'expiry', t: 'Expiry Date' },
+    { k: 'remain', t: 'Remain Days', num: 1 },
+    { k: 'type', t: 'Type' }
   ];
   function fcqs(extra) {
     var p = new URLSearchParams();
@@ -841,22 +973,36 @@
     if (!rows.length) {
       return '<tr><td class="empty" colspan="' + FC_COLS.length + '">No matching agreements</td></tr>';
     }
+    /* 数据条按「本页最大 Usage」归一（参考样例的做法），低值也保底 4% 可见；
+       分母不低于 100%，避免整页用量都低时条被放大成满格 */
+    var uMax = 1;
+    rows.forEach(function (r) { if (r.usage != null && r.usage > uMax) uMax = r.usage; });
     return rows.map(function (r) {
       var u = r.usage;
-      var uc = u == null ? '' : (u > 1 ? 'hi' : (u >= 0.5 ? 'mid' : 'low'));
       var ut = u == null ? '—' : (u * 100).toFixed(1) + '%';
-      var rd = r.remain, rc = rd < 0 ? 'bad' : (rd <= 90 ? 'warn' : 'ok');
-      var rt = (rd < 0 ? '✕ ' : (rd <= 90 ? '! ' : '✓ ')) + rd;
+      /* 开方归一：usage 分布极扁（多数 <10%、少数 >100%），线性会让低值几乎看不见 */
+      var uFill = u == null ? ''
+        : '<i class="u-bar' + (u > 1 ? ' hi' : '') + '" style="width:' +
+          Math.max(4, Math.min(100, Math.sqrt(u / uMax) * 100)).toFixed(1) + '%"></i>';
+      var rd = r.remain;
+      var rc = rd == null ? 'none' : (rd < 0 ? 'bad' : (rd <= 90 ? 'warn' : 'ok'));
+      var rk = { ok: ['✓', 'Active — more than 90 days remaining'],
+        warn: ['!', 'Expiring within 90 days'],
+        bad: ['✕', 'Expired'],
+        none: ['–', 'No expiry date'] }[rc];
+      var rt = rd == null ? '—' : rd;
       return '<tr>' +
         '<td class="contract strong" title="' + esc(r.contract) + '">' + esc(r.contract) + '</td>' +
         '<td class="supplier" title="' + esc(r.supplier) + '">' +
           esc(r.supplier_en || supEn(r.supplier)) + '</td>' +
         '<td class="num">' + money(r.cv, 1) + '</td>' +
         '<td class="num">' + money(r.pa, 1) + '</td>' +
-        '<td class="num"><span class="usage ' + uc + '">' + ut + '</span></td>' +
+        '<td class="num u-cell">' + uFill +
+          '<span class="u-txt' + (u != null && u > 1 ? ' hi' : '') + '">' + ut + '</span></td>' +
         '<td>' + esc(r.start || '—') + '</td>' +
         '<td>' + esc(r.expiry || '—') + '</td>' +
-        '<td class="num"><span class="remain ' + rc + '">' + rt + '</span></td>' +
+        '<td class="num"><span class="remain ' + rc + '" title="' + esc(rk[1]) + '">' +
+          '<b>' + rt + '</b><i aria-hidden="true">' + rk[0] + '</i></span></td>' +
         '<td>' + esc(r.type || '—') + '</td></tr>';
     }).join('');
   }
@@ -881,6 +1027,7 @@
       $('#fcTbl thead').innerHTML = fcHeadHtml();
       $('#fcTbl tbody').innerHTML = fcRowsHtml(d.rows || []);
       $('#fcPager').innerHTML = pagerHtml(d.total, d.page, d.size);
+      fillContractMeta(d.types, d.bounds);
     }).catch(function (e) { toast('Failed to load agreements: ' + e.message); });
   }
 
@@ -893,28 +1040,37 @@
     $('#drawerQ').value = '';
     $('#drawer').classList.add('on');
     $('#mask').classList.add('on');
+    /* html 才是滚动容器，body 单独设 overflow 锁不住（见 board.css 注释） */
+    _scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+    document.documentElement.classList.add('drawer-open');
+    document.body.classList.add('drawer-open');
     $('#drawer').setAttribute('aria-hidden', 'false');
     loadDrawer();
   }
+  var _scrollY = null;
   function closeDrawer() {
     $('#drawer').classList.remove('on');
     $('#mask').classList.remove('on');
+    document.documentElement.classList.remove('drawer-open');
+    document.body.classList.remove('drawer-open');
     $('#drawer').setAttribute('aria-hidden', 'true');
+    if (_scrollY != null) { window.scrollTo(0, _scrollY); _scrollY = null; }
   }
   function loadDrawer() {
     var seq = ++S.drawerSeq;
     var p = qs(Object.assign({
       page: S.drawer.page, size: S.drawer.size, q: S.drawer.q,
-      sort: 'amount', dir: 'desc'
+      sort: 'amount', dir: 'desc', by: 'company'
     }, S.drawer.filters || {}));
     api('/api/board/rows', p).then(function (d) {
       if (seq !== S.drawerSeq) return;
-      $('#drawerTbl thead').innerHTML = headHtml(COLS, 'amount', 'desc');
+      $('#drawerTbl thead').innerHTML = headHtml(AG_COLS, 'amount', 'desc');
       $('#drawerTbl tbody').innerHTML = rowsHtml(d.rows || []);
-      $('#drawerPager').innerHTML = pagerHtml(d.total, d.page, d.size) +
-        (d.amount != null ? '<span>Total ' + money(d.amount, 0) + '</span>' : '');
-      $('#drawerSub').textContent = (S.drawer.label || '') +
-        nf(d.total, 0) + ' PRs · total ' + money(d.amount, 0);
+      $('#drawerPager').innerHTML = pagerHtml(d.total, d.page, d.size, 'companies') +
+        (d.amount != null ? '<span>Total ' + money(d.amount, 0) + '</span>' : '') +
+        (d.poPaid != null ? '<span>PO Paid ' + money(d.poPaid, 0) + '</span>' : '');
+      $('#drawerSub').textContent = (S.drawer.label || '') + nf(d.total, 0) +
+        ' companies · total ' + money(d.amount, 0) + ' · PO Paid ' + money(d.poPaid, 0);
     }).catch(function (e) { toast('Failed to load details: ' + e.message); });
   }
 
@@ -954,7 +1110,7 @@
         return '<option value="' + esc(f) + '"' + (f === d.latestFy ? ' selected' : '') + '>' +
           esc(f) + '</option>';
       }).join('');
-      S.fy = d.latestFy;
+      if (!S.fy) S.fy = d.latestFy;   // 区域变更时只刷新公司选项，不重置已选财年
 
       // Chart5 局部筛选下拉
       $('#topCat').innerHTML = '<option value="">All categories</option>' +
@@ -968,20 +1124,43 @@
 
       renderFilters();
 
-      // 框架协议表的局部选项（Type / 日期边界），独立于 PRPO 全局筛选
-      return api('/api/board/contracts', fcqs({ size: 1 })).then(function (cd) {
-        $('#fcType').innerHTML = '<option value="">All types</option>' +
-          (cd.types || []).map(function (o) {
-            return '<option value="' + esc(o.k) + '">' + esc(o.k) + ' (' + o.n + ')</option>';
-          }).join('');
-        var b = cd.bounds || {};
-        if (b.mn) {
-          ['#fcFrom', '#fcTo'].forEach(function (sel) {
-            $(sel).min = b.mn;
-            if (b.mx) $(sel).max = b.mx;
-          });
-        }
+      /* 框架协议表的 Type 选项 / 日期边界曾在这里单独打一次 /contracts?size=1
+         （多一次 80ms 的视图扫描 + 一个串行往返）。现在 loadContracts 的响应
+         本来就带 types/bounds，改由它顺手填，首屏少一个请求。 */
+    });
+  }
+
+  /** 框架协议的局部下拉与日期边界（types/bounds 由 /contracts 捎带返回）
+      只在还没填过时构建，避免每次翻页/筛选都把下拉重建一遍（会闪、会丢焦点） */
+  function fillContractMeta(types, bounds) {
+    var sel = $('#fcType');
+    if (types && types.length && sel && sel.options.length <= 1) {
+      sel.innerHTML = '<option value="">All types</option>' +
+        types.map(function (o) {
+          return '<option value="' + esc(o.k) + '">' + esc(o.k) + ' (' + o.n + ')</option>';
+        }).join('');
+      if (S.fc.type) sel.value = S.fc.type;
+    }
+    var b = bounds || {};
+    if (b.mn && !$('#fcFrom').min) {
+      ['#fcFrom', '#fcTo'].forEach(function (s) {
+        $(s).min = b.mn;
+        if (b.mx) $(s).max = b.mx;
       });
+    }
+  }
+
+  /** Region 变化后刷新 Company 下级选项（只更新这一个下拉，不动其它状态） */
+  /** 公司选项随 Region 联动；只重建公司那一段，面板保持打开 */
+  function refreshCompanyOptions() {
+    return api('/api/board/options', qs(null, ['company'])).then(function (d) {
+      S.options.company = (d.options && d.options.company) || [];
+      var valid = (S.options.company || []).map(function (o) { return o.v; });
+      var kept = (S.sel.company || []).filter(function (v) { return valid.indexOf(v) >= 0; });
+      if (kept.length) S.sel.company = kept; else delete S.sel.company;
+      var sec = $('.fdrop[data-k="region"] .fsec[data-k="company"] .fpop-b');
+      if (sec) sec.innerHTML = optBody('company');
+      updateFilterLabels();
     });
   }
 
@@ -991,9 +1170,14 @@
     $('#fbar').addEventListener('click', function (e) {
       var a = e.target.closest('a[data-act]');
       if (a) {
-        var k = a.closest('.fdrop').dataset.k;
+        /* Clear 只作用于自己那一段（Region 的 Clear 不清 Company） */
+        var scope = a.closest('[data-k]');
+        var k = scope.dataset.k;
         setSel(k, []);
-        renderFilters(); loadAll();
+        $$('input', scope).forEach(function (i) { i.checked = false; });
+        updateFilterLabels();
+        if (k === 'region') refreshCompanyOptions();
+        loadAll();
         return;
       }
       var b = e.target.closest('.fdrop .fd-btn');
@@ -1009,11 +1193,13 @@
     $('#fbar').addEventListener('change', function (e) {
       var inp = e.target.closest('.fpop-b input');
       if (!inp) return;
-      var drop = inp.closest('.fdrop');
-      var list = $$('.fpop-b input', drop).filter(function (i) { return i.checked; })
+      var scope = inp.closest('[data-k]');
+      var k = scope.dataset.k;
+      var list = $$('input', scope).filter(function (i) { return i.checked; })
         .map(function (i) { return i.value; });
-      setSel(drop.dataset.k, list);
+      setSel(k, list);
       updateFilterLabels();
+      if (k === 'region') refreshCompanyOptions();
       loadAll();
     });
     document.addEventListener('click', function (e) {
@@ -1026,14 +1212,30 @@
       if (!b) return;
       var k = b.dataset.k, v = b.dataset.v;
       setSel(k, (S.sel[k] || []).filter(function (x) { return x !== v; }));
-      renderFilters(); loadAll();
+      renderFilters();
+      if (k === 'region') refreshCompanyOptions();
+      loadAll();
+    });
+
+    // 视觉对象「返回」：只清掉这张图自己造成的那个维度
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('.v-back');
+      if (!b || b.hidden) return;
+      var k = b.dataset.clear;
+      if (!k) return;
+      e.preventDefault();
+      setSel(k, []);
+      renderFilters();
+      if (k === 'region') refreshCompanyOptions();
+      loadAll();
+      toast('Cleared ' + (BACK_LABEL[k] || k) + ' filter');
     });
 
     // 重置
     $('#btnReset').addEventListener('click', function () {
       S.sel = {}; S.topLocal = { category: '', method: '' };
       $('#topCat').value = ''; $('#topMth').value = '';
-      renderFilters(); loadAll();
+      renderFilters(); refreshCompanyOptions(); loadAll();
       toast('Filters reset');
     });
 
@@ -1086,9 +1288,18 @@
       var list = (S.sel.region || []).slice();
       var i = list.indexOf(reg);
       if (i >= 0) list.splice(i, 1); else list.push(reg);
-      setSel('region', list); renderFilters(); loadAll();
+      setSel('region', list); renderFilters(); refreshCompanyOptions(); loadAll();
     });
     $('#chCat').addEventListener('click', function (e) {
+      /* 点 +N / − 只展开收起子类别，不触发类别筛选 */
+      var tog = e.target.closest('.cs-tog');
+      if (tog) {
+        e.stopPropagation();
+        var c = tog.dataset.sub;
+        if (S.catSub[c]) delete S.catSub[c]; else S.catSub[c] = 1;
+        renderCatDetails();
+        return;
+      }
       var tr = e.target.closest('.cd-row');
       if (!tr) return;
       var cat = tr.dataset.cat;
@@ -1281,8 +1492,26 @@
     $('#fcExport').addEventListener('click', exportContracts);
 
     // 抽屉
+    var catT = null;
+    $('#catQ').addEventListener('input', function (e) {
+      clearTimeout(catT);
+      catT = setTimeout(renderCatDetails, 150);
+    });
+
     $('#drawerClose').addEventListener('click', closeDrawer);
     $('#mask').addEventListener('click', closeDrawer);
+    /* 滚轮兜底：分页条/抽屉头部在表格滚动容器之外，滚轮会穿透到背景页 —— 直接吞掉 */
+    $('#drawer').addEventListener('wheel', function (e) {
+      if (!e.target.closest('.tbl-wrap')) e.preventDefault();
+    }, { passive: false });
+    $('#mask').addEventListener('wheel', function (e) { e.preventDefault(); }, { passive: false });
+    $('#drawerPager').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-pg]');
+      if (!b) return;
+      S.drawer.page = +b.dataset.pg;
+      loadDrawer();
+      $('.drawer-b').scrollTop = 0;
+    });
     $('#drawerSize').addEventListener('change', function (e) {
       S.drawer.size = +e.target.value; S.drawer.page = 1; loadDrawer();
     });
@@ -1356,6 +1585,7 @@
     filter_expense: [],
     filter_level: [],
     filter_region: [],
+    filter_company: [],
     monthly: ['fiscal', 'yoy'],
     donut: [],
     pareto: ['pareto'],
@@ -1373,7 +1603,7 @@
       notes: [
         '整页数字都从采购申请单一行一行算出来，再按当前筛选条件汇总，没有额外的中间表参与。',
         '顶部「财年」决定看哪一年；「RM / RMB」只改变显示单位，底层金额始终是人民币原值。',
-        '中间那排筛选（品牌、类别、支出类型、供应商属性、区域）同时作用于 KPI 和所有图表，多选取「或」的关系。',
+        '中间那排筛选（品牌、类别、支出类型、供应商属性、区域）同时作用于 KPI 和所有图表，多选取「或」的关系；公司收在区域下拉的第二段，是区域的下级。',
         '点图表上的柱子、扇区、热力格会再加一层筛选，顶部的小标签可以单独去掉。',
         '最下面的「框架协议统计」是另一套数据，不跟着上面的筛选走。'
       ],
@@ -1500,13 +1730,28 @@
       fields: [['供应商属性', '供应商属性', SRC.prpo]]
     },
     filter_region: {
-      title: '筛选 · 区域',
+      title: '筛选 · 区域 / 公司',
       source: '数据来源：' + SRC.comp,
       notes: [
-        '区域同样是由' + SRC.prpo + '的「公司」关联' + SRC.comp + '带出来的（南区、北区等）。',
+        '区域由' + SRC.prpo + '的「公司」关联' + SRC.comp + '带出来的（南区、北区等）。',
+        '下拉里分两段：上面是区域，下面是公司。公司是区域的下级 —— 先勾区域，公司列表只保留这些区域下的公司；不勾区域时是全部公司。',
+        '两段可以各自多选，选中之间是「或」的关系；两段之间是「且」（区域选中项 ∩ 公司选中项）。',
+        '公司值同样由' + SRC.prpo + '的「公司」关联' + SRC.comp + '带出。'
+      ],
+      fields: [
+        ['区域', '区域（RegionAbbreviationCN）', SRC.comp],
+        ['公司', '公司（Company_cn）', SRC.comp]
+      ]
+    },
+    filter_company: {
+      title: '筛选 · 公司',
+      source: '数据来源：' + SRC.comp,
+      notes: [
+        '公司收在 Region 下拉的第二段，不再单独占一个筛选格。',
+        '公司值由' + SRC.prpo + '的「公司」关联' + SRC.comp + '带出。',
         '可以多选，选中之间是「或」的关系。'
       ],
-      fields: [['区域', '区域（RegionAbbreviationCN）', SRC.comp]]
+      fields: [['公司', '公司（Company_cn）', SRC.comp]]
     },
 
     /* ---------------- 图表 ---------------- */
@@ -1516,7 +1761,7 @@
       notes: [
         '右上角可切换两种图示，数据口径相同。',
         'Region（默认）：柱子按财月堆叠，一根柱子里的不同颜色是不同区域；虚线是上一个财年同月的总额；点柱子按区域筛选。',
-        'Total vs Framework：每月两根柱，深色是当月全部采购，橙色是其中「通过框架协议方式申请」的部分；柱顶胶囊就是该柱金额，点柱子看当月明细。',
+        'Total vs Framework：每月两根柱，深色是当月全部采购，中蓝是其中「通过框架协议方式申请」的部分；柱顶胶囊就是该柱金额，点柱子看当月按公司汇总。',
         '两种视图都用同一个「豁免单一来源的理由 = Ongoing Frame Contract」判据识别框架协议，不做映射。',
         '公司的财年从 7 月开始，所以图上第 1 个月对应日历的 7 月；还没到的月份不补 0。'
       ],
@@ -1545,15 +1790,20 @@
       notes: [
         '这张表和左边的帕累托图是同一份汇总结果，只是换了看法：一行一个采购类别。',
         '「供应商数」是这一类别下去重后的供应商家数；「单据数」是采购申请单的条数。',
-        '「金额」= 该类别所有采购申请单的含增值税总价之和；「占比」= 该类别金额 ÷ 当前筛选下的总金额，条形长度就是它。',
+        '「金额」= 该类别所有采购申请单的含增值税总价之和；「PO Paid」= 这些申请关联采购订单的实际支付总额（Cancelled 不计）。',
+        '「占比」= 该类别金额 ÷ 当前筛选下的总金额，条形长度就是它；「Sub-Category」显示该类别下金额最高的采购子类别。',
+        '一个类别下子类别往往有十几条，所以默认只显示金额最高的一条；点右侧「+N」展开该类别全部子类别（各自金额、PO Paid、单数、占本类别比例），再点「−」收起。',
+        '类别搜索框只过滤这张表的行（按类别名或子类别名匹配），不影响 KPI 和上面的图表。',
         '合计行的供应商数是整页去重后的家数，不是各类别相加 —— 同一家供应商可能跨类别，相加会重复计算。',
         '点任意一行等于勾选这个类别（再点一次取消），和点帕累托柱子是同一个动作。'
       ],
       fields: [
         ['类别', '采购类别（归并后 11 类）', SRC.prpo + ' → ' + SRC.catmap],
+        ['Sub-Category', 'Table - 采购子类别 → Sub-Category（默认折叠，显示金额最高项）', SRC.prpo],
         ['供应商数', '供应商名称（去重计数）', SRC.prpo],
         ['单据数', '表单编号（计数）', SRC.prpo],
         ['金额', '含增值税总价（求和）', SRC.prpo],
+        ['PO Paid', 'PO Paid（求和）', SRC.prpo],
         ['占比', '金额 ÷ 当前筛选下的总金额', '由上面两列算出']
       ]
     },
@@ -1576,7 +1826,8 @@
       notes: [
         '按供应商把金额汇总起来后取前 10 名。',
         '图里那两个下拉（类别、采购方法）是「只管这张图」的筛选，不影响 KPI 和其它图表。',
-        '供应商原始名是「中文全称-英文名」，列表里只显示中文部分，鼠标悬停给全名。'
+        '供应商原始名是「中文全称-英文名」，列表里只显示中文部分，鼠标悬停给全名。',
+        '点任意一行打开右侧抽屉，按公司汇总（单数 / 供应商数 / 采购额 / PO Paid / 平均周期）。'
       ],
       fields: [
         ['供应商', '供应商名称', SRC.prpo],
@@ -1589,7 +1840,8 @@
       notes: [
         '行是供应商前 10 名，列是金额前 8 个类别。',
         '每个格子＝这家供应商在这个类别下的金额合计；颜色越深金额越大，按当前筛选下的最大值归一化。',
-        '只算这 10 × 8 的交叉部分，不是全量交叉。'
+        '只算这 10 × 8 的交叉部分，不是全量交叉。',
+        '点任意格子打开右侧抽屉，按公司汇总这一格（供应商 × 类别）的数据。'
       ],
       fields: [
         ['行（供应商）', '供应商名称', SRC.prpo],
@@ -1717,7 +1969,12 @@
   function init() {
     bind();
     bindSpec();
-    loadOptions().then(loadAll).catch(function (e) {
+    /* options 与 data 互不依赖：data 不带 fy 时后端取最新财年（与 options.latestFy
+       同一个口径），所以两个请求可以并行发，首屏少一个 300ms 的往返。 */
+    Promise.all([
+      loadOptions().catch(function (e) { console.error(e); }),
+      loadAll()
+    ]).catch(function (e) {
       toast('Initialization failed: ' + e.message, 5000);
       console.error(e);
     });
