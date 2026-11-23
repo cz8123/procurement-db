@@ -9,6 +9,11 @@
      页头/表头用 maximum #1E2F4B，热力色阶走 minimum #B1BFD5 → maximum #1E2F4B */
   var PALETTE = ['#1E2F4B', '#3B5E96', '#627EAB', '#A0D1FF', '#B1BFD5',
                  '#4D6172', '#8FA3C0', '#2C4771'];
+  /* 分类色板：同一系列在所有月份/所有柱子上保持固定颜色，
+     不再按数值做深浅色阶（用户明确：图例靠颜色区分，不要用色阶表达大小） */
+  var CAT_COLORS = ['#1E2F4B', '#3B5E96', '#5E9BB8', '#2F7D6B',
+                    '#C08A2E', '#8A5A8F', '#6B7A8F', '#B5544A'];
+  var PAIR_FRM = '#1E3A63', PAIR_OTHER = '#8FB3D9';
   /* Card 视觉对象的顶部色条：主题里所有卡片同一个 ColorId，故不按指标区分 */
   var KPI_COLORS = ['#3B5E96'];
   var FDEFS = [
@@ -165,13 +170,10 @@
   }
   function axisMoney(v) {
     var x = v / S.rate;
-    if (Math.abs(x) >= 1e9) return nf(x / 1e9, 1) + 'B';
-    if (Math.abs(x) >= 1e6) {
-      var m = x / 1e6; return nf(m, Math.abs(m % 1) < 0.05 ? 0 : 1) + 'M';
-    }
-    if (Math.abs(x) >= 1e3) {
-      var k = x / 1e3; return nf(k, Math.abs(k % 1) < 0.05 ? 0 : 1) + 'K';
-    }
+    /* 坐标轴只显示整数：带小数会让刻度看起来参差 */
+    if (Math.abs(x) >= 1e9) return nf(x / 1e9, 0) + 'B';
+    if (Math.abs(x) >= 1e6) return nf(x / 1e6, 0) + 'M';
+    if (Math.abs(x) >= 1e3) return nf(x / 1e3, 0) + 'K';
     return nf(x, 0);
   }
   /** 矩阵单元格里的数字：比坐标轴更紧凑（K 不带小数，避免 264.1K 这类噪声） */
@@ -264,8 +266,10 @@
         '<div class="k-top">' +
         '<span class="k-label">' + esc(k.label) + '</span>' +
         '<span class="k-fy">(' + esc(fy) + ')</span></div>' +
+        '<div class="k-mid">' +
         '<div class="k-val">' + kpiVal(k, k.v) + '</div>' +
         (pills ? '<div class="k-bot">' + pills + '</div>' : '') +
+        '</div>' +
         prev +
         '</div>';
     }).join('');
@@ -404,9 +408,9 @@
 
   /* 段内数字：段太矮或柱太窄就不显示；文字颜色按底色明暗自适应 */
   function segLabel(cx, yTop, h, w, v, fill) {
-    if (!(v > 0) || h < 17) return '';
+    if (!(v > 0) || h < 15) return '';
     var txt = money(v, 1).replace(/ ([KMB])$/, '$1');
-    if (txt.length * 6.9 > w - 8) return '';
+    if (txt.length * 7.2 > w - 8) return '';
     return '<text x="' + cx.toFixed(1) + '" y="' + (yTop + h / 2 + 4).toFixed(1) +
       '" text-anchor="middle" font-size="10" font-weight="600" pointer-events="none" fill="' +
       (isLight(fill) ? '#1E2F4B' : '#FFFFFF') + '">' + esc(txt) + '</text>';
@@ -430,7 +434,7 @@
     for (var t = 0; t <= 4; t++) {
       var y = T + ih - ih * t / 4;
       g += '<text x="' + (L - 8) + '" y="' + (y + 3.5).toFixed(1) +
-        '" text-anchor="end" font-size="10" font-weight="600" fill="#3B3A39">' +
+        '" text-anchor="end" font-size="10" font-weight="600" fill="#1E2F4B">' +
         axisMoney(ymax * t / 4) + '</text>';
     }
     return g;
@@ -474,9 +478,10 @@
     var bars = '', prevPts = [];
     idx.forEach(function (mi, j) {
       var x = L + j * slot + (slot - bw) / 2, acc = 0;
+      /* 区域颜色固定（按系列索引），不随金额深浅变化 */
       var segs = d.series.map(function (s, si) {
         return { v: s.vals[mi] || 0,
-          c: ramp(s.vals[mi] || 0, segMax, '#F2F5F9', PALETTE[si % PALETTE.length], 0.32),
+          c: CAT_COLORS[si % CAT_COLORS.length],
           k: s.k, si: si };
       }).filter(function (z) { return z.v > 0; });
       segs.forEach(function (z, zi) {
@@ -492,8 +497,8 @@
       var pv = (d.prev || [])[mi] || 0;
       if (pv > 0) prevPts.push([x + bw / 2, T + ih - pv / ymax * ih]);
       bars += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - B + 16) +
-        '" text-anchor="middle" font-size="10" font-weight="600" fill="#3B3A39">' +
-        esc(truncPx(mLbl[mi] || '', slot - 4, 12)) + '</text>';
+        '" text-anchor="middle" font-size="10" font-weight="600" fill="#1E2F4B">' +
+        esc(truncPx(mLbl[mi] || '', slot - 4, 13)) + '</text>';
     });
 
     var prevLine = '';
@@ -505,14 +510,14 @@
 
     $('#mLegend').innerHTML =
       d.series.map(function (s, i) {
-        return '<span><i style="background:' + PALETTE[i % PALETTE.length] + '"></i>' +
+        return '<span><i style="background:' + CAT_COLORS[i % CAT_COLORS.length] + '"></i>' +
           esc(s.k) + '</span>';
       }).join('') +
-      '<span><i style="background:#A9B7CB;height:2px;border-radius:0"></i>Prior year</span>';
+      '<span><i style="background:#7B8FA8;height:2px;border-radius:0"></i>Prior year</span>';
 
     box.innerHTML = svg(W, H, g + bars + prevLine +
       '<text x="' + (L + iw / 2) + '" y="' + (H - 4) +
-      '" class="t-note" text-anchor="middle" font-size="10.5" fill="#605E5C">Fiscal month</text>');
+      '" class="t-note" text-anchor="middle" font-size="10.5" fill="#1E2F4B">Fiscal month</text>');
   }
 
   /* ---------------- 参考样式：Total 由 Framework + Non-framework 堆叠而成 ---------------- */
@@ -538,12 +543,8 @@
       '<line x1="' + L + '" y1="' + (T + ih).toFixed(1) + '" x2="' + (W - R) + '" y2="' +
       (T + ih).toFixed(1) + '" stroke="#D9D9D9" stroke-width="1"/>';
 
-    /* 一根柱堆叠：底段 = 框架协议，上段 = 其余采购，柱顶 = 当月总额 */
-    var fMax = Math.max.apply(null, frm.concat([0])) || 1;
-    var oMax = Math.max.apply(null, tot.map(function (t, i) {
-      return Math.max(0, (t || 0) - (frm[i] || 0));
-    }).concat([0])) || 1;
-
+    /* 一根柱堆叠：底段 = 框架协议，上段 = 其余采购，柱顶 = 当月总额。
+       两段用固定图例色，不按金额做色阶 */
     var bars = '';
     for (var i = 0; i < n; i++) {
       var t = tot[i] || 0, f = Math.min(frm[i] || 0, t);
@@ -553,32 +554,30 @@
         var hAll = t / ymax * ih, hF = f / ymax * ih;
         var yTop = T + ih - hAll, other = t - f, hO = hAll - hF;
         if (hO > 0.4) {
-          var cO = ramp(other, oMax, '#E3EDF9', '#8FB3D9', 0.4);
           bars += '<rect class="pseg" data-m="' + i + '" data-s="other" data-v="' + other +
             '" x="' + x.toFixed(1) + '" y="' + yTop.toFixed(1) + '" width="' + bw.toFixed(1) +
-            '" height="' + hO.toFixed(1) + '" fill="' + cO + '" rx="0"/>';
-          bars += segLabel(cx2, yTop, hO, bw, other, cO);
+            '" height="' + hO.toFixed(1) + '" fill="' + PAIR_OTHER + '" rx="0"/>';
+          bars += segLabel(cx2, yTop, hO, bw, other, PAIR_OTHER);
         }
         if (hF > 0.4) {
-          var cF = ramp(f, fMax, '#C9D9EC', '#1E3A63', 0.4);
           bars += '<rect class="pseg" data-m="' + i + '" data-s="frm" data-v="' + f +
             '" x="' + x.toFixed(1) + '" y="' + (yTop + hO).toFixed(1) + '" width="' + bw.toFixed(1) +
-            '" height="' + hF.toFixed(1) + '" fill="' + cF + '" rx="0"/>';
-          bars += segLabel(cx2, yTop + hO, hF, bw, f, cF);
+            '" height="' + hF.toFixed(1) + '" fill="' + PAIR_FRM + '" rx="0"/>';
+          bars += segLabel(cx2, yTop + hO, hF, bw, f, PAIR_FRM);
         }
       }
       bars += '<text x="' + cx2.toFixed(1) + '" y="' + (H - B + 16) +
-        '" text-anchor="middle" font-size="10" font-weight="600" fill="#3B3A39">' +
-        esc(truncPx(lbl[i] || '', slot - 4, 12)) + '</text>';
+        '" text-anchor="middle" font-size="10" font-weight="600" fill="#1E2F4B">' +
+        esc(truncPx(lbl[i] || '', slot - 4, 13)) + '</text>';
     }
 
     $('#mLegend').innerHTML =
-      '<span><i style="background:#1E3A63"></i>Framework Contract</span>' +
-      '<span><i style="background:#8FB3D9"></i>Non-framework</span>';
+      '<span><i style="background:' + PAIR_FRM + '"></i>Framework Contract</span>' +
+      '<span><i style="background:' + PAIR_OTHER + '"></i>Non-framework</span>';
 
     box.innerHTML = svg(W, H, g + bars +
       '<text x="' + (L + iw / 2) + '" y="' + (H - 4) +
-      '" class="t-note" text-anchor="middle" font-size="10.5" fill="#605E5C">Fiscal month</text>');
+      '" class="t-note" text-anchor="middle" font-size="10.5" fill="#1E2F4B">Fiscal month</text>');
   }
 
   /* ================================================ Chart 2 帕累托 */
@@ -598,9 +597,9 @@
     for (var t = 0; t <= 4; t++) {
       var y = T + ih - ih * t / 4;
       g += '<text x="' + (L - 8) + '" y="' + (y + 3.5).toFixed(1) +
-        '" text-anchor="end" font-size="10" font-weight="600" fill="#3B3A39">' + axisMoney(ymax * t / 4) + '</text>' +
+        '" text-anchor="end" font-size="10" font-weight="600" fill="#1E2F4B">' + axisMoney(ymax * t / 4) + '</text>' +
         '<text x="' + (W - R + 8) + '" y="' + (y + 3.5).toFixed(1) +
-        '" font-size="10" font-weight="600" fill="#3B3A39">' + Math.round(t * 25) + '%</text>';
+        '" font-size="10" font-weight="600" fill="#1E2F4B">' + Math.round(t * 25) + '%</text>';
     }
     // 80% 参考线
     var y80 = T + ih - ih * 0.8;
@@ -614,15 +613,15 @@
     rows.forEach(function (r, i) {
       var h = (r.v || 0) / ymax * ih;
       var x = L + i * slot + (slot - bw) / 2, y = T + ih - h;
-      // 柱身按金额做蓝色深浅色阶
-      var col = ramp(r.v || 0, mx, '#A0D1FF', PALETTE[1], 0.3);
+      /* 单一主色：金额大小由柱高表达，不再叠加色阶 */
+      var col = '#3B5E96';
       bars += '<rect class="pbar" data-cat="' + esc(r.k) + '" x="' + x.toFixed(1) + '" y="' + y.toFixed(1) +
         '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, h).toFixed(1) + '" fill="' + col + '" rx="0"/>';
       pts.push([x + bw / 2, T + ih - (r.cum || 0) * ih]);
 
-      var nm = truncPx(r.k, Math.max(46, slot * 2.1), 12);
+      var nm = truncPx(r.k, Math.max(46, slot * 2.1), 13);
       bars += '<text transform="translate(' + (x + bw / 2).toFixed(1) + ',' + (T + ih + 8) +
-        ') rotate(-40)" text-anchor="end" font-size="10" font-weight="600" fill="#3B3A39">' + esc(nm) + '</text>';
+        ') rotate(-40)" text-anchor="end" font-size="10" font-weight="600" fill="#1E2F4B">' + esc(nm) + '</text>';
     });
 
     var line = '<polyline points="' + pts.map(function (p) {
@@ -683,8 +682,7 @@
         '<td class="num cd-money">' + money(r.v, 1) + '</td>' +
         '<td class="num">' + money(r.po_paid, 1) + '</td>' +
         '<td class="cd-share"><i style="width:' +
-          ((maxShare ? share / maxShare : 0) * MAXB * 100).toFixed(1) + '%;background:' +
-          ramp(share, maxShare, '#A0D1FF', '#1E2F4B', 0.35) + '"></i>' +
+          ((maxShare ? share / maxShare : 0) * MAXB * 100).toFixed(1) + '%;background:#3B5E96"></i>' +
         '<b>' + pct(share) + '</b></td></tr>';
       if (!open || !sl.length) return tr;
       var smax = sl[0].v || 1;
@@ -692,7 +690,7 @@
         var ss = r.v ? (s.v || 0) / r.v : 0;
         return '<li><span class="cs-k" title="' + esc(s.k) + '">' + esc(s.k) + '</span>' +
           '<i class="cs-bar"><b style="width:' + Math.max(2, (s.v / smax) * 100).toFixed(1) +
-          '%;background:' + ramp(s.v, smax, '#BBD4F2', '#1E2F4B', 0.35) + '"></b></i>' +
+          '%;background:#8FB3D9"></b></i>' +
           '<span class="cs-v">' + money(s.v, 1) + '</span>' +
           '<span class="cs-p">' + money(s.po, 1) + '</span>' +
           '<span class="cs-n">' + nf(s.n, 0) + ' PRs · ' + pct(ss) + '</span></li>';
@@ -757,7 +755,7 @@
     rows.forEach(function (x, i) {
       var frac = (x.v || 0) / tot;
       var a1 = a0 + frac * Math.PI * 2;
-      var col = PALETTE[i % PALETTE.length];
+      var col = CAT_COLORS[i % CAT_COLORS.length];
       if (frac > 0.9999) {
         /* 单值满环：也要带 class/data-exp —— 否则筛到一个类型后这一圈点不动，
            用户会卡在「只剩一个扇区、点哪都回不去」的状态 */
@@ -779,14 +777,14 @@
     });
 
     var center = '<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" font-size="10" ' +
-      'fill="#3B3A39">Total</text>' +
+      'fill="#1E2F4B">Total</text>' +
       '<text x="' + cx + '" y="' + (cy + 17) + '" class="t-big" text-anchor="middle" font-size="17" ' +
-      'font-weight="600" fill="#000000">' + money(tot, 1) + '</text>';
+      'font-weight="600" fill="#0E1720">' + money(tot, 1) + '</text>';
 
     $('#chDonut').innerHTML = svg(W, H, paths + labels + center);
     $('#donutLegend').innerHTML = rows.map(function (x, i) {
       return '<span class="li" data-exp="' + esc(x.k) + '"><i style="background:' +
-        PALETTE[i % PALETTE.length] + '"></i>' + esc(x.k) +
+        CAT_COLORS[i % CAT_COLORS.length] + '"></i>' + esc(x.k) +
         ' <b>' + money(x.v, 1) + '</b><span class="pc">' + pct(x.share) + '</span></span>';
     }).join('');
   }
@@ -814,29 +812,30 @@
     for (var t = 0; t <= 4; t++) {
       var x = L + iw * t / 4;
       g += '<text x="' + x.toFixed(1) + '" y="' + (H - B + 14) +
-        '" text-anchor="middle" font-size="10" font-weight="600" fill="#3B3A39">' + axisMoney(mx * t / 4) + '</text>';
+        '" text-anchor="middle" font-size="10" font-weight="600" fill="#1E2F4B">' + axisMoney(mx * t / 4) + '</text>';
     }
 
     var rowsHtml = '';
     rows.forEach(function (r, i) {
       var y = T + i * 27, bh = 18;
       var w = Math.max(2, (r.v || 0) / mx * iw);
-      var col = ramp(r.v || 0, mx, '#A0D1FF', '#1E2F4B', 0.3);
+      /* 单一主色：长度表达金额，不做色阶 */
+      var col = '#3B5E96';
       var label = money(r.v, 1);
       /* 条够长就把金额写进条内右端（浅条用深字），不够才放到条外 */
-      var inside = w > label.length * 6.8 + 14;
+      var inside = w > label.length * 7.4 + 14;
       rowsHtml += '<g class="trow" data-sup="' + esc(r.k) + '">' +
         '<rect x="0" y="' + y + '" width="' + W + '" height="' + 27 + '" fill="transparent"/>' +
         '<text x="' + (L - 8) + '" y="' + (y + 14) + '" text-anchor="end" font-size="10" ' +
-        'fill="#3B3A39">' + esc(truncPx(r.en || supEn(r.k), L - 18, 12)) + '</text>' +
+        'fill="#1E2F4B">' + esc(truncPx(r.en || supEn(r.k), L - 18, 13)) + '</text>' +
         '<rect class="tbar" x="' + L + '" y="' + (y + 2) + '" width="' + w.toFixed(1) + '" height="' + bh +
         '" fill="' + col + '" rx="0"/>' +
         (inside
           ? '<text x="' + (L + w - 7).toFixed(1) + '" y="' + (y + 14) + '" text-anchor="end" ' +
-            'font-size="10" font-weight="600" fill="' + (isLight(col) ? '#10304F' : '#FFFFFF') + '">' +
+            'font-size="10" font-weight="600" fill="#FFFFFF">' +
             label + '</text>'
           : '<text x="' + (L + w + 6).toFixed(1) + '" y="' + (y + 14) + '" font-size="10" ' +
-            'fill="#333333">' + label + '</text>') +
+            'fill="#1F2A36">' + label + '</text>') +
         '</g>';
     });
 
@@ -857,13 +856,13 @@
     cols.forEach(function (c, i) {
       var x = L + i * cw + cw / 2;
       g += '<text transform="translate(' + x.toFixed(1) + ',' + (T - 8) + ') rotate(-38)" ' +
-        'text-anchor="start" font-size="10" font-weight="600" fill="#3B3A39">' + esc(truncPx(c, 92, 12)) + '</text>';
+        'text-anchor="start" font-size="10" font-weight="600" fill="#1E2F4B">' + esc(truncPx(c, 92, 13)) + '</text>';
     });
 
     rows.forEach(function (r, ri) {
       var y = T + ri * ch;
       g += '<text x="' + (L - 12) + '" y="' + (y + ch / 2 + 3.5) + '" text-anchor="end" ' +
-        'font-size="10" font-weight="600" fill="#3B3A39">' + esc(truncPx(r.en || supEn(r.k), L - 28, 12)) + '</text>';
+        'font-size="10" font-weight="600" fill="#1E2F4B">' + esc(truncPx(r.en || supEn(r.k), L - 28, 13)) + '</text>';
       r.vals.forEach(function (v, ci) {
         var x = L + ci * cw;
         var k = v > 0 ? 0.08 + 0.92 * Math.pow(v / mx, 0.55) : 0;
@@ -889,11 +888,11 @@
     [0, 0.5, 1].forEach(function (kk) {
       var y = by + bh - bh * kk;
       g += '<text x="' + (bx + bw + 5) + '" y="' + (y + 3.5) +
-        '" font-size="10" fill="#3B3A39">' + axisMoney(mx * kk) + '</text>';
+        '" font-size="10" fill="#1E2F4B">' + axisMoney(mx * kk) + '</text>';
     });
-    g += '<text x="' + bx + '" y="' + (by - 8) + '" class="t-note" font-size="10.5" fill="#3B3A39">Amount</text>';
+    g += '<text x="' + bx + '" y="' + (by - 8) + '" class="t-note" font-size="10.5" fill="#1E2F4B">Amount</text>';
     g += '<text x="' + (L + (W - L - R) / 2) + '" y="' + (H - 4) +
-      '" class="t-note" text-anchor="middle" font-size="10.5" fill="#605E5C">Category</text>';
+      '" class="t-note" text-anchor="middle" font-size="10.5" fill="#1E2F4B">Category</text>';
 
     $('#chHeat').innerHTML = svg(W, H, g);
   }

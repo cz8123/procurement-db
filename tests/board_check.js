@@ -506,8 +506,11 @@ async function waitFor(pg, fn, timeout, label) {
     // 口径：PA 只统计「框架协议方式申请」的采购单（视图 agg 里限定 Exception Reason）
     const faSql = await new Promise(resolve => {
       const { execFileSync } = require('child_process');
+      /* 用当前环境可用的 Python（sqlite3 是标准库，任意 Python 都行）；
+         不再写死某台机器的 venv 路径 */
+      const py = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
       try {
-        resolve(execFileSync('C:/Users/CONG ZHU/.workbuddy/binaries/python/envs/procurement/Scripts/python.exe',
+        resolve(execFileSync(py,
           ['-c', "import sqlite3;c=sqlite3.connect('procurement.db');print(c.execute(\"select sql from sqlite_master where name='vw_fa_analysis'\").fetchone()[0])"],
           { encoding: 'utf-8' }));
       } catch (e) { resolve(''); }
