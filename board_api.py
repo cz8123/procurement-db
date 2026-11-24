@@ -13,8 +13,10 @@
 """
 import csv
 import io
+import json
 import os
 import sqlite3
+import time
 
 from flask import Blueprint, Response, jsonify, request
 
@@ -27,6 +29,7 @@ board_bp = Blueprint("board", __name__, url_prefix="/api/board")
 FILTERS = {
     "brand": "Brand",
     "category": "Category",
+    "sub": "Sub-Category",
     "expense": "Expense Type",
     "level": "Supplier Category",
     "region": "Region_cn",
@@ -36,6 +39,28 @@ FILTERS = {
 }
 
 CP_METHODS = ("SS-Exempt", "SS-Non Exempt", "Tender")
+
+# 子类别面板点选的是「聚合值」：筛选必须比聚合值，否则下钻后一条都选不中。
+# 用单表相关子查询而不是 JOIN，dash_po 的每个查询都能直接用（244 行小表，代价可忽略）
+SUB_EXPR = ('COALESCE((SELECT m."采购子类别" FROM dim_agg_采购子类别 m '
+            'WHERE m."原始值" = p."Sub-Category"), p."Sub-Category")')
+# 只有 sub 需要换表达式，其余仍是裸列名（_id() 会加引号）
+FILTER_EXPR = {"sub": SUB_EXPR}
+
+# 区域图例统一英文：Region_en 里「二手车 / 多品牌」都写成 Others 会撞名，
+# 所以这里给一份全站唯一对照（取不到就回落中文原值）
+REGION_EN = {"中国区": "HO", "南区": "South", "西区": "West",
+             "超豪": "Super Luxury", "二手车": "Used Cars", "多品牌": "Multi-brand"}
+
+# 采购方式饼图的第二层：单一来源两种方式各自按「理由」聚合（走 dim_agg 映射）
+REASON_DRILL = {
+    "SS-Exempt": ("豁免单一来源的理由", "dim_agg_豁免单一来源的理由"),
+    "SS-Non Exempt": ("单一来源采购理由", "dim_agg_单一来源采购理由"),
+}
+REASON_FILTERS = {
+    "exempt_reason": "豁免单一来源的理由",
+    "single_reason": "单一来源采购理由",
+}
 RATES = {"RM": 1.5, "RMB": 1.0}
 
 # 主题色：取 Regional Sales Sample.pbip 的 Fidex 主题（蓝灰阶 + 主题 min/max）
@@ -95,7 +120,9 @@ def _cached(key, build):
 # 刷新一次页面会重复请求同一组参数（默认财年 + 无筛选），缓存后基本 0ms；
 # 一旦导入/改行改了 mtime，全部自动失效。
 _JSON_CACHE_PATHS = ("/api/board/data", "/api/board/top",
-                     "/api/board/contracts", "/api/board/options")
+                     "/api/board/contracts", "/api/board/options",
+                     "/api/board/detail", "/api/board/detail/values",
+                     "/api/board/method-drill")
 _JSON_CACHE_MAX = 40
 
 
@@ -124,6 +151,68 @@ def _json_cache_store(resp):
             _CACHE.pop(k, None)
     _CACHE[("resp", request.path) + _arg_key()] = (_db_stamp(), resp.get_data())
     return resp
+
+
+# ---------------------------------------------------------------------------
+# 启动预热
+#   首访的耗时不在 SQL 本身，而在「第一次读盘」：dash_po 全表扫描 +
+#   vw_fa_analysis 求值 + 供应商英文映射，刚开机/进程刚起时实测 5.9s。
+#   启动后用内部 test_client 把首屏那 4 个默认请求先算一遍，
+#   页面打开时直接命中整响应缓存（连同 SQLite 页缓存一起热起来）。
+#
+#   URL 必须与前端首访请求逐字一致——参数进了缓存键：
+#     data      = qs()                        → 只有 cur（fy 未选）
+#     top       = qs({category:'',method:''}) → 空值不下发，但此时 S.fy 已被
+#                 data 返回的 fy 填上，所以实际是 cur + fy（财年每次开年都会变，
+#                 故不能在常量里写死，跑完 data 再从响应里取 fy 拼）
+#     contracts = fcqs()                      → cur/page/size/sort/dir
+#   改前端默认参数（如默认排序）时同步这里，否则预热白做。
+# ---------------------------------------------------------------------------
+WARMUP_URLS = (
+    "/api/board/options",
+    "/api/board/data?cur=RMB",
+    "/api/board/contracts?cur=RMB&page=1&size=50&sort=start&dir=desc",
+)
+WARMUP_TOP = "/api/board/top?cur=RMB"
+
+
+def warm_up(app, log=print):
+    """把首屏默认请求跑一遍填满缓存。必须在后台线程调用（冷盘要 1-6s），
+    否则 serve_forever 会被挡住。返回 (成功数, 总数, 总用时秒)。"""
+    t_all = time.time()
+    ok = total = 0
+    client = app.test_client()
+
+    def hit(url):
+        nonlocal ok, total
+        total += 1
+        t0 = time.time()
+        try:
+            resp = client.get(url)
+        except Exception as e:  # noqa: BLE001
+            log("  预热 %s 失败：%s" % (url, e))
+            return None
+        if resp.status_code != 200:
+            log("  预热 %s → HTTP %s（未命中，跳过）" % (url, resp.status_code))
+            return None
+        ok += 1
+        log("  预热 %-56s %6.0fms" % (url, (time.time() - t0) * 1000))
+        return resp
+
+    fy = None
+    for url in WARMUP_URLS:
+        resp = hit(url)
+        if resp is not None and url.startswith("/api/board/data"):
+            try:
+                fy = (resp.get_json(silent=True) or {}).get("fy")
+            except Exception:  # noqa: BLE001
+                fy = None
+    # 前端在 data 返回后才知道当前财年，Top10 请求会带上它
+    hit(WARMUP_TOP + ("&fy=%s" % fy if fy else ""))
+
+    cost = time.time() - t_all
+    log("看板缓存预热完成：%d/%d，用时 %.1fs" % (ok, total, cost))
+    return ok, total, cost
 
 
 def _id(name):
@@ -198,8 +287,16 @@ def _filters(args):
         vals = [v for v in args.getlist(key) if v not in ("", None)]
         if not vals:
             continue
-        parts.append("%s IN (%s)" % (_id(col), ",".join("?" * len(vals))))
+        expr = FILTER_EXPR.get(key) or _id(col)
+        parts.append("%s IN (%s)" % (expr, ",".join("?" * len(vals))))
         params.extend(vals)
+    # 「理由」只存在于 fct_prpo（dash_po 无此列）：用单号子查询接入，避免每次查询都 JOIN
+    for key, col in REASON_FILTERS.items():
+        vals = [v for v in args.getlist(key) if v not in ("", None)]
+        if vals:
+            parts.append('p."No." IN (SELECT "表单编号" FROM fct_prpo WHERE %s IN (%s))'
+                         % (_id(col), ",".join("?" * len(vals))))
+            params.extend(vals)
     return parts, params
 
 
@@ -261,7 +358,9 @@ def _build_options(regs=()):
                "rows": c.execute('SELECT COUNT(*) FROM dash_po').fetchone()[0],
                "options": {}}
         for key, col in FILTERS.items():
-            if key == "supplier":                  # 4982 个值，前端走抽屉搜索，不进筛选下拉
+            # supplier 4982 个值，前端走抽屉搜索；sub 只在帕累托下钻时点选，
+            # 都不进筛选下拉，省掉一次全表 GROUP BY
+            if key in ("supplier", "sub"):
                 continue
             extra, extra_p = [], []
             # Company 是 Region 的下级：选中区域后只展示这些区域下的公司
@@ -332,7 +431,7 @@ def data():
              "v": row["cp"], "pv": prv.get("cp"), "sub": "SS / Tender"},
             {"k": "poSpend", "label": "PO Paid", "fmt": "money",
              "v": row["po_paid"], "pv": prv.get("po_paid"), "sub": "Actually paid"},
-            {"k": "txn", "label": "PR Count", "fmt": "int",
+            {"k": "txn", "label": "Orders", "fmt": "int",
              "v": row["txn"], "pv": prv.get("txn")},
             {"k": "suppliers", "label": "Suppliers", "fmt": "int",
              "v": row["suppliers"], "pv": prv.get("suppliers"), "sub": "unique"},
@@ -372,9 +471,9 @@ def data():
             if reg not in reg_sum:
                 reg_sum[reg] = [0.0] * 12
             reg_sum[reg][fm - 1] = round(reg_sum[reg][fm - 1] + v, 2)
-        # 区域按财年总额降序，图例与堆叠顺序稳定
+        # 区域按财年总额降序，图例与堆叠顺序稳定；l = 图例英文名（k 仍是中文，筛选照旧）
         order = sorted(reg_sum, key=lambda k: -sum(reg_sum[k]))
-        series = [{"k": k, "vals": reg_sum[k]} for k in order]
+        series = [{"k": k, "l": REGION_EN.get(k, k), "vals": reg_sum[k]} for k in order]
 
         # 上期总额序列（保留给口径说明/未来对比用；双柱图本身不再画虚线）
         prev_line = [0.0] * 12
@@ -407,11 +506,17 @@ def data():
             r["cum"] = round(acc / tot, 4) if tot else None
             r["share"] = round((r["v"] or 0) / tot, 4) if tot else None
         # 每个类别下的采购子类别（Table - 采购子类别 → dash_po."Sub-Category"）
+        # 子类别有聚合（dim_agg_采购子类别：244 个原始值 → 144 个聚合名），
+        # 表格与下钻一律用聚合值，和用户在管理台维护的映射保持同步
         # subMap = 金额最高的那一条（表格折叠态显示）；subsMap = 全部明细（展开时显示）
+        sbase = ('FROM dash_po p JOIN dash_calendar c ON p."Date"=c."Date" '
+                 'LEFT JOIN dim_agg_采购子类别 sm ON sm."原始值" = p."Sub-Category" '
+                 'WHERE ' + where)
         ssql = ('SELECT COALESCE(NULLIF(TRIM(p."Category"),\'\'),\'Unassigned\') cat, '
-                'COALESCE(NULLIF(TRIM(p."Sub-Category"),\'\'),\'Unassigned\') sub, '
+                'COALESCE(NULLIF(TRIM(sm."采购子类别"),\'\'), '
+                'NULLIF(TRIM(p."Sub-Category"),\'\'), \'Unassigned\') sub, '
                 'SUM(p."Total Price") v, COUNT(p."No.") n, '
-                'SUM(COALESCE(p."PO Paid",0)) po_paid ' + base +
+                'SUM(COALESCE(p."PO Paid",0)) po_paid ' + sbase +
                 ' GROUP BY 1,2 ORDER BY 1,3 DESC')
         spec["subs"] = ssql
         sub_map, subs_map = {}, {}
@@ -433,6 +538,16 @@ def data():
         dtot = sum((r["v"] or 0) for r in donut) or 0
         for r in donut:
             r["share"] = round((r["v"] or 0) / dtot, 4) if dtot else None
+
+        # ---------------- Chart 3b 采购方式环形（同口径：金额 & 占比）
+        msql = ('SELECT COALESCE(NULLIF(TRIM(p."Procurement Method"),\'\'),\'Unassigned\') k, '
+                'SUM(p."Total Price") v, COUNT(p."No.") n ' + base +
+                ' GROUP BY 1 ORDER BY v DESC')
+        spec["methodDonut"] = msql
+        mdonut = [dict(r) for r in c.execute(msql, params)]
+        mdtot = sum((r["v"] or 0) for r in mdonut) or 0
+        for r in mdonut:
+            r["share"] = round((r["v"] or 0) / mdtot, 4) if mdtot else None
 
         # ---------------- Chart 4/5 供应商 TopN
         tsql = ('SELECT COALESCE(NULLIF(TRIM(p."Supplier_cn"),\'\'),\'Unassigned\') k, '
@@ -475,7 +590,8 @@ def data():
             "status": {"txn": row["txn"], "suppliers": row["suppliers"],
                        "stores": row["stores"]},
             "kpi": kpi, "monthly": monthly, "pareto": pareto,
-            "donut": donut, "top": top, "heat": heat, "palette": PALETTE,
+            "donut": donut, "methodDonut": mdonut,
+            "top": top, "heat": heat, "palette": PALETTE,
             "spec": spec,
             # 当前生效的取数参数（供「计算逻辑」说明展示）
             "params": {
@@ -487,6 +603,45 @@ def data():
                 "cpMethods": list(CP_METHODS),
             },
         })
+    finally:
+        c.close()
+
+
+# ---------------------------------------------------- method drill (第二层)
+@board_bp.get("/method-drill")
+def method_drill():
+    """采购方式饼图第二层：SS-Exempt → 豁免理由、SS-Non Exempt → 单一来源理由。
+    单独接口按需取（放 /data 里会让每次整页刷新多跑两次全表 JOIN）。"""
+    mk = (request.args.get("method") or "").strip()
+    if mk not in REASON_DRILL:
+        return jsonify({"error": "unknown method"}), 400
+    c = con()
+    try:
+        fys = _fy_list(c)
+        fy = request.args.get("fy") or (fys[-1] if fys else None)
+        if not fy:
+            return jsonify({"error": "dash_po 为空"}), 400
+        cur, rate = _rate(request.args)
+        where, params = _scope(request.args, fy)
+        rcol, atbl = REASON_DRILL[mk]
+        rmap = {}
+        for a, raw in c.execute('SELECT %s, "原始值" FROM %s' % (_id(rcol), _id(atbl))):
+            rmap.setdefault(a, []).append(raw)
+        dbase = ('FROM dash_po p JOIN dash_calendar c ON p."Date"=c."Date" '
+                 'LEFT JOIN fct_prpo f ON f."表单编号"=p."No." '
+                 'LEFT JOIN (SELECT "原始值" src, %s agg FROM %s) m ON m.src = f.%s '
+                 'WHERE %s AND p."Procurement Method"=?'
+                 % (_id(rcol), _id(atbl), _id(rcol), where))
+        rsql = ('SELECT COALESCE(m.agg, NULLIF(TRIM(f.%s),\'\'), \'Unassigned\') k, '
+                'SUM(p."Total Price") v, COUNT(p."No.") n %s GROUP BY 1 ORDER BY v DESC'
+                % (_id(rcol), dbase))
+        rows = [dict(r) for r in c.execute(rsql, params + [mk])]
+        tot = sum((r["v"] or 0) for r in rows) or 0
+        for r in rows:
+            r["share"] = round((r["v"] or 0) / tot, 4) if tot else None
+            r["raws"] = rmap.get(r["k"], [])
+        return jsonify({"method": mk, "reason": rcol, "rows": rows,
+                        "total": round(tot, 2), "fy": fy, "cur": cur, "rate": rate})
     finally:
         c.close()
 
@@ -835,3 +990,180 @@ def contracts_csv():
     return Response(gen(), mimetype="text/csv",
                     headers={"Content-Disposition":
                              "attachment; filename*=UTF-8''%s" % urllib.parse.quote(fname)})
+
+
+# -------------------------------------------------------------------- detail
+# Detail 页大表格：区域 / 公司 / 类别 / 供应商 / 采购方法 / 说明 / PRPO金额 / PO Paid
+# 每列都可搜索（LIKE）、筛选（多选取值 / 数值区间）、排序；三级树 + 全集合计，不分页。
+DETAIL_TEXT = {
+    "region": "Region", "company": "Company", "category": "Category",
+    "supplier": "Supplier", "method": "Method",
+    # 豁免理由 / 单一来源理由 两列互斥（FY2627 同时非空 0 条），合并成一列
+    "reason": "Single Source Reason",
+}
+# 长文本列：只给「搜索」，不给取值勾选（说明有 4 万多种，勾选没意义）
+DETAIL_LONG = {"note"}
+DETAIL_EXPR = {
+    "region": 'p."Region_cn"',
+    "company": 'p."Company_cn"',
+    "category": 'p."Category"',
+    "supplier": 'p."Supplier_cn"',
+    "method": 'p."Procurement Method"',
+    # 豁免单一来源的理由 与 单一来源采购理由 不会同时出现，合并一列：
+    # 优先取 dim_agg 的聚合值，聚合表里没有该原始值就回落原文
+    "reason": ('COALESCE(mx."豁免单一来源的理由", f."豁免单一来源的理由", '
+               'ms."单一来源采购理由", f."单一来源采购理由")'),
+    # fct_prpo.说明 → dash_po."Note"（PRPO 的申请说明）
+    "note": 'p."Note"',
+    "amount": 'p."Total Price"',
+    "paid": 'COALESCE(p."PO Paid",0)',
+}
+DETAIL_SORTS = dict(DETAIL_EXPR)
+DETAIL_SELECT = ', '.join(
+    '%s %s' % (expr, key) for key, expr in DETAIL_EXPR.items())
+# fct_prpo."表单编号" 唯一（46,013/46,013），1:1 LEFT JOIN 不会放大行数；
+# 两张 dim_agg 的主键是原始值，也是 1:1
+DETAIL_BASE = ('FROM dash_po p JOIN dash_calendar c '
+               'ON p."Date"=c."Date" '
+               'LEFT JOIN fct_prpo f ON f."表单编号"=p."No." '
+               'LEFT JOIN dim_agg_豁免单一来源的理由 mx '
+               'ON mx."原始值"=f."豁免单一来源的理由" '
+               'LEFT JOIN dim_agg_单一来源采购理由 ms '
+               'ON ms."原始值"=f."单一来源采购理由" WHERE ')
+
+
+def _like_esc(v):
+    """LIKE 通配符转义，配合 SQL 的 ESCAPE '\\'。"""
+    return (str(v).replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_'))
+
+
+def _detail_extra(args, skip=None):
+    """每列的搜索 / 取值筛选 / 数值区间 → (WHERE 片段, 参数)。
+    skip 用于取值列表：排除自身那一列，否则选中某值后列表只剩自己。"""
+    parts, params = [], []
+    for key, expr in DETAIL_EXPR.items():
+        if key == skip:
+            continue
+        q = (args.get("q_" + key) or "").strip()
+        # 长文本列（说明）只支持全文搜索，不做取值勾选
+        if q and (key in DETAIL_TEXT or key in DETAIL_LONG):
+            parts.append("%s LIKE ? ESCAPE '\\'" % expr)
+            params.append("%" + _like_esc(q) + "%")
+        raw = args.get("f_" + key)
+        if raw and key in DETAIL_TEXT:
+            try:
+                vals = json.loads(raw)
+            except (ValueError, TypeError):
+                vals = None
+            if isinstance(vals, list) and vals:
+                vals = [str(v) for v in vals if str(v) != ""]
+                if vals:
+                    parts.append("%s IN (%s)" % (expr, ",".join("?" * len(vals))))
+                    params.extend(vals)
+        if key in ("amount", "paid"):
+            for side, op in (("min", ">="), ("max", "<=")):
+                raw = args.get(side + "_" + key)
+                if raw in (None, ""):
+                    continue
+                try:
+                    num = float(raw)
+                except (ValueError, TypeError):
+                    continue
+                parts.append("%s %s ?" % (expr, op))
+                params.append(num)
+    return parts, params
+
+
+def _detail_scope(args, fy, extra_parts, extra_params):
+    where, params = _scope(args, fy, extra_parts)
+    return where, params + extra_params      # _scope 不拼 extra 的参数，这里补上
+
+
+@board_bp.get("/detail")
+def detail():
+    """Detail 大表格：三级树（区域→公司→明细），一次返回筛选全集，不分页。
+    合计 / 区域小计 / 公司小计都按筛选全集算，前端只做折叠渲染。"""
+    c = con()
+    try:
+        fys = _fy_list(c)
+        fy = request.args.get("fy") or (fys[-1] if fys else None)
+        if not fy:
+            return jsonify({"error": "dash_po 为空，请先运行 dash_build.py"}), 400
+        cur, rate = _rate(request.args)
+        ep, ev = _detail_extra(request.args)
+        where, params = _detail_scope(request.args, fy, ep, ev)
+        base = DETAIL_BASE + where
+
+        tot = dict(c.execute(
+            'SELECT COUNT(*) n, SUM(%s) amount, SUM(%s) paid %s'
+            % (DETAIL_EXPR["amount"], DETAIL_EXPR["paid"], base), params).fetchone())
+        sort = DETAIL_SORTS.get(request.args.get("sort"), 'p."Date"')
+        dirn = "ASC" if request.args.get("dir") == "asc" else "DESC"
+        # 默认按区域升序，让同一区域/公司的行聚在一起；其余排序在组内生效
+        sql = ('SELECT ' + DETAIL_SELECT + ' ' + base +
+               ' ORDER BY %s %s, p."No." DESC' % (sort, dirn))
+        rows = [dict(r) for r in c.execute(sql, params)]
+        for r in rows:
+            for k in ("amount", "paid"):
+                r[k] = None if r[k] is None else round(r[k] / rate, 2)
+            for k in DETAIL_TEXT:
+                if r[k] is None:
+                    r[k] = ""
+            # 说明：表格只显示一行，全文走悬停浮窗。库里最长 2,367 字符，超过 500 的
+            # 只有 25 行，放开上限只多约 30KB，换来浮窗能给出完整说明
+            if r.get("note") is None:
+                r["note"] = ""
+            elif len(r["note"]) > 4000:
+                r["note"] = r["note"][:4000]
+        sums = {k: (None if tot.get(k) is None else round(tot[k] / rate, 2))
+                for k in ("amount", "paid")}
+        # 区域 / 公司分组行小计：按筛选全集算
+        rt = [dict(r) for r in c.execute(
+            'SELECT %s region, COUNT(*) n, SUM(%s) amount, SUM(%s) paid %s '
+            'GROUP BY 1 ORDER BY 3 DESC'
+            % (DETAIL_EXPR["region"], DETAIL_EXPR["amount"], DETAIL_EXPR["paid"], base), params)]
+        ct = [dict(r) for r in c.execute(
+            'SELECT %s region, %s company, COUNT(*) n, SUM(%s) amount, SUM(%s) paid %s '
+            'GROUP BY 1, 2 ORDER BY 1, 3 DESC'
+            % (DETAIL_EXPR["region"], DETAIL_EXPR["company"],
+               DETAIL_EXPR["amount"], DETAIL_EXPR["paid"], base), params)]
+        for group in (rt, ct):
+            for r in group:
+                r["region"] = r["region"] or ""
+                if "company" in r:
+                    r["company"] = r["company"] or ""
+                for k in ("amount", "paid"):
+                    r[k] = None if r[k] is None else round(r[k] / rate, 2)
+        return jsonify({"rows": rows, "total": int(tot["n"] or 0), "sums": sums,
+                        "regionTotals": rt, "companyTotals": ct,
+                        "fy": fy, "cur": cur, "rate": rate,
+                        "columns": list(DETAIL_TEXT) + ["note", "amount", "paid"]})
+    finally:
+        c.close()
+
+
+@board_bp.get("/detail/values")
+def detail_values():
+    """某一文本列的取值及次数（用于表头筛选面板，带搜索）。"""
+    col = request.args.get("col")
+    if col not in DETAIL_TEXT:
+        return jsonify({"error": "unknown column"}), 400
+    c = con()
+    try:
+        fys = _fy_list(c)
+        fy = request.args.get("fy") or (fys[-1] if fys else None)
+        ep, ev = _detail_extra(request.args, skip=col)
+        parts = list(ep)
+        params = list(ev)
+        q = (request.args.get("q") or "").strip()
+        if q:
+            parts.append("%s LIKE ? ESCAPE '\\'" % DETAIL_EXPR[col])
+            params.append("%" + _like_esc(q) + "%")
+        where, params = _detail_scope(request.args, fy, parts, params)
+        rows = c.execute(
+            'SELECT %s v, COUNT(*) n %s GROUP BY 1 ORDER BY n DESC LIMIT 200'
+            % (DETAIL_EXPR[col], DETAIL_BASE + where), params).fetchall()
+        return jsonify([{"v": (r["v"] if r["v"] is not None else ""), "n": r["n"]}
+                        for r in rows])
+    finally:
+        c.close()

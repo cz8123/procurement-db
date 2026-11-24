@@ -31,9 +31,15 @@ function chk(name, ok, detail) {
     const r = await page.evaluate(() => {
       const rs = performance.getEntriesByType('resource')
         .filter(x => /\/api\/board\//.test(x.name));
+      const norm = u => {
+        const a = new URL(u, location.origin);
+        const q = [...a.searchParams].map(p => p[0] + '=' + p[1]).sort().join('&');
+        return a.pathname.replace('/api/board', '') + (q ? '?' + q : '');
+      };
       return {
         n: rs.length,
         urls: rs.map(x => x.name.split('/api/board')[1].split('?')[0]),
+        full: rs.map(x => norm(x.name)).sort(),
         firstReady: Math.round(performance.now())
       };
     });
@@ -68,6 +74,23 @@ function chk(name, ok, detail) {
     chk('/contracts 行内不泄漏窗口列', warm.k.rows.every(x => Object.keys(x).every(k => k[0] !== '_')));
     chk('/contracts 仍带 types / bounds / supplier_en',
       (warm.k.types || []).length > 0 && !!warm.k.bounds.mn && !!warm.k.rows[0].supplier_en);
+
+    /* 启动预热（board_api.WARMUP_URLS）按这 4 条默认参数建缓存。
+       前端默认参数一改，预热就白做，所以这里把契约钉住。
+       Top10 会带上当前财年（开年就变），比较时把 fy 去掉，只比路径与其余参数。 */
+    console.log('=== 4. 首屏请求 == 启动预热 URL ===');
+    const stripFy = u => u.replace(/[?&]fy=[^&]*/, '').replace(/[?&]$/, '');
+    const got = r.full.map(stripFy).sort();
+    const WARM = [
+      '/options',
+      '/data?cur=RMB',
+      '/top?cur=RMB',
+      '/contracts?cur=RMB&dir=desc&page=1&size=50&sort=start'
+    ].sort();
+    console.log('    首屏 ' + JSON.stringify(r.full));
+    chk('首屏 URL 与 WARMUP_URLS 一致（忽略 fy）', JSON.stringify(got) === JSON.stringify(WARM),
+      { got: got, want: WARM });
+    chk('Top10 带上已解析的财年', r.full.some(u => /^\/top\?.*fy=/.test(u)), r.full);
 
     console.log('\n' + (fail ? 'FAILED ' + fail + ' / ' : 'ALL PASS ') + pass);
   } catch (e) {

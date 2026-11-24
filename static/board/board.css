@@ -19,6 +19,11 @@
   /* 画布 / 卡片 */
   --bg:#E7E9ED;
   --card:#FFFFFF;
+  /* 视觉对象卡片：底色略微透明，透出画布灰，层次比纯白轻一档
+     （弹层 / 筛选条仍用 --card 实色，避免半透明叠在图表上看不清） */
+  --card-a:rgba(255,255,255,.80);
+  /* 视觉对象标题：低饱和钢蓝，和正文黑拉开层次又不抢图表颜色 */
+  --title:#2E5177;
   --line:#D6DAE1;
   --line-2:#E9ECF1;
   /* 文字层级（主题里 card 标题与数值都是纯黑） */
@@ -99,8 +104,40 @@ h1,h2,h3,p{ margin:0; }
   font-family:Verdana,"Segoe UI","Microsoft YaHei UI",sans-serif;
   font-size:20px; font-weight:700; letter-spacing:.1px; color:#fff;
 }
-.hd-sub{ font-size:11.5px; color:rgba(255,255,255,.86); margin-top:3px; }
-.hd-r{ display:flex; align-items:center; gap:8px; flex:none; }
+.hd-sub{
+  font-size:11.5px; color:rgba(255,255,255,.86); margin-top:3px;
+  /* 副标题永远单行：换行会把顶栏从 68 顶到 74，窄屏下页签跟着错位 */
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
+}
+
+/* ---------------- 页签（参考 Power BI 页头：选中页白色上翻） ----------------
+   钉在顶栏**最右侧**；FY / 币种 / Export 移到中段（.hd-r 与 .pg-tabs 各占一个
+   auto margin，均分剩余空间）。只保留大标题（用户 11-24 要求去掉小标题行），
+   高度 50px、下沿与顶栏下沿齐平；切页只换 class，不改变顶栏高度。 */
+.pg-tabs{
+  display:flex; align-items:stretch; gap:3px; height:50px;
+  margin-left:auto; flex:0 1 auto; min-width:0;
+  /* 顶栏上下各有 9px 内边距；页签下移 9px 后，下沿与顶栏下沿（= KPI 顶边）齐平。
+     relative 偏移不占布局高度，顶栏仍是 68px。 */
+  position:relative; top:9px;
+}
+.pg-tab{
+  width:clamp(132px,9vw,176px); height:50px; padding:0; border:0;
+  background:transparent; cursor:pointer; flex:0 0 auto;
+  color:#2A3542; font-family:var(--font-semi);
+}
+.pg-tab-top{
+  display:flex; align-items:center; justify-content:center; height:50px;
+  background:#A9B1BC; border-radius:6px 6px 0 0;
+  font-size:14px; font-weight:700; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; padding:0 8px;
+  transition:background .12s ease;
+}
+.pg-tab:hover:not(.on) .pg-tab-top{ background:#BEC5CE; }
+.pg-tab.on .pg-tab-top{ background:#fff; color:#0E1720; }
+.pg-tab:focus-visible{ outline:2px solid #FF6B12; outline-offset:-2px; }
+
+.hd-r{ display:flex; align-items:center; gap:8px; flex:none; margin-left:auto; }
 
 .sel{ display:flex; align-items:center; gap:6px; font-size:12px; color:rgba(255,255,255,.9); }
 .sel select{
@@ -244,6 +281,7 @@ h1,h2,h3,p{ margin:0; }
 .fpop-h .fh-note{
   font-style:normal; font-weight:500; color:var(--faint); margin-left:5px; font-size:11px;
 }
+.fh-acts{ display:inline-flex; gap:10px; flex:0 0 auto; }
 .fpop-h a{ color:var(--blue); cursor:pointer; text-decoration:none; font-weight:600; }
 .fpop-h a:hover{ text-decoration:underline; }
 .fpop-b{ overflow:auto; padding:3px 0; min-height:0; }
@@ -297,12 +335,12 @@ h1,h2,h3,p{ margin:0; }
 .g3{ grid-column:span 3; }   /* 辅图：支出类型环形 */
 
 .card{
-  background:var(--card); border:1px solid var(--line); border-radius:var(--r);
+  background:var(--card-a); border:1px solid rgba(30,47,75,.10); border-radius:var(--r);
   box-shadow:var(--shadow); display:flex; flex-direction:column; min-width:0;
 }
 .card-h{
   display:flex; align-items:center; justify-content:space-between; gap:10px;
-  padding:11px 14px 2px; flex-wrap:wrap;
+  padding:11px 14px 2px; flex-wrap:nowrap;
   /* 固定高度：返回图标（22px）出现时不会把标题栏顶高，图表自身不会下移 2px */
   min-height:32px;
 }
@@ -310,7 +348,7 @@ h1,h2,h3,p{ margin:0; }
    （min-width:0 让标题先让位，工具组永不换行；极端窄屏才回落到 wrap） */
 .card-h h2{
   font-family:var(--font-semi);
-  font-size:15.5px; font-weight:600; color:var(--ink); letter-spacing:.1px;
+  font-size:15.5px; font-weight:600; color:var(--title); letter-spacing:.1px;
   flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .card-tools{ display:flex; align-items:center; gap:7px; flex-wrap:nowrap; flex:0 0 auto;
@@ -325,21 +363,62 @@ h1,h2,h3,p{ margin:0; }
 }
 .lg-row .lg{ flex:0 1 auto; min-width:0; overflow:hidden; flex-wrap:nowrap; }
 
-/* 视觉对象「返回」：Power BI 视觉对象头部那种小图标按钮（无边框、灰、悬浮才亮）
-   只在「这张图造成的筛选」生效时出现，点一下回到全量视图。
-   放在工具栏最后一位（PBI 头部图标位）；月度图外面包一层等宽 .v-slot，
-   保证它出现/消失时 Region / Total vs Framework 不位移。 */
-.v-back{
+/* 视觉对象头部图标组（Power BI 模式）：上钻 / 下钻 / 展开下一级 / 筛选 / 突出显示
+   全部是无边框小图标，悬浮才亮底；只在能力可用时出现，避免挤占标题。 */
+.v-tools{ display:inline-flex; align-items:center; gap:2px; flex:0 0 auto; }
+.v-ico{
   width:22px; height:22px; flex:0 0 auto; padding:0;
   display:inline-flex; align-items:center; justify-content:center;
   border:0; border-radius:2px; background:transparent;
   color:#5B6473; cursor:pointer;
   transition:background .12s ease, color .12s ease;
 }
-.v-back[hidden]{ display:none; }
-.v-back:hover{ background:#E8EDF4; color:var(--navy); }
-.v-back:active{ background:#DCE4EE; }
+.v-ico[hidden]{ display:none; }
+.v-ico:hover{ background:#E8EDF4; color:var(--navy); }
+.v-ico:active{ background:#DCE4EE; }
+.v-ico:disabled{ color:#C2C8D2; cursor:default; background:transparent; }
+.v-ico.on{ background:#DCE6F2; color:var(--navy); }
+.v-ico svg{ width:14px; height:14px; display:block; }
+/* 突出显示关闭（= 筛选模式）时图标转为淡灰，一眼看出当前模式 */
+.v-ico.v-hl.off{ color:#9AA4B2; }
+.v-ico.v-hl.off:hover{ color:var(--navy); }
+/* 月度图返回图标外面包一层等宽位，出现/消失时 Region 按钮不位移 */
 .v-slot{ width:22px; height:22px; flex:0 0 auto; display:inline-flex; }
+.v-sep{ width:1px; height:14px; background:#DDE2EA; margin:0 3px; flex:0 0 auto; }
+
+/* 视觉对象筛选浮层：列出影响这张图的切片器与筛选器（PBI 头部漏斗） */
+.vt-pop{
+  position:fixed; z-index:70; width:268px; background:var(--card);
+  border:1px solid #D3D9E2; box-shadow:0 12px 30px rgba(16,32,56,.20);
+  padding:11px 12px 12px; font-size:12px; color:var(--ink);
+}
+.vt-pop[hidden]{ display:none; }
+.vt-pop .vt-h{
+  display:flex; align-items:center; gap:7px;
+  font-weight:600; font-size:12px; color:var(--ink);
+  padding-bottom:8px; margin-bottom:8px; border-bottom:1px solid #E5E9F0;
+}
+.vt-pop .vt-h svg{ width:13px; height:13px; color:#5B6473; flex:0 0 auto; }
+.vt-pop .vt-g{ font-size:10.5px; font-weight:700; letter-spacing:.3px;
+  text-transform:none; color:var(--note); margin:9px 0 5px; }
+.vt-pop .vt-g:first-of-type{ margin-top:0; }
+.vt-pop .vt-row{
+  background:#F2F4F7; border:1px solid #E4E8EF; border-radius:2px;
+  padding:5px 8px 6px; margin-bottom:5px;
+}
+.vt-pop .vt-row:last-child{ margin-bottom:0; }
+.vt-pop .vt-row b{ display:block; font-weight:600; font-size:11.5px; color:var(--ink);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.vt-pop .vt-row span{ display:block; font-size:11px; color:var(--ink-2);
+  margin-top:2px; word-break:break-word; }
+.vt-pop .vt-row.mine{ background:#E9F0F9; border-color:#CFDDEE; }
+.vt-pop .vt-none{ color:var(--note); font-size:11.5px; padding:3px 0 1px; }
+
+/* 突出显示：未命中当前选择的图元淡化（PBI highlight），布局与位置完全不动 */
+.dv{ opacity:.22; }
+/* 文字类（图例 / 表格行）留得多一点，否则完全读不出来 */
+.legend-list .dv, .lg .dv{ opacity:.4; }
+tr.dv{ opacity:.45; }
 /* 卡片内的图示切换（月度图：区域堆叠 / 双柱对比） */
 .seg-sw{ display:inline-flex; border:1px solid #C8C8C8; overflow:hidden; }
 .seg-sw button{
@@ -381,7 +460,23 @@ rect.seg, rect.pbar, rect.pseg, .dseg, .trow, .hcell, .cd-row{ cursor:pointer; }
   display:flex; flex-wrap:wrap; gap:6px 13px;
   padding:0 13px 12px; font-size:11.5px; font-weight:600; color:var(--axis);
 }
-.legend-list .li{ display:flex; align-items:center; gap:6px; cursor:pointer; }
+/* 环形图图例：固定高度，点扇区筛到单类时图例少一行也不顶动下方卡片。
+   下钻到理由层会从 6 项变 8 项、且理由名更长 —— 用两列网格排布，
+   8 项正好 4 行；再多就框内滚动，绝不溢出卡片或把最后一行切一半。 */
+.g3 .legend-list{
+  height:80px; align-content:flex-start;
+  display:grid; grid-template-columns:1fr 1fr; gap:4px 10px;
+  overflow-y:auto; overflow-x:hidden;
+  scrollbar-width:thin;
+}
+.g3 .legend-list::-webkit-scrollbar{ width:6px; }
+.g3 .legend-list::-webkit-scrollbar-thumb{ background:#CBD3DE; border-radius:3px; }
+.legend-list .li{ display:flex; align-items:center; gap:6px; cursor:pointer;
+  min-width:0; max-width:100%; overflow:hidden; }
+/* 理由名很长（Internal Asset Transfer）时截断，避免把图例横向撑出去 */
+.legend-list .li .lb{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  flex:1 1 auto; min-width:0; }
+.legend-list .li .pc{ flex:0 0 auto; }
 .legend-list .li:hover{ color:var(--ink); }
 .legend-list .li i{ width:10px; height:10px; border-radius:0; }
 .legend-list .li b{ font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
@@ -389,6 +484,7 @@ rect.seg, rect.pbar, rect.pseg, .dseg, .trow, .hcell, .cd-row{ cursor:pointer; }
 
 /* ---------------- 表格 / 矩阵（表头深藏青白字，同示例矩阵） ---------------- */
 .tbl-wrap{ overflow:auto; max-height:400px; padding:0; }
+#pgFramework .tbl-wrap{ flex:1 1 auto; min-height:0; max-height:none; }
 .tbl{ width:100%; border-collapse:collapse; font-size:12.5px; }
 .tbl thead th{
   position:sticky; top:0; background:var(--hdr-bg); z-index:2;
@@ -554,7 +650,13 @@ body.drawer-open{ overflow:hidden; }
 .remain.none i{ background:#BFC5CE; }
 
 /* ---------------- 类别明细表（参考 AdventureWorks「Product details」） ---------------- */
-.cd-wrap{ padding:2px 8px 10px; overflow:auto; }
+/* 类别明细卡与同排的「Top 10 Suppliers × Category」等高：
+   卡片被拉高后，让 .cd-wrap 吃掉剩余高度，表格由 fitCatTable() 撑满，
+   合计行才会贴着卡片底边（两张卡的下沿横线对齐） */
+/* 只拉长类别卡（默认比右侧热力卡矮 60px 左右）；热力卡保持自身高度，
+   展开子类别把类别卡撑高时，不至于让右侧矩阵下面空一大片 */
+#catCard{ align-self:stretch; }
+.cd-wrap{ padding:2px 8px 10px; overflow:auto; flex:1 1 auto; min-height:0; }
 .cd-tbl{ width:100%; border-collapse:collapse; table-layout:fixed; font-size:12.5px; }
 .cd-tbl thead th{
   text-align:left; font-weight:600; color:#122745; font-size:12px;
@@ -651,8 +753,18 @@ body.drawer-open{ overflow:hidden; }
      这里降到 4 列两行，数值完整可读 */
   .kpis{ grid-template-columns:repeat(4,1fr); }
 }
+@media (max-width:1600px){
+  /* 页签占掉顶栏中段，标题/副标题缩一档，避免副标题折行把顶栏从 68px 顶到 86px */
+  .hd h1{ font-size:17px; }
+  .hd-sub{ font-size:10.5px; }
+  .hd-logo{ height:28px; }
+}
 @media (max-width:1280px){
   :root{ --pad:24px; }
+  .hd h1{ font-size:15.5px; }
+  .hd-sub{ font-size:10px; }
+  .pg-tab{ width:112px; }
+  .pg-tab-top{ font-size:12px; }
   .kpis{ grid-template-columns:repeat(4,1fr); }
   .g9,.g8,.g7,.g6,.g5,.g4,.g3{ grid-column:span 12; }
   .fc-summary{ grid-template-columns:repeat(3,1fr); }
@@ -766,3 +878,119 @@ body.drawer-open{ overflow:hidden; }
 }
 .fdrop:hover .spec-btn{ opacity:1; }
 .fdrop .spec-btn:hover{ opacity:1; }
+
+/* ---------------- 多页面容器（Overview / Detail / Framework） ---------------- */
+main[hidden], .page[hidden], .fbar[hidden], .kpis[hidden]{ display:none !important; }
+.page{ padding:10px var(--pad) 32px; }
+/* Detail / Framework 表格页：KPI 与全局筛选已隐藏，固定区只剩 68px 顶栏；
+   卡片与滚动容器撑满视口剩余高度，表格不再只占页面上半部。 */
+#pgDetail, #pgFramework{ height:calc(100vh - 68px); display:flex; flex-direction:column; }
+#pgDetail > .card, #pgFramework > .card{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+/* 卡片头 / 摘要 / 分页条保持自身高度，只让表格滚动容器伸缩 */
+#pgDetail > .card > .card-h, #pgFramework > .card > .card-h,
+#pgFramework .fc-summary, .pager{ flex:0 0 auto; }
+.fw-intro{ padding:14px 16px; margin-bottom:12px; }
+.fw-intro p{ font-size:12px; color:var(--note); margin-top:4px; }
+
+/* ---------------- Detail 大表格 ----------------
+   参考商务报表：紧凑行高、浅蓝表头、细网格、数值列淡色数据条、底部合计。 */
+.dt-card{ background:#fff; }
+.dt-meta{ font-size:11.5px; color:var(--note); }
+.dt-wrap{ position:relative; flex:1 1 auto; min-height:0; margin:6px 12px 0; overflow:auto; }
+.dt-tbl{ width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed; font-size:12px; }
+.dt-tbl thead th{
+  position:sticky; top:0; z-index:3; height:34px; padding:0 2px 0 8px;
+  background:var(--hdr-bg); color:#122745; border:0;
+  border-right:1px solid rgba(18,39,71,.12); border-bottom:1px solid var(--hdr-line);
+  font-size:12px; font-weight:600; text-align:left; white-space:nowrap;
+}
+.dt-tbl thead th:last-child{ border-right:0; }
+.dt-th{ display:flex; align-items:center; gap:2px; }
+.dt-sort{ flex:1 1 auto; min-width:0; cursor:pointer; user-select:none;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dt-sort:hover{ color:#0E385E; }
+.dt-arrow{ display:inline-block; width:8px; font-size:9px; color:#5B6473; }
+.dt-funnel{
+  flex:0 0 auto; width:20px; height:20px; padding:0; border:0; background:transparent;
+  color:#122745; cursor:pointer; font-size:11px; line-height:20px; text-align:center;
+}
+.dt-funnel:hover{ background:rgba(255,255,255,.55); }
+.dt-funnel.on{ background:#1E3A63; color:#fff; }
+.dt-tbl td{
+  position:relative; padding:5px 9px; border-bottom:1px solid #E6EAF0;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--ink-2);
+}
+.dt-tbl tbody tr:hover td{ background:#F4F7FB; }
+.dt-tbl td.num{ text-align:right; font-variant-numeric:tabular-nums; }
+.dt-tbl td.num > span{ position:relative; z-index:1; }
+.dt-bar{ position:absolute; z-index:0; top:2px; bottom:2px; left:0; background:#DCE7F5; }
+.dt-bar.paid{ background:#D7EBE5; }
+.dt-tbl tfoot td{
+  position:sticky; bottom:0; z-index:2; background:#EDF2F8; font-weight:700; color:#122745;
+  border-top:1px solid var(--hdr-line); border-bottom:0;
+}
+/* 区域分组行：− / + 折叠，粗体浅蓝底；子行缩进并带树形符号 */
+.dt-tbl tr.dt-group td{ background:#E9EFF7; font-weight:700; color:#122745; }
+.dt-tbl tr.dt-group td:first-child{ white-space:nowrap; }
+.dt-tbl tr.dt-group .dt-gmeta{ color:#5B6473; font-size:11px; font-weight:600; }
+.dt-gn{ font-style:normal; font-size:10.5px; color:#5B6473; margin-left:7px; font-weight:600; }
+.dt-toggle{
+  display:inline-block; width:16px; height:16px; margin-right:6px; padding:0;
+  border:1px solid #A9B9CF; background:#fff; color:#1E3A63; border-radius:0;
+  font-size:12px; line-height:14px; text-align:center; cursor:pointer; vertical-align:middle;
+}
+.dt-toggle:hover{ background:#D9E5F4; }
+/* 公司分组行：二级树，浅一档底色；公司名在 Company 列 */
+.dt-tbl tr.dt-company td{ background:#F2F6FB; font-weight:600; color:#173A60; }
+.dt-tbl tr.dt-company td:first-child{ background:#EDF2F8; }
+.dt-tbl tr.dt-company .dt-gmeta{ color:#66758A; font-size:10.5px; font-weight:600; }
+.dt-tbl tr.dt-company .dt-gn{ color:#66758A; }
+.dt-tbl tr.dt-company .dt-toggle{ width:15px; height:15px; line-height:13px; font-size:11px; }
+.dt-tbl tr.dt-child td:nth-child(2){ padding-left:20px; }
+.dt-tbl tr.dt-child td.dt-tree{ text-align:center; color:#9AA6B5; }
+/* 说明列：永远单行 + 省略号（全文在 title 里），tab 形宽度不会被长文本撑开 */
+.dt-tbl td.dt-note{
+  max-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  color:var(--ink-2);
+}
+.dt-tbl tr.dt-company td.dt-tree{ text-align:center; color:#9AA6B5; padding-left:8px; }
+.dt-empty{ padding:28px; text-align:center; color:var(--note); }
+
+/* 单元格悬停浮窗：fixed 挂 body，不受表格横向滚动/裁剪影响；pre-wrap 保留说明里的换行 */
+.dt-tip{
+  position:fixed; z-index:130; left:0; top:0; max-width:440px; max-height:300px;
+  overflow:auto; padding:8px 11px; background:#fff;
+  border:1px solid #C9D4E3; box-shadow:0 10px 26px rgba(16,28,48,.24);
+  font-size:12px; line-height:1.55; color:var(--ink);
+  white-space:pre-wrap; word-break:break-word; pointer-events:none;
+}
+.dt-tip[hidden]{ display:none; }
+
+/* 表头筛选浮层（挂在 body，不受表格滚动容器裁剪） */
+.dt-pop{
+  position:fixed; z-index:80; width:270px; padding:9px;
+  background:#fff; border:1px solid #C9D4E3; box-shadow:0 8px 22px rgba(16,28,48,.20);
+  color:var(--ink-2);
+}
+.dt-pop[hidden]{ display:none; }
+.dt-pop .dt-pt{ font-size:11.5px; font-weight:700; color:#122745; margin-bottom:6px; }
+.dt-pop input[type=search], .dt-pop input[type=number]{
+  width:100%; border:1px solid #CBD5E2; padding:4px 7px; font-size:12px; outline:none;
+  background:#fff; color:var(--ink);
+}
+.dt-pop input:focus{ border-color:#5E86B8; }
+.dt-pop .dt-range{ display:flex; align-items:center; gap:5px; }
+.dt-pop .dt-range span{ color:var(--note); font-size:11px; }
+.dt-pop .dt-list{ max-height:230px; overflow:auto; margin:7px 0; border:1px solid #E3E8F0; }
+.dt-pop .dt-list label{
+  display:flex; align-items:center; gap:6px; padding:3px 6px; font-size:11.5px; cursor:pointer;
+}
+.dt-pop .dt-list label:hover{ background:#F1F5FA; }
+.dt-pop .dt-list label span{ flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dt-pop .dt-list i{ font-style:normal; color:#7D8797; font-size:10.5px; }
+.dt-pop .dt-none{ padding:10px; font-size:11px; color:var(--note); text-align:center; }
+.dt-pop .dt-acts{ display:flex; justify-content:flex-end; gap:6px; }
+.dt-pop .btn{ font-size:11.5px; padding:3px 10px; }
+@media (max-width:1280px){
+  .dt-wrap{ max-height:none; }
+}

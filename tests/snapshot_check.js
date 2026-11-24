@@ -113,6 +113,34 @@ async function waitFor(pg, fn, timeout, label) {
     chk('中位周期按天', /\bd$/.test(k0.days || ''), k0.days);
     chk('帕累托 11 类', await count('#chPareto rect.pbar') === 11, await count('#chPareto rect.pbar'));
     chk('环形 4 类', await count('#chDonut [data-exp]') === 4, await count('#chDonut [data-exp]'));
+    const mdApi = await page.evaluate(async () => {
+      const r = await fetch('/api/board/data?cur=RMB'); return (await r.json()).methodDonut.length;
+    });
+    chk('离线采购方式环形 = 在线条数', await count('#chMethodDonut [data-exp]') === mdApi,
+      { offline: await count('#chMethodDonut [data-exp]'), api: mdApi });
+    /* 售后下钻：离线也应能切到豁免理由层（扇区数与在线接口一致） */
+    const drillOffline = await page.evaluate(async () => {
+      const el = [...document.querySelectorAll('#chMethodDonut [data-exp]')]
+        .find(e => e.dataset.exp === 'SS-Exempt');
+      if (!el) return null;
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      const r = await fetch('/api/board/method-drill?method=SS-Exempt&cur=RMB');
+      const j = await r.json();
+      const t0 = Date.now();
+      while (Date.now() - t0 < 5000 &&
+        document.querySelectorAll('#chMethodDonut [data-exp]').length < 2) {
+        await new Promise(x => setTimeout(x, 100));
+      }
+      return {
+        title: document.getElementById('mDonutTitle').textContent,
+        segs: document.querySelectorAll('#chMethodDonut [data-exp]').length,
+        apiRows: (j.rows || []).length,
+        first: ((j.rows || [])[0] || {}).k
+      };
+    });
+    console.log('    ' + JSON.stringify(drillOffline));
+    chk('离线也能下钻到豁免理由层', !!drillOffline && /Exemption Reason/.test(drillOffline.title) &&
+      drillOffline.segs === drillOffline.apiRows && drillOffline.apiRows >= 5, drillOffline);
     chk('热力 80 格', await count('#chHeat .hcell') === 80, await count('#chHeat .hcell'));
     chk('Top10 10 条', await count('#chTop .trow') === 10, await count('#chTop .trow'));
     chk('协议表默认 50 行', await count('#fcTbl tbody tr') === 50, await count('#fcTbl tbody tr'));
@@ -168,8 +196,10 @@ async function waitFor(pg, fn, timeout, label) {
       chk('协议表供应商英文名与在线一致',
         pairs.length > 0 && pairs.every(x => x.cell === x.en),
         pairs.filter(x => x.cell !== x.en).slice(0, 2));
+      /* 具体英文后缀随源数据版本变，只验证「连写被还原成带空格」 */
       chk('离线也补回了被吞掉的空格',
-        pairs.some(x => /Dongguan Zhongfan auto supplies/i.test(x.cell)),
+        pairs.some(x => /Dongguan Zhongfan /i.test(x.cell)) &&
+        !pairs.some(x => /DongguanZhongfan/i.test(x.cell)),
         pairs.slice(0, 2).map(x => x.cell));
     } else {
       chk('（服务未启动，跳过供应商英文名比对）', true);
@@ -259,6 +289,9 @@ async function waitFor(pg, fn, timeout, label) {
       csv1.trim().split('\r\n').length === Number(kv('txn').v) + 1,
       [csv1.trim().split('\r\n').length, Number(kv('txn').v) + 1]);
     await page.evaluate(() => { window.__csv = null; });
+    /* 协议卡已移到 Framework 页，导出按钮要先切到该页才可点击 */
+    await page.click('.pg-tab[data-page=framework]');
+    await sleep(400);
     await page.click('#fcExport');
     await waitFor(page, () => !!window.__csv, 9000, '协议 CSV');
     const csv2 = await page.evaluate(() => window.__csv);
@@ -266,6 +299,29 @@ async function waitFor(pg, fn, timeout, label) {
       csv2.trim().split('\r\n').length === LC.total + 1,
       [csv2.trim().split('\r\n').length, LC.total + 1]);
     chk('协议 CSV 表头英文', /Contract,Supplier/.test(csv2), csv2.slice(0, 40));
+
+    console.log('=== 5b. 离线 Detail：说明列 ===');
+    await page.click('.pg-tab[data-page=detail]');
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-group').length > 0,
+      12000, 'offline detail');
+    const dtOff = await page.evaluate(() =>
+      [...document.querySelectorAll('#dtTbl thead th')].map(t => t.textContent.trim()));
+    await page.evaluate(() => document.querySelector('#dtTbl tr.dt-group .dt-toggle').click());
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tr.dt-company').length > 0, 8000, 'offline company');
+    await page.evaluate(() => document.querySelector('#dtTbl tr.dt-company .dt-toggle').click());
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tr.dt-child').length > 0, 8000, 'offline child');
+    const noteOff = await page.evaluate(() => {
+      const td = document.querySelector('#dtTbl tr.dt-child td.dt-note');
+      return td ? { text: td.textContent.trim(), tip: td.getAttribute('data-tip') || '',
+                    ellipsis: getComputedStyle(td).textOverflow,
+                    hasTipBox: !!document.querySelector('#dtTip') } : null;
+    });
+    chk('离线 Detail 9 列，理由紧跟方法、Note 在理由之后',
+      dtOff.length === 9 && dtOff[5].indexOf('Single Source Reason') === 0 &&
+      dtOff[6].indexOf('Note') === 0, dtOff);
+    chk('离线说明也是单行 + 省略号 + data-tip（悬停浮窗同构）',
+      !!noteOff && noteOff.ellipsis === 'ellipsis' && noteOff.hasTipBox &&
+      noteOff.text.length > 0 && noteOff.tip.length > 0, noteOff);
 
     console.log('=== 6. 运行期错误 ===');
     chk('全程 0 JS 报错', errs.length === 0, errs.slice(0, 3));

@@ -49,6 +49,8 @@ DB_PATH = db.DB_PATH
 KNOWN_TABLES = {t for t, _, _ in db.FILE_MAP.values()}
 # 单独导入维护的维度表（非 FILE_MAP 批量导入来源），需在此显式注册
 KNOWN_TABLES.add("fct_company_location")
+# 供应商名称归并映射（supplier_dedup.py 生成）
+KNOWN_TABLES.add("dim_supplier_alias")
 
 # 表名 -> (中文简称, 一句话说明)  —— 供前端展示与检索使用
 TABLE_LABELS = {
@@ -62,6 +64,7 @@ TABLE_LABELS = {
     "dim_supplier_attribute_detail": ("供应商属性明细", "供应商属性明细项"),
     "dim_exception_reason": ("豁免理由", "单一来源 / 豁免理由字典"),
     "dim_expense_type": ("支出类型", "支出类型（CAPEX / OPEX 等）"),
+    "dim_supplier_alias": ("供应商别名", "供应商名称变体 → 规范名（空格/大小写/标点归并）"),
     # 事实 / 交易表
     "fct_supplier": ("供应商列表", "供应商准入 / 资格提交记录（事实表）"),
     "fct_preapproval": ("集采前置审批", "集采项目前置审批单"),
@@ -338,9 +341,14 @@ def _req_token():
             or request.cookies.get("dbadmin_token") or "")
 
 
+# 预热线程用内部 test_client 打自己的接口，没有 token/cookie；
+# 用线程局部标记放行，避免设了口令时预热全被挡成 401。
+_WARMUP_TLS = threading.local()
+
+
 @app.before_request
 def _access_guard():
-    if not ACCESS_TOKEN:
+    if not ACCESS_TOKEN or getattr(_WARMUP_TLS, "on", False):
         return None
     tok = _req_token()
     if tok and hmac.compare_digest(tok, ACCESS_TOKEN):
@@ -4000,5 +4008,20 @@ if __name__ == "__main__":
     # 服务就绪后自动打开浏览器（设 BROWSER=0 可关闭，适合无界面环境）
     if os.environ.get("BROWSER", "1") != "0":
         threading.Timer(1.0, lambda: webbrowser.open(open_url)).start()
+
+    # 首屏缓存预热：起后台线程把看板的 4 个默认接口先算一遍，
+    # 用户打开页面时直接命中缓存（冷盘首访 5.9s → 约 0.2s）。WARMUP=0 可关闭。
+    if os.environ.get("WARMUP", "1") != "0":
+        def _warm_board():
+            _WARMUP_TLS.on = True
+            try:
+                from board_api import warm_up
+                warm_up(app, log=print)
+            except Exception as _e:  # noqa: BLE001
+                print("！看板缓存预热失败：%s" % _e)
+            finally:
+                _WARMUP_TLS.on = False
+        threading.Thread(target=_warm_board, name="board-warmup", daemon=True).start()
+
     SERVER = make_server(host, port, app, threaded=True)
     SERVER.serve_forever()

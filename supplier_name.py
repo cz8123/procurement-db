@@ -78,9 +78,16 @@ def english_variants(con) -> dict:
 
 
 def _distinct_names(con):
-    """库里出现过的供应商名字（两处都是「中文-English」写法）。"""
+    """库里出现过的供应商名字（「中文-English」写法）。
+
+    dash_po 存的是归并后的规范名（连写变体已被合并掉），补空格的依据必须回到
+    fct_po / fct_prpo 的原始 `供应商名称`，否则像 DongguanZhongfan… 这类连写
+    找不到「有空格的标准写法」，协议表就补不回来。
+    """
     sqls = ('SELECT DISTINCT "Supplier_cn" FROM dash_po WHERE "Supplier_cn" IS NOT NULL',
-            'SELECT DISTINCT "Vendor Name" FROM fct_supplier WHERE "Vendor Name" IS NOT NULL')
+            'SELECT DISTINCT "Vendor Name" FROM fct_supplier WHERE "Vendor Name" IS NOT NULL',
+            'SELECT DISTINCT "供应商名称" FROM fct_po WHERE "供应商名称" IS NOT NULL',
+            'SELECT DISTINCT "供应商名称" FROM fct_prpo WHERE "供应商名称" IS NOT NULL')
     for sql in sqls:
         try:
             for r in con.execute(sql):

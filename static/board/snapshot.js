@@ -23,7 +23,7 @@
     return o;
   });
 
-  var FILTER_KEYS = ['brand', 'category', 'expense', 'level', 'region',
+  var FILTER_KEYS = ['brand', 'category', 'sub', 'expense', 'level', 'region',
                      'company', 'method', 'supplier'];
 
   function readFilters(sp) {
@@ -32,10 +32,18 @@
       var v = sp.getAll(k).filter(function (x) { return x !== '' && x != null; });
       if (v.length) o[k] = v;
     });
+    /* 单一来源理由：在线在后端用 fct_prpo 子查询，离线用行内 exc / ssr 两列 */
+    [['exempt_reason', 'exc'], ['single_reason', 'ssr']].forEach(function (p) {
+      var v = sp.getAll(p[0]).filter(function (x) { return x !== '' && x != null; });
+      if (v.length) o[p[0]] = v;
+    });
     return o;
   }
   function pass(r, f) {
-    for (var k in f) if (f[k].indexOf(r[k]) < 0) return false;
+    for (var k in f) {
+      var v = k === 'exempt_reason' ? r.exc : (k === 'single_reason' ? r.ssr : r[k]);
+      if (f[k].indexOf(v) < 0) return false;
+    }
     return true;
   }
   function pick(fy, f) {
@@ -108,7 +116,8 @@
       labels: Array.from({ length: 12 }, function (_, i) { return monthLabel(i + 1); }),
       labelsLong: Array.from({ length: 12 }, function (_, i) { return MON_LONG[(i + 6) % 12]; }),
       series: keys.map(function (k) {
-        return { k: k, vals: series[k].map(function (v) { return r2(v); }) };
+        var en = (S.regionEn || {})[k] || k;
+        return { k: k, l: en, vals: series[k].map(function (v) { return r2(v); }) };
       }),
       total: tot,
       frame: frame.map(function (v) { return r2(v); }),
@@ -150,10 +159,11 @@
     return { rows: out, total: r2(total), subMap: subMap, subsMap: subsMap };
   }
 
-  function donutOf(list) {
+  function donutOf(list, field, blank) {
+    field = field || 'expense'; blank = blank || 'Unclassified';
     var m = {}, total = 0;
     list.forEach(function (r) {
-      var k = r.expense == null || r.expense === '' ? 'Unclassified' : r.expense;
+      var k = r[field] == null || r[field] === '' ? blank : r[field];
       if (!m[k]) m[k] = { k: k, v: 0, n: 0 };
       m[k].v += (r.amount || 0);
       if (r.no != null) m[k].n++;
@@ -167,6 +177,39 @@
           share: total ? Math.round((r.v / total) * 10000) / 10000 : null
         };
       });
+  }
+
+  /* 采购方式第二层：单一来源两种理由的聚合（与在线 methodDrill 同口径） */
+  function methodDrillOf(list) {
+    var RM = S.reasonMap || { exempt: {}, single: {} };
+    var defs = {
+      'SS-Exempt': { map: RM.exempt || {}, col: 'exc', reason: '豁免单一来源的理由' },
+      'SS-Non Exempt': { map: RM.single || {}, col: 'ssr', reason: '单一来源采购理由' }
+    };
+    var out = {};
+    Object.keys(defs).forEach(function (mk) {
+      var d = defs[mk], m = {}, rawByAgg = {}, total = 0;
+      list.forEach(function (r) {
+        if (r.method !== mk) return;
+        var raw = r[d.col];
+        var agg = (raw === null || raw === undefined || raw === '') ? 'Unassigned' : (d.map[raw] || raw);
+        if (!m[agg]) m[agg] = { k: agg, v: 0, n: 0 };
+        m[agg].v += (r.amount || 0);
+        if (r.no != null) m[agg].n++;
+        total += (r.amount || 0);
+        var arr = rawByAgg[agg] || (rawByAgg[agg] = []);
+        if (raw && arr.indexOf(raw) < 0) arr.push(raw);
+      });
+      var rs = Object.keys(m).map(function (k) { return m[k]; })
+        .sort(function (a, b) { return b.v - a.v; })
+        .map(function (x) {
+          return { k: x.k, v: r2(x.v), n: x.n,
+                   share: total ? Math.round((x.v / total) * 10000) / 10000 : null,
+                   raws: rawByAgg[x.k] || [] };
+        });
+      out[mk] = { rows: rs, reason: d.reason, total: r2(total) };
+    });
+    return out;
   }
 
   function topOf(list, limit) {
@@ -238,7 +281,7 @@
       ['amount', 'Total Spend', 'money', k0.amount, kp.amount, null],
       ['cp', 'Centralised Spend', 'money', k0.cp, kp.cp, 'SS / Tender'],
       ['poSpend', 'PO Paid', 'money', k0.poPaid, kp.poPaid, 'Actually paid'],
-      ['txn', 'PR Count', 'int', k0.txn, kp.txn, null],
+      ['txn', 'Orders', 'int', k0.txn, kp.txn, null],
       ['suppliers', 'Suppliers', 'int', k0.suppliers, kp.suppliers, 'unique'],
       ['stores', 'Stores Covered', 'int', k0.stores, kp.stores, null],
       ['days', 'Median Cycle Time', 'days', medianArr(daysList), pDays, 'submit → approve']
@@ -262,6 +305,7 @@
 
     var pareto = paretoOf(list);
     var donut = donutOf(list);
+    var methodDonut = donutOf(list, 'method', 'Unassigned');
     var top = topOf(list, 10);
     var cats = pareto.rows.slice(0, 8).map(function (r) { return r.k; });
     var heat = heatOf(list, top.map(function (r) { return r.k; }), cats);
@@ -271,7 +315,7 @@
       fy: fy, prevFy: prevFy, cur: cur, rate: rate,
       range: rg,
       status: { txn: k0.txn, suppliers: k0.suppliers, stores: k0.stores },
-      kpi: kpi, monthly: monthly, pareto: pareto, donut: donut,
+      kpi: kpi, monthly: monthly, pareto: pareto, donut: donut, methodDonut: methodDonut,
       top: top, heat: heat, palette: S.palette,
       params: { fy: fy, prevFy: prevFy, cur: cur, rate: rate, cpMethods: CP },
       spec: {}
@@ -541,6 +585,120 @@
     saveCsv(out.text, out.name);
   };
 
+  /* ---------- /api/board/detail + detail/values（Detail 大表格） ----------
+     与在线接口同口径：财年 + 全局筛选 + 每列搜索/取值/区间，三级树全量行 + 全集合计。
+     离线已内嵌 46k 行（ROW_COLS 里有 region/company/category/supplier/method/
+     amount/poPaid），所以这里只是本地复算，不需要额外数据。 */
+  var DETAIL_KEYS = ['region', 'company', 'category', 'supplier', 'method', 'reason', 'note'];
+
+  function detailPass(r, sp, fy, f, skip) {
+    if (r.fy !== fy) return false;
+    for (var k in f) if (f[k].indexOf(r[k]) < 0) return false;
+    for (var i = 0; i < DETAIL_KEYS.length; i++) {
+      var key = DETAIL_KEYS[i];
+      if (key === skip) continue;
+      var q = (sp.get('q_' + key) || '').toLowerCase();
+      if (q && String(r[key] == null ? '' : r[key]).toLowerCase().indexOf(q) < 0) return false;
+      var raw = sp.get('f_' + key);
+      if (raw) {
+        var arr = null;
+        try { arr = JSON.parse(raw); } catch (e) { arr = null; }
+        if (arr && arr.length && arr.indexOf(String(r[key] == null ? '' : r[key])) < 0) return false;
+      }
+    }
+    var mn = sp.get('min_amount'), mx = sp.get('max_amount');
+    if (mn && Number(r.amount || 0) < Number(mn)) return false;
+    if (mx && Number(r.amount || 0) > Number(mx)) return false;
+    mn = sp.get('min_paid'); mx = sp.get('max_paid');
+    var paid = r.poPaid || 0;
+    if (mn && Number(paid) < Number(mn)) return false;
+    if (mx && Number(paid) > Number(mx)) return false;
+    return true;
+  }
+
+  function detailResp(sp) {
+    var fy = sp.get('fy') || S.options.latestFy;
+    var f = readFilters(sp);
+    var cur = (sp.get('cur') || 'RMB').toUpperCase();
+    var rate = cur === 'RM' ? 1.5 : 1;
+    var list = rows.filter(function (r) { return detailPass(r, sp, fy, f, null); });
+    var sa = 0, sp_ = 0;
+    list.forEach(function (r) { sa += r.amount || 0; sp_ += r.poPaid || 0; });
+    var field = { region: 'region', company: 'company', category: 'category',
+                  supplier: 'supplier', method: 'method', note: 'note',
+                  amount: 'amount', paid: 'poPaid' };
+    var sk = field[sp.get('sort') || 'amount'] || 'date';
+    var dir = sp.get('dir') === 'asc' ? 1 : -1;
+    list.sort(function (a, b) {
+      var x = a[sk], y = b[sk];
+      if (x == null) x = ''; if (y == null) y = '';
+      if (typeof x === 'number' && typeof y === 'number') return (x - y) * dir;
+      return String(x).localeCompare(String(y), 'zh') * dir;
+    });
+    var out = list.map(function (r) {
+      return {
+        region: r.region || '', company: r.company || '', category: r.category || '',
+        supplier: r.supplier || '', method: r.method || '', note: r.note || '',
+        amount: r2((r.amount || 0) / rate), paid: r2((r.poPaid || 0) / rate)
+      };
+    });
+    var rmap = {}, cmap = {};
+    list.forEach(function (r) {
+      var rk = r.region || '', k = r.company || '', ck = rk + '\u0001' + k, g = rmap[rk], h = cmap[ck];
+      if (!g) g = rmap[rk] = { region: rk, n: 0, amount: 0, paid: 0 };
+      if (!h) h = cmap[ck] = { region: rk, company: k, n: 0, amount: 0, paid: 0 };
+      g.n++; g.amount += r.amount || 0; g.paid += r.poPaid || 0;
+      h.n++; h.amount += r.amount || 0; h.paid += r.poPaid || 0;
+    });
+    var rt = Object.keys(rmap).map(function (k) {
+      var g = rmap[k];
+      return { region: g.region, n: g.n, amount: r2(g.amount / rate), paid: r2(g.paid / rate) };
+    }).sort(function (a, b) { return b.n - a.n; });
+    var ct = Object.keys(cmap).map(function (k) {
+      var h = cmap[k];
+      return { region: h.region, company: h.company, n: h.n,
+               amount: r2(h.amount / rate), paid: r2(h.paid / rate) };
+    }).sort(function (a, b) { return b.n - a.n; });
+    return { rows: out, total: list.length,
+             sums: { amount: r2(sa / rate), paid: r2(sp_ / rate) },
+             regionTotals: rt, companyTotals: ct,
+             fy: fy, cur: cur, rate: rate,
+             columns: DETAIL_KEYS.concat(['amount', 'paid']) };
+  }
+
+  /* GET /api/board/method-drill?method=SS-Exempt（采购方式饼图第二层） */
+  function methodDrillResp(sp) {
+    var mk = sp.get('method') || '';
+    var fy = sp.get('fy') || S.options.latestFy;
+    var f = readFilters(sp);
+    var cur = (sp.get('cur') || 'RMB').toUpperCase();
+    var rate = cur === 'RM' ? 1.5 : 1;
+    var list = rows.filter(function (r) { return r.fy === fy && pass(r, f); });
+    var all = methodDrillOf(list);
+    if (!all[mk]) return { error: 'unknown method' };
+    var o = all[mk];
+    return { method: mk, reason: o.reason, rows: o.rows, total: o.total,
+             fy: fy, cur: cur, rate: rate };
+  }
+
+  function detailValuesResp(sp) {
+    var col = sp.get('col');
+    if (DETAIL_KEYS.indexOf(col) < 0) return [];
+    var fy = sp.get('fy') || S.options.latestFy;
+    var f = readFilters(sp);
+    var q = (sp.get('q') || '').toLowerCase();
+    var cnt = {};
+    rows.forEach(function (r) {
+      if (!detailPass(r, sp, fy, f, col)) return;
+      var v = r[col] == null ? '' : String(r[col]);
+      if (q && v.toLowerCase().indexOf(q) < 0) return;
+      cnt[v] = (cnt[v] || 0) + 1;
+    });
+    return Object.keys(cnt).map(function (v) { return { v: v, n: cnt[v] }; })
+      .sort(function (a, b) { return b.n - a.n || a.v.localeCompare(b.v, 'zh'); })
+      .slice(0, 200);
+  }
+
   /* ---------- fetch 垫片 ---------- */
   var _fetch = window.fetch ? window.fetch.bind(window) : null;
   var PREFIX = '/api/board/';
@@ -559,6 +717,9 @@
     else if (path === 'top') out = topResp(sp);
     else if (path === 'rows') out = rowsResp(sp);
     else if (path === 'contracts') out = contractsResp(sp);
+    else if (path === 'detail') out = detailResp(sp);
+    else if (path === 'detail/values') out = detailValuesResp(sp);
+    else if (path === 'method-drill') out = methodDrillResp(sp);
     else out = {};
     return Promise.resolve(new Response(JSON.stringify(out), {
       status: 200, headers: { 'Content-Type': 'application/json' }

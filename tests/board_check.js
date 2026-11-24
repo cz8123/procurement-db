@@ -77,7 +77,7 @@ async function waitFor(pg, fn, timeout, label) {
        与 PO Paid 同源；期望值现场从 API 取，避免每次导入新数据都要改测试 */
     chk('PO 实付金额显示为金额', /^[¥R]/.test(poTxt || ''), poTxt);
     chk('PO 实付金额与库一致', poTxt === fmtM(kv('poSpend').v), poTxt + ' / ' + fmtM(kv('poSpend').v));
-    chk('5 组筛选下拉（公司收在 Region 内）', await count('.fdrop') === 5, await count('.fdrop'));
+    chk('6 组筛选下拉（公司收在 Region 内，含采购方式）', await count('.fdrop') === 6, await count('.fdrop'));
     chk('Region 下拉含公司一段',
       await count('.fdrop[data-k=region] .fsec') === 2,
       await count('.fdrop[data-k=region] .fsec'));
@@ -86,11 +86,14 @@ async function waitFor(pg, fn, timeout, label) {
       e => (e.textContent.match(/Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/g) || []).length)) >= 12);
     chk('帕累托 11 类', await count('#chPareto rect.pbar') === 11, await count('#chPareto rect.pbar'));
     chk('环形 4 个支出类型', await count('#chDonut [data-exp]') === 4, await count('#chDonut [data-exp]'));
+    chk('采购方式环形 = API methodDonut 条数', await count('#chMethodDonut [data-exp]') ===
+      (await page.evaluate(async () => (await (await fetch('/api/board/data?cur=RMB')).json()).methodDonut.length)),
+      await count('#chMethodDonut [data-exp]'));
     chk('热力 10×8 = 80 格', await count('#chHeat .hcell') === 80, await count('#chHeat .hcell'));
     chk('Top10 供应商 10 条', await count('#chTop .trow') === 10, await count('#chTop .trow'));
     chk('协议表默认 50 行', await count('#fcTbl tbody tr') === 50, await count('#fcTbl tbody tr'));
     chk('默认财年 FY2627', await page.$eval('#fySel', e => e.value) === 'FY2627');
-    chk('副标题含当前 PR 数', new RegExp(fmtI(kv('txn').v) + '\\s*PRs').test(await num('.hd-sub') || ''));
+    chk('副标题含当前单据数（Orders）', new RegExp(fmtI(kv('txn').v) + '\\s*orders').test(await num('.hd-sub') || ''));
     chk('标题用原版 Procurement Data Dashboard',
       await num('h1') === 'Procurement Data Dashboard', await num('h1'));
     chk('logo 用原素材 logo-sime.png 且已加载',
@@ -167,6 +170,73 @@ async function waitFor(pg, fn, timeout, label) {
       chk('点扇区 → Expense Type chip', /Expense Type/.test(await num('.chip') || ''));
       chk('点扇区 → 金额变化', (await num('.kpi[data-k=amount] .k-val')) !== k0.amount);
     }
+    await page.click('#btnReset');
+
+    console.log('=== 5b. 采购方式环形：两层下钻 ===');
+    const pickSeg = v => page.evaluate(val => {
+      const el = [...document.querySelectorAll('#chMethodDonut [data-exp]')]
+        .find(e => e.dataset.exp === val);
+      if (!el) return false;
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      return true;
+    }, v);
+
+    /* 第一层点 SS-Exempt → 下钻到豁免理由层（不产生 chip） */
+    chk('点 SS-Exempt 进入下钻', await pickSeg('SS-Exempt'));
+    await waitFor(page, () => /Exemption Reason/.test(document.getElementById('mDonutTitle').textContent) &&
+      document.querySelectorAll('#chMethodDonut [data-exp]').length > 1, 8000, 'exempt drill');
+    const drill1 = await page.evaluate(() => ({
+      title: document.getElementById('mDonutTitle').textContent,
+      keys: [...document.querySelectorAll('#chMethodDonut [data-exp]')].map(e => e.dataset.exp),
+      chips: document.querySelectorAll('.chip').length,
+      back: !document.querySelector('.v-back[data-clear=method]').hidden
+    }));
+    console.log('    ' + JSON.stringify(drill1));
+    chk('下钻标题/理由列表/返回按钮正确', /SS-Exempt/.test(drill1.title) &&
+      drill1.keys.indexOf('Frame Contract') >= 0 && drill1.keys.length >= 5 &&
+      drill1.chips === 0 && drill1.back, drill1);
+
+    /* 第二层点一个理由 → 交叉筛选（方式 + 理由两个 chip） */
+    const mdBefore = await page.$eval('.kpi[data-k=amount] .k-val', e => e.textContent.trim());
+    await pickSeg('Frame Contract');
+    await waitFor(page, t => document.querySelectorAll('.chip').length === 2 &&
+      document.querySelector('.kpi[data-k=amount] .k-val').textContent.trim() !== t,
+      10000, 'reason filter', mdBefore);
+    const reasonChips = await page.evaluate(() =>
+      [...document.querySelectorAll('.chip')].map(e => e.textContent.trim()));
+    const mdAfter = await num('.kpi[data-k=amount] .k-val');
+    chk('点理由 → Method + Exemption Reason 两个 chip',
+      reasonChips.some(c => /Procurement Method/.test(c) && /SS-Exempt/.test(c)) &&
+      reasonChips.some(c => /Exemption Reason/.test(c) && /Frame Contract/.test(c)), reasonChips);
+    chk('点理由 → 金额收窄到该理由', mdAfter !== Number(mdBefore.replace(/[^\d.]/g, '')),
+      { before: mdBefore, after: mdAfter });
+
+    /* 返回：退出下钻并清掉方式/理由筛选，回到第一层 */
+    await page.evaluate(() => document.querySelector('.v-back[data-clear=method]').click());
+    await waitFor(page, () => /Spend by Method/.test(
+      document.getElementById('mDonutTitle').textContent) &&
+      document.querySelectorAll('.chip').length === 0, 10000, 'exit drill');
+    chk('返回退出下钻并清空筛选', await page.evaluate(() =>
+      document.querySelector('.v-back[data-clear=method]').hidden));
+
+    /* SS-Non Exempt 走另一张理由表 */
+    await pickSeg('SS-Non Exempt');
+    await waitFor(page, () => /Single Source Reason/.test(
+      document.getElementById('mDonutTitle').textContent) &&
+      document.querySelectorAll('#chMethodDonut [data-exp]').length > 1, 8000, 'single drill');
+    const drill2 = await page.evaluate(() => [...document.querySelectorAll('#chMethodDonut [data-exp]')]
+      .map(e => e.dataset.exp));
+    console.log('    ' + JSON.stringify(drill2));
+    chk('SS-Non Exempt 下钻到单一来源理由', drill2.indexOf('Inadequate Competition') >= 0, drill2);
+    await page.evaluate(() => document.querySelector('.v-back[data-clear=method]').click());
+    await waitFor(page, () => /Spend by Method/.test(
+      document.getElementById('mDonutTitle').textContent), 8000, 'back method');
+
+    /* 非单一来源方式（Quotation）仍走普通交叉筛选 */
+    await pickSeg('Quotation');
+    await waitFor(page, () => document.querySelectorAll('.chip').length === 1 &&
+      /Procurement Method/.test(document.querySelector('.chip').textContent), 8000, 'quotation chip');
+    chk('其它采购方式仍为普通筛选', true);
     await page.click('#btnReset');
     await waitFor(page, () => document.querySelectorAll('.chip').length === 0, 6000, 'reset2');
 
@@ -331,9 +401,11 @@ async function waitFor(pg, fn, timeout, label) {
       .some(w => w.length > 24));
     chk('协议表英文名已补空格（无超长连写）', longTok.length === 0,
       longTok.slice(0, 2).map(x => x.t));
-    chk('DongguanZhongfan… 已还原成 Dongguan Zhongfan auto supplies',
-      /Dongguan Zhongfan auto supplies/i.test(
-        await page.$eval('#fcTbl tbody', e => e.textContent)));
+    /* 具体英文后缀会随源数据版本变（auto supplies / Car Accessories Supplies），
+       只断言连写被还原成带空格写法 */
+    const fcBody = await page.$eval('#fcTbl tbody', e => e.textContent);
+    chk('DongguanZhongfan… 已还原成 Dongguan Zhongfan …',
+      /Dongguan Zhongfan /i.test(fcBody) && !/DongguanZhongfan/i.test(fcBody));
 
     const topLong = await page.$$eval('#chTop .trow text', a => a
       .map(e => e.textContent.trim())
@@ -397,15 +469,17 @@ async function waitFor(pg, fn, timeout, label) {
 
     await page.evaluate(() => document.querySelector('#chCat .cd-row').click());
     await waitFor(page, () => document.querySelectorAll('.chip').length === 1 &&
-      document.querySelectorAll('#chCat .cd-row').length === 1,
-      8000, 'cat table chip');
+      document.querySelectorAll('#chCat .cd-row.dv').length > 0,
+      10000, 'cat table chip + dim');
     chk('点明细行 → 类别 chip', /Category/.test(await num('.chip') || ''),
       await num('.chip'));
-    chk('点明细行后只剩 1 个类别',
-      await count('#chCat .cd-row') === 1, await count('#chCat .cd-row'));
+    /* 突出显示（默认开）：其余类别淡化保留，不隐藏 —— 行数仍是 11 */
+    chk('突出显示：其余行淡化而非隐藏',
+      await count('#chCat .cd-row') === 11 && await count('#chCat .cd-row.dv') === 10,
+      { rows: await count('#chCat .cd-row'), dim: await count('#chCat .cd-row.dv') });
     await page.evaluate(() => document.querySelector('#chCat .cd-row').click());
     await waitFor(page, () => document.querySelectorAll('.chip').length === 0 &&
-      document.querySelectorAll('#chCat .cd-row').length === 11,
+      document.querySelectorAll('#chCat .cd-row.dv').length === 0,
       8000, 'cat table reset');
     chk('再点一次取消筛选', await count('#chCat .cd-row') === 11,
       await count('#chCat .cd-row'));
@@ -448,17 +522,22 @@ async function waitFor(pg, fn, timeout, label) {
       caps: [...document.querySelectorAll('#chMonthly text')]
         .map(t => t.textContent).filter(t => /^¥/.test(t)),
       legend: document.querySelector('#mLegend').textContent,
+      /* X 轴改 3 字母缩写后，12 个刻度不再互相压字 */
       longMonths: [...document.querySelectorAll('#chMonthly text')].map(t => t.textContent)
-        .filter(t => /^(July|August|September|October|November|December|January|February|March|April|May|June)$/.test(t))
+        .filter(t => /^(Jul|Aug|Sep|Oct|Nov|Dec|Jan|Feb|Mar|Apr|May|Jun)$/.test(t))
     }));
     chk('切到堆叠改标题', /Total vs Framework/.test(pb.title), pb.title);
     chk('每月一根柱、按框架/非框架堆叠',
       pb.months >= activeM && pb.bars >= activeM && pb.bars <= activeM * 2,
       [pb.bars, pb.months, activeM]);
     chk('金额写在柱内（不再有柱顶胶囊）', pb.caps.length >= activeM, pb.caps.length);
+    /* 窄图（g6）段内标签用整数紧凑格式，宽图用一位小数；两种都认 */
     chk('首段金额与接口一致',
-      pb.caps.some(c => c.replace(/[^\d.]/g, '') === (mData.frame[0] / 1e6).toFixed(1) ||
-        c.replace(/[^\d.]/g, '') === ((mData.total[0] - mData.frame[0]) / 1e6).toFixed(1)),
+      pb.caps.some(c => {
+        const n = parseFloat(c.replace(/[^\d.]/g, ''));
+        return Math.abs(n - mData.frame[0] / 1e6) < 0.6 ||
+          Math.abs(n - (mData.total[0] - mData.frame[0]) / 1e6) < 0.6;
+      }),
       [pb.caps.slice(0, 3), mData.total[0], mData.frame[0]]);
     chk('图例换成 Framework / Non-framework',
       /Framework Contract/.test(pb.legend) && /Non-framework/.test(pb.legend), pb.legend);
@@ -468,7 +547,7 @@ async function waitFor(pg, fn, timeout, label) {
       geoP.baseY === geoR.baseY && geoP.h === geoR.h && geoP.relTop === geoR.relTop,
       [geoR, geoP]);
     /* 双柱与区域视图一致，横轴固定 12 个财月 */
-    chk('月份改用全称并显示 12 个月', pb.longMonths.length === 12, pb.longMonths);
+    chk('月份用 3 字母缩写并显示 12 个月', pb.longMonths.length === 12, pb.longMonths);
 
     await page.evaluate(() => document.querySelector('#chMonthly rect.pseg').dispatchEvent(
       new MouseEvent('click', { bubbles: true })));
@@ -492,6 +571,9 @@ async function waitFor(pg, fn, timeout, label) {
       /Prior year/.test(await num('#mLegend') || ''), await num('#mLegend'));
 
     console.log('=== 9. 框架协议统计表 ===');
+    /* 协议卡已移到 Framework 页：先切过去，否则输入框不可见 */
+    await page.click('.pg-tab[data-page=framework]');
+    await sleep(350);
     chk('摘要 6 项', await count('.fc-summary .fs') === 6, await count('.fc-summary .fs'));
     const fs = await page.evaluate(() =>
       [...document.querySelectorAll('.fc-summary .fs')].map(e => e.textContent.trim()));
@@ -619,11 +701,13 @@ async function waitFor(pg, fn, timeout, label) {
     chk('旧 API /api/dash/* 已下线', legacy[2] === 404, legacy);
 
     console.log('=== 11. 取值计算逻辑说明 ===');
+    await page.click('.pg-tab[data-page=overview]');
+    await sleep(350);
     const specBtns = await page.$$eval('.spec-btn', a => a.map(e => e.dataset.spec));
-    /* 视觉对象 7 个 + 整页 1 个 + KPI 卡 7 张 + 筛选下拉 5 个 = 20 */
-    chk('每个视觉对象都有说明按钮', specBtns.length === 20, specBtns);
-    chk('按钮覆盖 8 个对象',
-      ['global', 'monthly', 'donut', 'pareto', 'catdetail',
+    /* 视觉对象 8 个（含 methodDonut）+ 整页 1 + KPI 卡 7 + 筛选下拉 6 = 22 */
+    chk('每个视觉对象都有说明按钮', specBtns.length === 22, specBtns);
+    chk('按钮覆盖 9 个对象',
+      ['global', 'monthly', 'donut', 'methodDonut', 'pareto', 'catdetail',
        'top', 'heat', 'contracts']
         .every(k => specBtns.indexOf(k) >= 0), specBtns);
     chk('7 张 KPI 卡各有说明按钮',

@@ -195,11 +195,22 @@ COLS = ["No.", "Date", "Company", "Company_cn", "Company_en", "Region_cn", "Regi
         "DT-related", "Procurement Method", "Note", "Contract Type", "Contract Name",
         "Contract No.", "Contract Value", "Contract Start Date", "Contract Expiry Date",
         "Category", "Sub-Category", "Category Description", "Exception Reason",
-        "Total Price", "Time Taken", "Supplier_cn", "Supplier_en", "AVL No.",
+        "Total Price", "Time Taken", "Supplier_cn", "Supplier_en", "Supplier_raw", "AVL No.",
         "Supplier Category", "Category Detail", "PO_flag", "PO Paid"]
 
 
 def build_po(con):
+    # 供应商名称归并：先刷新 dim_supplier_alias（manual 行保留），再按规范名写 Supplier_cn/en
+    try:
+        from supplier_dedup import build as _build_alias
+        _build_alias(con, apply=True, quiet=True)
+    except Exception as e:                       # 归并失败不阻断主构建，回退原文
+        print("· 供应商归并跳过：%s" % e)
+    alias = {r[0]: r[1] for r in con.execute(
+        'SELECT 别名, 规范名 FROM dim_supplier_alias')} if con.execute(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='dim_supplier_alias'"
+    ).fetchone()[0] else {}
+
     exp = {r[0]: r[1] for r in con.execute('SELECT 原始值,支出类型 FROM dim_agg_支出类型')}
     pm = {r[0]: r[1] for r in con.execute('SELECT 原始值,选择采购方法 FROM dim_agg_选择采购方法')}
     cmap = {r[0]: r[1] for r in con.execute('SELECT 原始值,采购类别 FROM dim_category_map')}
@@ -247,7 +258,12 @@ def build_po(con):
          cat_raw, subcat, catdesc, exc, price, appr, sup, avlno, supattr, avldetail) in src:
         d = (sub or "")[:10]
         c = comp.get(comp_raw) or (None,) * 7
-        sup_cn, sup_en = split_supplier(sup)
+        # 归并口径：完整原文 → 规范名（空格/大小写/标点统一）→ 再拆中英文
+        sup_full = alias.get(sup, sup) if sup else sup
+        sup_cn, sup_en = split_supplier(sup_full)
+        # 纯英文供应商没有中文名：中文列补成英文名，否则 KPI / TopN / 明细会漏掉它们
+        if not sup_cn and sup_en:
+            sup_cn = sup_en
         amt = to_amount(price)
         tt = None
         if appr and sub:
@@ -267,7 +283,7 @@ def build_po(con):
             dtrel, pm.get(__strip_ws(pm, method)), note, ctype, cname, cno,
             None, None, cexp,
             cmap.get(cat_raw, rule_category(cat_raw) or "Others"), subcat, catdesc,
-            exc, amt, tt, sup_cn, sup_en, avlno, supcat, avldetail,
+            exc, amt, tt, sup_cn, sup_en, sup, avlno, supcat, avldetail,
             1 if (no and no.strip() in po_nos) else 0,
             round(po_paid.get((no or "").strip(), 0.0), 2),
         ))

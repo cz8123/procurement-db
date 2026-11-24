@@ -184,6 +184,13 @@ async function waitFor(pg, fn, timeout, label) {
     await sleep(900);
 
     console.log('=== 4. 视觉对象「返回」 ===');
+    /* 本节验证 filter 模式（点扇区后本图只剩当前项）：先把突出显示关掉，
+       否则本图会保留全环、只把其余扇区淡化（那是 4b 之后的语义） */
+    await page.evaluate(() => {
+      const b = document.querySelector('.v-hl');
+      if (b && !b.classList.contains('off')) b.click();
+    });
+    await sleep(250);
     await page.evaluate(() => document.querySelector('#donutLegend .li').click());
     await waitFor(page, () => {
       const c = document.querySelector('.v-back[data-clear=expense]');
@@ -248,24 +255,40 @@ async function waitFor(pg, fn, timeout, label) {
     chk('返回图标在工具栏最右', after.iconLeft > after.gap, after);
     await page.evaluate(() => document.querySelector('.v-back[data-clear=region]').click());
     await sleep(600);
+    /* 恢复突出显示（默认模式），别把全局开关留在 filter */
+    await page.evaluate(() => {
+      const b = document.querySelector('.v-hl');
+      if (b && b.classList.contains('off')) b.click();
+    });
+    await sleep(150);
 
     console.log('=== 5. 排版（留白 / 列宽 / KPI 不截断） ===');
+    /* 协议表已移到 Framework 页，先切过去才能量到真实列宽 */
+    await page.click('.pg-tab[data-page=framework]');
+    await sleep(400);
+    const fcLay = await page.evaluate(() => {
+      const heads = [...document.querySelectorAll('#fcTbl thead th')].map(e => e.getBoundingClientRect().width);
+      const tbl = document.querySelector('#fcTbl').getBoundingClientRect().width;
+      return { leftPct: (heads[0] + heads[1]) / tbl,
+               numMin: Math.min.apply(null, heads.slice(2, 8)) };
+    });
+    /* 留白 / KPI 要在 Overview 量：隐藏的 main 拿不到真实几何 */
+    await page.click('.pg-tab[data-page=overview]');
+    await sleep(400);
     const lay = await page.evaluate(() => {
       const pad = getComputedStyle(document.documentElement).getPropertyValue('--pad').trim();
       const card = document.querySelector('.kpi').getBoundingClientRect();
       const gridLeft = document.querySelector('main.grid > .card').getBoundingClientRect().left;
-      const heads = [...document.querySelectorAll('#fcTbl thead th')].map(e => e.getBoundingClientRect().width);
-      const tbl = document.querySelector('#fcTbl').getBoundingClientRect().width;
       return {
         pad: parseInt(pad, 10),
         leftGap: Math.round(card.left),
+        gridLeft: Math.round(gridLeft),
         aligned: Math.abs(card.left - gridLeft) < 1,
-        leftPct: (heads[0] + heads[1]) / tbl,
-        numMin: Math.min.apply(null, heads.slice(2, 8)),
         clipped: [...document.querySelectorAll('.kpi .k-val')]
           .filter(e => e.scrollWidth > e.clientWidth + 1).length
       };
     });
+    lay.leftPct = fcLay.leftPct; lay.numMin = fcLay.numMin;
     console.log('    ' + JSON.stringify(lay));
     chk('左右留白 ≥ 24px', lay.pad >= 24, lay.pad);
     chk('KPI 与卡片左边缘对齐', lay.aligned, [lay.leftGap, lay.pad]);

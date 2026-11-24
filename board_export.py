@@ -25,7 +25,7 @@ import sqlite3
 import sys
 
 from app import app
-from board_api import PALETTE, supplier_en_map
+from board_api import PALETTE, REGION_EN, supplier_en_map
 from supplier_name import split_en, clean_en, english_variants
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -36,17 +36,33 @@ OUT_DIR = os.path.join(APP_DIR, "exports")
 # 行级数据列（顺序即 JSON 数组里的顺序）
 ROW_COLS = [
     "no", "date", "fy", "company", "region", "brand", "dept", "category", "sub",
-    "expense", "method", "supplier", "amount", "days", "budget", "level",
-    "poPaid", "month", "exc",
+    "expense", "method", "note", "supplier", "amount", "days", "budget", "level",
+    "poPaid", "month", "exc", "ssr",
+    # 明细表「Single Source Reason」列：豁免理由 / 单一来源理由合并（两者互斥），
+    # 已按 dim_agg 映射成聚合名，离线表格与在线逐字一致
+    "reason",
 ]
 # 这几列是数值，其余做字典编码
 NUM_COLS = {"amount", "days", "poPaid", "month"}
+# 说明是长文本、几乎条条不同（字典编码会因唯一值过多被跳过）。离线给全量说明，
+# 悬停浮窗才和在线一致（库里最长 2,367 字）；代价是文件从 9.1MB 到 ~12.2MB，
+# 3000 只是防呆上限，正常碰不到
+NOTE_LIMIT = 3000
 
 ROW_SQL = """
-SELECT "No.","Date","FY","Company_cn","Region_cn","Brand","Department","Category",
-       "Sub-Category","Expense Type","Procurement Method","Supplier_cn","Total Price",
-       "Time Taken","Budget Type","Supplier Category","PO Paid","Exception Reason"
+SELECT dash_po."No.",dash_po."Date",dash_po."FY",dash_po."Company_cn",dash_po."Region_cn",
+       dash_po."Brand",dash_po."Department",dash_po."Category",dash_po."Sub-Category",
+       dash_po."Expense Type",dash_po."Procurement Method",dash_po."Note",
+       dash_po."Supplier_cn",dash_po."Total Price",dash_po."Time Taken",
+       dash_po."Budget Type",dash_po."Supplier Category",dash_po."PO Paid",
+       dash_po."Exception Reason",
+       (SELECT "单一来源采购理由" FROM fct_prpo f WHERE f."表单编号"=dash_po."No."),
+       COALESCE(mx."豁免单一来源的理由", f."豁免单一来源的理由",
+                ms."单一来源采购理由", f."单一来源采购理由")
 FROM dash_po
+LEFT JOIN fct_prpo f ON f."表单编号" = dash_po."No."
+LEFT JOIN dim_agg_豁免单一来源的理由 mx ON mx."原始值" = f."豁免单一来源的理由"
+LEFT JOIN dim_agg_单一来源采购理由 ms ON ms."原始值" = f."单一来源采购理由"
 """
 
 CONTRACT_SQL = """
@@ -64,15 +80,22 @@ def month_map(con):
 
 def build_rows(con):
     cal = month_map(con)
+    # 子类别走聚合映射（与 board_api 同口径）：244 个原始值 → 144 个聚合名
+    submap = {r[0]: r[1] for r in con.execute(
+        'SELECT "原始值","采购子类别" FROM dim_agg_采购子类别')}
     data, dicts = [], {}
     cols = ROW_COLS
     for row in con.execute(ROW_SQL):
         (no, date, fy, company, region, brand, dept, category, sub,
-         expense, method, supplier, amount, days, budget, level, po_paid,
-         exc) = row
+         expense, method, note, supplier, amount, days, budget, level, po_paid,
+         exc, ssr, reason) = row
+        note = (note or "").strip()
+        if sub:
+            sub = submap.get(sub, sub)
         vals = [no, date, fy, company, region, brand, dept, category, sub,
-                expense, method, supplier, amount, days, budget, level, po_paid,
-                cal.get(date), exc]
+                expense, method, note[:NOTE_LIMIT] or None,
+                supplier, amount, days, budget, level, po_paid,
+                cal.get(date), exc, ssr, reason]
         data.append(vals)
 
     # 字典编码：字符串列去重后存索引，体积约为裸 JSON 的 1/4
@@ -124,12 +147,23 @@ def build_en_fix(con):
     return fix
 
 
+def build_reason_map(con):
+    """单一来源两层的「原始值 → 聚合值」映射（供离线复算下钻饼图）。"""
+    return {
+        "exempt": {r[0]: r[1] for r in con.execute(
+            'SELECT "原始值","豁免单一来源的理由" FROM dim_agg_豁免单一来源的理由')},
+        "single": {r[0]: r[1] for r in con.execute(
+            'SELECT "原始值","单一来源采购理由" FROM dim_agg_单一来源采购理由')},
+    }
+
+
 def build_snapshot():
     con = sqlite3.connect(DB)
     try:
         rows = build_rows(con)
         contracts = build_contracts(con)
         en_fix = build_en_fix(con)
+        reason_map = build_reason_map(con)
     finally:
         con.close()
 
@@ -148,6 +182,8 @@ def build_snapshot():
         "rows": rows,
         "contracts": contracts,
         "enFix": en_fix,
+        "reasonMap": reason_map,
+        "regionEn": REGION_EN,
     }
 
 

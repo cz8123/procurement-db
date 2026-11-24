@@ -20,6 +20,7 @@
     { k: 'brand', name: 'Brand' },
     { k: 'category', name: 'Category' },
     { k: 'expense', name: 'Expense Type' },
+    { k: 'method', name: 'Procurement Method' },
     { k: 'level', name: 'Supplier Category' },
     { k: 'region', name: 'Region' },
     /* Company 是 Region 的下级：不再单独占一格，收在 Region 下拉的第二段 */
@@ -29,7 +30,7 @@
   var AG_COLS = [
     { k: 'company', t: 'Company', w: 230 },
     { k: 'region', t: 'Region', w: 84 },
-    { k: 'n', t: 'PRs', num: 1, w: 68 },
+    { k: 'n', t: 'Orders', num: 1, w: 68 },
     { k: 'sup', t: 'Suppliers', num: 1, w: 88 },
     { k: 'amount', t: 'Spend', num: 1, w: 108 },
     { k: 'poPaid', t: 'PO Paid', num: 1, w: 108 },
@@ -37,17 +38,26 @@
   ];
 
   var S = {
-    fy: null, cur: 'RMB', rate: 1,
+    fy: null, cur: 'RMB', rate: 1, page: 'overview',
     sel: {},
     options: {},
     data: null,
     topLocal: { category: '', method: '' },
     catSub: {},               // 类别明细里已展开子类别的类别名（默认全部折叠）
     mMode: 'region',          // 月度图：region=区域堆叠 / pair=Total vs Framework
+    methodDrill: null,        // 采购方式饼图下钻：null | SS-Exempt | SS-Non Exempt
+    subLevel: null,           // 帕累托下钻：null=类别层 | 'sub'=子类别层
+    hlOn: (localStorage.getItem('board-hl') !== '0'),   // 突出显示（PBI highlight）默认开
+    hl: null,                 // {src, key, vals, base}：当前高亮的来源视觉对象 + 点击前数据
+    hlFresh: false,
+    drill: {},                // 下钻数据缓存 {method: {rows,...}}（筛选变化时清空）
     // 框架协议统计（独立数据源 vw_fa_analysis，不吃 PRPO 全局筛选）
     fc: { page: 1, size: 50, sort: 'start', dir: 'desc',
           q: '', sup: '', type: '', df: '', dt: '', status: '' },
     drawer: { page: 1, size: 50, q: '', filters: null },
+    detail: { sort: 'region', dir: 'asc',
+              q: {}, f: {}, min: {}, max: {}, expR: {}, expC: {},
+              loaded: false, stale: true, seq: 0, pop: null, tmp: null },
     seq: 0, rowSeq: 0, drawerSeq: 0
   };
 
@@ -230,7 +240,7 @@
     return nf(x, 0);
   }
 
-  /** 差额带正负号：-¥627.7 M / +12 PRs */
+  /** 差额带正负号：-¥627.7 M / +12 orders */
   function kpiSigned(k, x) {
     var sgn = x < 0 ? '-' : (x > 0 ? '+' : '');
     return sgn + kpiVal(k, Math.abs(x));
@@ -277,7 +287,7 @@
     var r = d.range || {};
     $('#hdSub').textContent = 'Procurement spend analysis · ' + (d.fy || '') +
       ' · ' + (r.from || '—') + ' ~ ' + (r.to || '—') +
-      ' · ' + nf(d.status.txn, 0) + ' PRs / ' + nf(d.status.suppliers, 0) + ' suppliers';
+      ' · ' + nf(d.status.txn, 0) + ' orders / ' + nf(d.status.suppliers, 0) + ' suppliers';
   }
 
   /* ================================================ 筛选 */
@@ -313,7 +323,7 @@
     return '<div class="fsec" data-k="' + f.k + '">' +
       '<div class="fpop-h"><span>' + f.name +
       (note ? '<i class="fh-note">' + note + '</i>' : '') + '</span>' +
-      '<a data-act="none">Clear</a></div>' +
+      '<span class="fh-acts"><a data-act="all">All</a><a data-act="none">Clear</a></span></div>' +
       '<div class="fpop-b">' + optBody(f.k) + '</div></div>';
   }
 
@@ -352,33 +362,123 @@
     renderChips();
   }
 
-  /* ---------------- 视觉对象级「返回」（Power BI 式下钻返回） ----------------
-     每张图只对自己造成的那个维度负责：点了环形图扇区 → 卡片头部右上角出现
-     一个小返回图标（悬浮提示写明清哪个维度），点它回到全量视图。
-     控件是图标不是文字胶囊 —— 文字版挤占头部，也和 PBI 的视觉对象头部不一致。 */
+  /* ---------------- 视觉对象头部工具（Power BI 模式） ----------------
+     v-back  = Drill up：层级上退一级；已在顶层就清掉这张图造成的筛选（原「返回」）。
+     v-down  = Go to next level：进入下一层级（方式→理由 / 类别→子类别）。
+     v-exp   = Expand all down one level：一次展开所有下一级（类目明细的子类别）。
+     v-flt   = Filters affecting this visual：列出切片器 / 全局筛选 / 本图局部筛选。
+     v-hl    = Highlight 开关：点图元时淡化其他（开）或只留当前（关）。
+     每个按钮只在该图「有这个能力」时出现，避免把标题挤没。 */
   var BACK_LABEL = { region: 'Region', expense: 'Expense type', category: 'Category',
-    method: 'Procurement method', supplier: 'Supplier', company: 'Company' };
-  function updateBacks() {
+    method: 'Procurement method', supplier: 'Supplier', company: 'Company', sub: 'Sub-category' };
+  var HL_ICON_ON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"' +
+    ' stroke-width="2.1" stroke-linecap="round" aria-hidden="true">' +
+    '<path d="M4 20v-6M9 20V6M14 20v-9M19 20V9"/></svg>';
+  var HL_ICON_OFF = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"' +
+    ' stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8.2"/>' +
+    '<path d="M6.4 17.6 17.6 6.4" stroke-linecap="round"/></svg>';
+
+  /** 卡片上的能力名（v-flt 的 data-flt）→ 该卡的 card 元素 */
+  function cardOf(name) {
+    var b = document.querySelector('.v-flt[data-flt="' + name + '"]');
+    return b ? b.closest('.card') : null;
+  }
+  function setBtn(el, show, title) {
+    if (!el) return;
+    el.hidden = !show;
+    if (title) { el.title = title; el.setAttribute('aria-label', title); }
+  }
+  function updateVisualTools() {
     $$('.v-back').forEach(function (el) {
       var k = el.dataset.clear, vals = (S.sel && S.sel[k]) || [];
+      var card = el.closest('.card');
+      var isCat = !!(card && card.querySelector('#chCat'));
+      var isPareto = !!(card && card.querySelector('#chPareto'));
+      /* 类目明细：展开过子类别 → 上钻 = 收起全部（优先于清类别筛选） */
+      var nOpen = Object.keys(S.catSub || {}).length;
+      if (isCat && nOpen) {
+        el.hidden = false;
+        var ct = 'Drill up — collapse ' + nOpen +
+          (nOpen > 1 ? ' expanded sub-categories' : ' expanded sub-category');
+        el.title = ct; el.setAttribute('aria-label', ct);
+        return;
+      }
+      /* 采购方式饼图下钻态：先退出下钻（回到方式层） */
+      if (k === 'method' && S.methodDrill) {
+        el.hidden = false;
+        var dt = 'Drill up — exit ' + S.methodDrill + ' drill-down';
+        el.title = dt; el.setAttribute('aria-label', dt);
+        return;
+      }
+      /* 帕累托子类别层：先回到类别层 */
+      if (isPareto && S.subLevel === 'sub') {
+        el.hidden = false;
+        var st = 'Drill up — back to categories';
+        el.title = st; el.setAttribute('aria-label', st);
+        return;
+      }
       if (!vals.length) {
         el.hidden = true;
-        el.title = 'Back';
+        el.title = 'Drill up';
         return;
       }
       el.hidden = false;
-      var txt = 'Back — clear ' + (BACK_LABEL[k] || k) + ': ' + vals.join(', ');
+      var txt = 'Drill up — clear ' + (BACK_LABEL[k] || k) + ': ' + vals.join(', ');
       el.title = txt;
       el.setAttribute('aria-label', txt);
     });
-  }
 
+    /* 下一级：方式饼图（方式层 → 理由层）、帕累托（类别 → 子类别） */
+    $$('.v-down').forEach(function (dn) {
+      var cn = dn.closest('.card');
+      var f = cn && cn.querySelector('.v-flt');
+      var nm = f ? f.dataset.flt : '';
+      var showDn = nm === 'methodDonut' ? !S.methodDrill : (nm === 'pareto' ? S.subLevel !== 'sub' : false);
+      setBtn(dn, showDn, nm === 'methodDonut'
+        ? 'Go to next level — reason (pick SS-Exempt / SS-Non Exempt first)'
+        : 'Go to next level — sub-categories (pick a category bar first)');
+    });
+
+    /* 展开所有下一级：类目明细表一次性展开所有子类别 */
+    $$('.v-exp').forEach(function (ex) {
+      var pack = S.data && S.data.pareto;
+      var subs = (pack && pack.subsMap) || {};
+      var multi = Object.keys(subs).filter(function (k) { return (subs[k] || []).length > 1; });
+      var closed = multi.some(function (k) { return !(S.catSub || {})[k]; });
+      setBtn(ex, multi.length > 0,
+        closed ? 'Expand all down one level' : 'All sub-categories already expanded');
+      ex.disabled = !closed;
+    });
+
+    /* 突出显示开关 */
+    $$('.v-hl').forEach(function (b) {
+      b.classList.toggle('off', !S.hlOn);
+      var t = S.hlOn
+        ? 'Highlight: click a bar to dim the rest'
+        : 'Filter: click a bar to show only it';
+      b.title = t; b.setAttribute('aria-label', t);
+      b.innerHTML = S.hlOn ? HL_ICON_ON : HL_ICON_OFF;
+    });
+  }
+  function updateBacks() { updateVisualTools(); }
+
+  var EXTRA_CHIP_LABEL = {
+    exempt_reason: 'Exemption Reason', single_reason: 'Single Source Reason',
+    sub: 'Sub-category'
+  };
   function renderChips() {
     var box = $('#chips'), out = [];
     FDEFS.forEach(function (f) {
       (S.sel[f.k] || []).forEach(function (v) {
         out.push('<span class="chip"><b>' + f.name + '</b>' + esc(v) +
           '<button data-k="' + f.k + '" data-v="' + esc(v) + '" title="Remove">×</button></span>');
+      });
+    });
+    /* 单一来源理由不在 FDEFS（不占筛选下拉），但下钻后要能看见并移除 */
+    Object.keys(EXTRA_CHIP_LABEL).forEach(function (k) {
+      (S.sel[k] || []).forEach(function (v) {
+        out.push('<span class="chip"><b>' + EXTRA_CHIP_LABEL[k] + '</b>' + esc(v) +
+          '<button data-k="' + k + '" data-v="' + esc(v) + '" title="Remove">×</button></span>');
       });
     });
     box.innerHTML = out.join('');
@@ -389,6 +489,39 @@
     if (!vals.length) delete S.sel[k]; else S.sel[k] = vals;
     S.fc.page = 1;
   }
+
+  /* ---------------- 突出显示（Power BI highlight） ----------------
+     点图元时两种模式：
+       highlight（默认）→ 本图用「点击前那份数据」重绘，未命中的项淡化但位置不变，
+                          其他视觉对象照常按新筛选联动（PBI 的交叉筛选高亮）。
+       filter          → 本图直接用筛选后的数据，只剩当前项（其他隐藏）。
+     来源图一旦变了（别的图点击 / 筛选条改动 / 重置），高亮自动失效。 */
+  function hlPack(src, key) {
+    if (!S.hlOn || !S.hl || S.hl.src !== src) return null;
+    if (key && S.hl.key !== key) return null;
+    return S.hl;
+  }
+  function hlDim(src, key, val) {
+    var h = hlPack(src, key);
+    if (!h || !h.vals || !h.vals.length) return false;
+    return h.vals.indexOf(val) < 0;
+  }
+  /** 本图要画的数据：高亮态用点击前的全量那份，否则用当前筛选结果 */
+  function hlBase(src, pick) {
+    var h = hlPack(src), d = h && h.base ? pick(h.base) : null;
+    return d || pick(S.data);
+  }
+  function beginHl(src, key, vals) {
+    if (!S.hlOn || !vals.length) { S.hl = null; S.hlFresh = false; return; }
+    if (S.hl && S.hl.src === src && S.hl.key === key) {
+      S.hl.vals = vals.slice();
+    } else {
+      S.hl = { src: src, key: key, vals: vals.slice(), base: S.data };
+    }
+    S.hlFresh = true;
+  }
+  function clearHl() { S.hl = null; S.hlFresh = false; }
+  function dv(on) { return on ? ' dv' : ''; }
 
   /* ================================================ Chart 1 月度堆叠 */
   /* ---------------------------------------------------------------- 月度图
@@ -406,11 +539,12 @@
   /* 柱宽：两种月度视图共用 —— 切换时柱子的位置、宽度、基线完全一致 */
   function barW(slot) { return Math.min(52, slot * 0.62); }
 
-  /* 段内数字：段太矮或柱太窄就不显示；文字颜色按底色明暗自适应 */
+  /* 段内数字：段太矮或柱太窄就不显示；文字颜色按底色明暗自适应。
+     窄图（g6，两饼图并排时）用整数紧凑格式，保证金额仍能落在段内。 */
   function segLabel(cx, yTop, h, w, v, fill) {
     if (!(v > 0) || h < 15) return '';
-    var txt = money(v, 1).replace(/ ([KMB])$/, '$1');
-    if (txt.length * 7.2 > w - 8) return '';
+    var txt = money(v, w < 44 ? 0 : 1).replace(/ ([KMB])$/, '$1');
+    if (txt.length * 6 > w - 4) return '';
     return '<text x="' + cx.toFixed(1) + '" y="' + (yTop + h / 2 + 4).toFixed(1) +
       '" text-anchor="middle" font-size="10" font-weight="600" pointer-events="none" fill="' +
       (isLight(fill) ? '#1E2F4B' : '#FFFFFF') + '">' + esc(txt) + '</text>';
@@ -426,8 +560,10 @@
       iw: W - L - R, ih: H - T - B,
       ymax: niceMax(Math.max.apply(null, vals) * 1.12) };
   }
+  /* X 轴用 3 字母月份：12 个刻度挤在 ~690px 里，全称会互相压字（AuguSemptOcto…）。
+     悬停 tooltip 仍直接取 labelsLong 给全称，所以缩写只影响坐标轴。 */
   function monthLabels(d) {
-    return d.labelsLong && d.labelsLong.length ? d.labelsLong : (d.labels || []);
+    return d.labels && d.labels.length ? d.labels : (d.labelsLong || []);
   }
   function yAxisText(L, T, ih, W, R, ymax) {
     var g = '';
@@ -447,7 +583,7 @@
 
   /* ---------------- 原样式：按区域堆叠 ---------------- */
   function renderMonthlyRegion() {
-    var d = S.data.monthly, box = $('#chMonthly');
+    var d = hlBase('monthly', function (x) { return x.monthly; }), box = $('#chMonthly');
     mTitle('Monthly Spend by Region');
     if (!d || !d.series || !d.series.length) {
       emptyBox('chMonthly', 'No data for the current filters'); return;
@@ -488,10 +624,11 @@
         var h = z.v / ymax * ih;
         var y = T + ih - acc - h;
         var hh = Math.max(0, h - (zi < segs.length - 1 ? 1.2 : 0));
-        bars += '<rect class="seg" data-reg="' + esc(z.k) + '" data-m="' + mi +
+        var faded = hlDim('monthly', 'region', z.k);
+        bars += '<rect class="seg' + dv(faded) + '" data-reg="' + esc(z.k) + '" data-m="' + mi +
           '" x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) +
           '" height="' + hh.toFixed(1) + '" fill="' + z.c + '" rx="0"/>';
-        bars += segLabel(x + bw / 2, y, hh, bw, z.v, z.c);
+        if (!faded) bars += segLabel(x + bw / 2, y, hh, bw, z.v, z.c);
         acc += h;
       });
       var pv = (d.prev || [])[mi] || 0;
@@ -510,8 +647,8 @@
 
     $('#mLegend').innerHTML =
       d.series.map(function (s, i) {
-        return '<span><i style="background:' + CAT_COLORS[i % CAT_COLORS.length] + '"></i>' +
-          esc(s.k) + '</span>';
+        return '<span' + dv(hlDim('monthly', 'region', s.k)) + '><i style="background:' +
+          CAT_COLORS[i % CAT_COLORS.length] + '"></i>' + esc(s.l || s.k) + '</span>';
       }).join('') +
       '<span><i style="background:#7B8FA8;height:2px;border-radius:0"></i>Prior year</span>';
 
@@ -568,7 +705,7 @@
       }
       bars += '<text x="' + cx2.toFixed(1) + '" y="' + (H - B + 16) +
         '" text-anchor="middle" font-size="10" font-weight="600" fill="#1E2F4B">' +
-        esc(truncPx(lbl[i] || '', slot - 4, 13)) + '</text>';
+        esc(truncPx(lbl[i] || '', slot - 2, Math.min(13, slot * 0.16))) + '</text>';
     }
 
     $('#mLegend').innerHTML =
@@ -581,10 +718,58 @@
   }
 
   /* ================================================ Chart 2 帕累托 */
+  /* 帕累托两层的行集：
+       category 层 → /data 的 pareto.rows（按类别）
+       sub 层      → 当前选中类别下的子类别（/data 的 pareto.subsMap，前端合并重算累计）
+     高亮态一律用「点击前」那份，保证柱子数量与位置不跳。 */
+  function paretoPack() {
+    var d = hlBase('pareto', function (x) { return x.pareto; });
+    if (S.subLevel !== 'sub') {
+      return { rows: (d && d.rows) || [], total: (d && d.total) || 0, level: 'category' };
+    }
+    var cats = (S.sel.category || []).slice();
+    var src = (d && d.subsMap) || {};
+    if (!cats.length) cats = Object.keys(src);
+    var map = {}, order = [];
+    cats.forEach(function (c) {
+      (src[c] || []).forEach(function (it) {
+        var g = map[it.k];
+        if (!g) { g = map[it.k] = { k: it.k, v: 0, n: 0, po_paid: 0 }; order.push(it.k); }
+        g.v += it.v || 0; g.n += it.n || 0; g.po_paid += it.po || 0;
+      });
+    });
+    var rows = order.map(function (k) { return map[k]; })
+      .sort(function (a, b) { return b.v - a.v; });
+    var total = rows.reduce(function (s, r) { return s + r.v; }, 0);
+    /* 子类别可能有几十个：留 Top 14 + 一根 Other，柱宽和标签才看得清 */
+    if (rows.length > 15) {
+      var rest = rows.slice(14);
+      var o = { k: 'Other · ' + rest.length, v: 0, n: 0, po_paid: 0, other: 1 };
+      rest.forEach(function (r) { o.v += r.v; o.n += r.n; o.po_paid += r.po_paid; });
+      rows = rows.slice(0, 14).concat([o]);
+    }
+    var acc = 0;
+    rows.forEach(function (r) {
+      acc += r.v;
+      r.cum = total ? acc / total : null;
+      r.share = total ? r.v / total : null;
+    });
+    return { rows: rows, total: total, level: 'sub' };
+  }
+
   function renderPareto() {
-    var rows = (S.data.pareto && S.data.pareto.rows) || [];
+    var pack = paretoPack(), rows = pack.rows;
     var box = $('#chPareto');
-    if (!rows.length) { emptyBox('chPareto', 'No categories for the current filters'); return; }
+    var pt = $('#pTitle');
+    if (pt) {
+      pt.textContent = S.subLevel === 'sub' ? 'Sub-category Spend (Pareto)' : 'Category Spend (Pareto)';
+    }
+    if (!rows.length) {
+      emptyBox('chPareto', S.subLevel === 'sub'
+        ? 'Pick a category bar first, then drill down' : 'No categories for the current filters');
+      return;
+    }
+    var hlKey = S.subLevel === 'sub' ? 'sub' : 'category';
     var W = chartW('chPareto', 660), H = 310;
     var L = 62, R = 52, T = 22, B = 76;
     var iw = W - L - R, ih = H - T - B;
@@ -608,20 +793,23 @@
       '<text x="' + (L + 6) + '" y="' + (y80 - 5).toFixed(1) +
       '" font-size="10" fill="#EA1313">80%</text>';
 
-    var mx = Math.max.apply(null, rows.map(function (r) { return r.v || 0; })) || 1;
     var bars = '', pts = [];
     rows.forEach(function (r, i) {
       var h = (r.v || 0) / ymax * ih;
       var x = L + i * slot + (slot - bw) / 2, y = T + ih - h;
       /* 单一主色：金额大小由柱高表达，不再叠加色阶 */
-      var col = '#3B5E96';
-      bars += '<rect class="pbar" data-cat="' + esc(r.k) + '" x="' + x.toFixed(1) + '" y="' + y.toFixed(1) +
-        '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, h).toFixed(1) + '" fill="' + col + '" rx="0"/>';
+      var faded = hlDim('pareto', hlKey, r.k);
+      bars += '<rect class="pbar' + dv(faded) + '" data-cat="' + esc(r.k) + '"' +
+        (r.other ? ' data-other="1"' : '') + ' x="' + x.toFixed(1) +
+        '" y="' + y.toFixed(1) +
+        '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, h).toFixed(1) +
+        '" fill="' + (faded ? '#AFC0D6' : '#3B5E96') + '" rx="0"/>';
       pts.push([x + bw / 2, T + ih - (r.cum || 0) * ih]);
 
       var nm = truncPx(r.k, Math.max(46, slot * 2.1), 13);
       bars += '<text transform="translate(' + (x + bw / 2).toFixed(1) + ',' + (T + ih + 8) +
-        ') rotate(-40)" text-anchor="end" font-size="10" font-weight="600" fill="#1E2F4B">' + esc(nm) + '</text>';
+        ') rotate(-40)" text-anchor="end" font-size="10" font-weight="600" fill="' +
+        (faded ? '#98A6B8' : '#1E2F4B') + '">' + esc(nm) + '</text>';
     });
 
     var line = '<polyline points="' + pts.map(function (p) {
@@ -641,7 +829,7 @@
      行 = 维度成员，列 = 数量 / 金额 / 占比，占比那列用条形表达。
      这里行 = 采购类别，多给两列（供应商数、单据数），点一行等同勾选该类别。 */
   function renderCatDetails() {
-    var d = S.data.pareto, box = $('#chCat');
+    var d = hlBase('catdetail', function (x) { return x.pareto; }), box = $('#chCat');
     if (!d || !d.rows || !d.rows.length) {
       box.innerHTML = '<div class="no-data">No categories for the current filters</div>';
       return;
@@ -674,7 +862,8 @@
           (open ? 'Collapse' : more + ' more sub-categories') + '">' +
           (open ? '−' : '+' + more) + '</button>' : '') +
         '</div></td>';
-      var tr = '<tr class="cd-row' + (on ? ' on' : '') + '" data-cat="' + esc(r.k) + '">' +
+      var tr = '<tr class="cd-row' + (on ? ' on' : '') +
+        dv(hlDim('catdetail', 'category', r.k)) + '" data-cat="' + esc(r.k) + '">' +
         '<td class="cd-cat" title="' + esc(r.k) + '"><span>' + esc(r.k) + '</span></td>' +
         cell +
         '<td class="num">' + nf(r.sup, 0) + '</td>' +
@@ -693,13 +882,13 @@
           '%;background:#8FB3D9"></b></i>' +
           '<span class="cs-v">' + money(s.v, 1) + '</span>' +
           '<span class="cs-p">' + money(s.po, 1) + '</span>' +
-          '<span class="cs-n">' + nf(s.n, 0) + ' PRs · ' + pct(ss) + '</span></li>';
+          '<span class="cs-n">' + nf(s.n, 0) + ' orders · ' + pct(ss) + '</span></li>';
       }).join('');
       return tr + '<tr class="cd-subrow" data-cat="' + esc(r.k) + '"><td colspan="7">' +
         '<div class="cs-wrap"><div class="cs-h">' + esc(r.k) + ' · Sub-categories' +
         '<span>' + sl.length + ' items</span></div><ul class="cs-list">' +
         '<li class="cs-head"><span>Sub-category</span><span></span>' +
-        '<span>Spend</span><span>PO Paid</span><span>PRs</span></li>' + items +
+        '<span>Spend</span><span>PO Paid</span><span>Orders</span></li>' + items +
         '</ul></div></td></tr>';
     }).join('');
     if (!body) body = '<tr><td class="empty" colspan="7">No matching categories</td></tr>';
@@ -716,9 +905,30 @@
 
     box.innerHTML = '<table class="cd-tbl"><thead><tr>' +
       '<th class="cd-cat">Category</th><th class="cd-sub">Sub-Category</th>' +
-      '<th class="num">Suppliers</th><th class="num">PRs</th>' +
+      '<th class="num">Suppliers</th><th class="num">Orders</th>' +
       '<th class="num">Spend</th><th class="num">PO Paid</th><th>Share</th></tr></thead>' +
       '<tbody>' + body + (q ? '' : total) + '</tbody></table>';
+    /* 铺满：等高之后再补齐高度，让合计行贴着卡片底边（否则和右侧热力卡错位） */
+    requestAnimationFrame(function () { requestAnimationFrame(fitCatTable); });
+    saveView();               // 展开/收起子类别不走 loadAll，单独落一次
+  }
+
+  /** 类别表比卡片矮时，把富余高度摊给各行（table 高度撑满），合计行才会落在卡片底部。
+      内容更高（展开子类别）时不设高度，交给 .cd-wrap 滚动。 */
+  function fitCatTable() {
+    var wrap = $('#chCat'), tbl = wrap && wrap.querySelector('.cd-tbl');
+    if (!tbl) return;
+    tbl.style.height = '';
+    /* 展开子类别：把表格锁成和右侧热力卡一样高、内部滚动，
+       否则类别卡被撑高，两张卡的下沿又错开了 */
+    if (Object.keys(S.catSub || {}).length) {
+      var heat = $('#chHeat');
+      wrap.style.height = (heat && heat.offsetHeight > 160 ? heat.offsetHeight : '') + 'px';
+      return;
+    }
+    wrap.style.height = '';
+    var avail = wrap.clientHeight - 12;      /* .cd-wrap 上 2 + 下 10 的内边距 */
+    if (avail > 0 && tbl.offsetHeight < avail - 1) tbl.style.height = avail + 'px';
   }
 
   /** 数值色阶：柱形按 v/max 从浅色渐变到主题深色，小值也保留最低可见强度 */
@@ -744,10 +954,40 @@
   }
 
   /* ================================================ Chart 3 环形 */
-  function renderDonut() {
-    var rows = S.data.donut || [];
-    if (!rows.length) { emptyBox('chDonut', 'No data for the current filters'); $('#donutLegend').innerHTML = ''; return; }
-    var W = chartW('chDonut', 340), H = 230;
+  function renderExpenseDonut() {
+    drawDonut(hlBase('chDonut', function (x) { return x.donut; }) || [],
+      'chDonut', 'donutLegend', 'chDonut', 'expense');
+  }
+  /* 采购方式环形：默认第一层（方式）；点 SS-Exempt / SS-Non Exempt 下钻到各自的理由层。
+     下钻数据走单独接口按需取（塞在 /data 里会让整页每次刷新多跑两次全表 JOIN）。 */
+  function loadMethodDrill(mk, cb) {
+    if (S.drill[mk]) return cb(S.drill[mk]);
+    api('/api/board/method-drill', qs({ method: mk }, ['method', 'exempt_reason', 'single_reason']))
+      .then(function (d) {
+        S.drill[mk] = d;
+        if (S.methodDrill === mk) cb(d);
+      })
+      .catch(function (e) { toast('Failed to load reasons: ' + e.message, 3500); });
+  }
+  function renderMethodDonut() {
+    var t = $('#mDonutTitle'), drill = S.methodDrill;
+    var pack = drill ? S.drill[drill] : null;
+    if (drill) {
+      var rkey = drill === 'SS-Exempt' ? 'exempt_reason' : 'single_reason';
+      t.textContent = (drill === 'SS-Exempt' ? 'Exemption Reason' : 'Single Source Reason') + ' · ' + drill;
+      /* 理由层数据本来就不吃理由筛选（接口 skip 了 reason），天然保留全量，
+         这里再按已选理由淡化其余扇区，和第二层下钻的视觉一致 */
+      if (pack) drawDonut(pack.rows || [], 'chMethodDonut', 'methodDonutLegend', 'chMethodDonut', rkey);
+      else emptyBox('chMethodDonut', 'Loading…');
+      return;
+    }
+    t.textContent = 'Spend by Method';
+    drawDonut(hlBase('chMethodDonut', function (x) { return x.methodDonut; }) || [],
+      'chMethodDonut', 'methodDonutLegend', 'chMethodDonut', 'method');
+  }
+  function drawDonut(rows, chartId, legendId, src, key) {
+    if (!rows.length) { emptyBox(chartId, 'No data for the current filters'); $('#' + legendId).innerHTML = ''; return; }
+    var W = chartW(chartId, 340), H = 230;
     var cx = W / 2, cy = H / 2 + 2, R = Math.min(W, H) * 0.44, r0 = R * 0.58;
     var tot = rows.reduce(function (s, x) { return s + (x.v || 0); }, 0) || 1;
 
@@ -756,6 +996,7 @@
       var frac = (x.v || 0) / tot;
       var a1 = a0 + frac * Math.PI * 2;
       var col = CAT_COLORS[i % CAT_COLORS.length];
+      var faded = src ? hlDim(src, key, x.k) : false;
       if (frac > 0.9999) {
         /* 单值满环：也要带 class/data-exp —— 否则筛到一个类型后这一圈点不动，
            用户会卡在「只剩一个扇区、点哪都回不去」的状态 */
@@ -763,11 +1004,11 @@
           '" r="' + ((R + r0) / 2) + '" fill="none" stroke="' + col +
           '" stroke-width="' + (R - r0) + '"/>';
       } else {
-        paths += '<path class="dseg" data-exp="' + esc(x.k) + '" d="' + arc(cx, cy, R, r0, a0, a1) +
+        paths += '<path class="dseg' + dv(faded) + '" data-exp="' + esc(x.k) + '" d="' + arc(cx, cy, R, r0, a0, a1) +
           '" fill="' + col + '" stroke="#fff" stroke-width="2"/>';
       }
       var am = (a0 + a1) / 2, rr = (R + r0) / 2;
-      if (frac >= 0.045) {
+      if (!faded && frac >= 0.045) {
         labels += '<text x="' + (cx + rr * Math.cos(am)).toFixed(1) + '" y="' +
           (cy + rr * Math.sin(am) + 3.5).toFixed(1) + '" text-anchor="middle" font-size="10" ' +
           'font-weight="600" fill="' + (isLight(col) ? '#1E2F4B' : '#fff') +
@@ -781,11 +1022,17 @@
       '<text x="' + cx + '" y="' + (cy + 17) + '" class="t-big" text-anchor="middle" font-size="17" ' +
       'font-weight="600" fill="#0E1720">' + money(tot, 1) + '</text>';
 
-    $('#chDonut').innerHTML = svg(W, H, paths + labels + center);
-    $('#donutLegend').innerHTML = rows.map(function (x, i) {
-      return '<span class="li" data-exp="' + esc(x.k) + '"><i style="background:' +
-        CAT_COLORS[i % CAT_COLORS.length] + '"></i>' + esc(x.k) +
-        ' <b>' + money(x.v, 1) + '</b><span class="pc">' + pct(x.share) + '</span></span>';
+    $('#' + chartId).innerHTML = svg(W, H, paths + labels + center);
+    /* 项数多（下钻到理由层 7~8 项）时图例只留名称：
+       金额与占比在扇区和悬浮提示里都有，省掉才能两列排开、名字少截断 */
+    var compact = rows.length > 6;
+    $('#' + legendId).innerHTML = rows.map(function (x, i) {
+      return '<span class="li' + dv(src ? hlDim(src, key, x.k) : false) + '" data-exp="' + esc(x.k) +
+        '"><i style="background:' + CAT_COLORS[i % CAT_COLORS.length] + '"></i>' +
+        '<span class="lb" title="' + esc(x.k) + ' · ' + money(x.v, 1) + ' · ' + pct(x.share) + '">' +
+        esc(x.k) + '</span>' +
+        (compact ? '' : '<b>' + money(x.v, 1) + '</b><span class="pc">' + pct(x.share) + '</span>') +
+        '</span>';
     }).join('');
   }
 
@@ -1076,14 +1323,26 @@
   /* ================================================ 加载 */
   function loadAll() {
     var seq = ++S.seq;
+    /* 这次刷新是不是图内点击（高亮）造成的：不是就把高亮清掉，
+       避免筛选条 / chip / 重置之后还留着上一张图的淡化形态 */
+    var keepHl = S.hlFresh;
+    S.hlFresh = false;
+    S.detail.stale = true;          // 全局筛选变了：下次进 Detail 页重新取数
+    S.drill = {};                   // 下钻数据依赖筛选，一起失效
+    saveView();                     // 筛选 / 下钻 / 财年 / 币种的任何变化都在这里落盘
+    if (S.page === 'detail' && !$('#pgDetail').hidden) loadDetail();
     document.body.classList.add('loading');
     return api('/api/board/data', qs()).then(function (d) {
       if (seq !== S.seq) return;
+      if (!keepHl) S.hl = null;
       S.data = d; S.rate = d.rate || 1;
+      /* 下钻态且缓存已清：重新拉一次理由层，保证与当前筛选一致 */
+      if (S.methodDrill) loadMethodDrill(S.methodDrill, function () { renderMethodDonut(); });
       renderKpis(); renderMonthly(); renderPareto(); renderCatDetails();
-      renderDonut(); renderHeat();
+      renderExpenseDonut(); renderMethodDonut(); renderHeat();
       loadTop();
       loadContracts();
+      updateVisualTools();
     }).catch(function (e) {
       toast('Failed to load data: ' + e.message, 4000);
       console.error(e);
@@ -1109,7 +1368,10 @@
         return '<option value="' + esc(f) + '"' + (f === d.latestFy ? ' selected' : '') + '>' +
           esc(f) + '</option>';
       }).join('');
-      if (!S.fy) S.fy = d.latestFy;   // 区域变更时只刷新公司选项，不重置已选财年
+      /* 已选财年可能是刷新前还原的：还在列表里就保留，被删了就回落最新 */
+      var fys = d.fy || [];
+      if (!S.fy || fys.indexOf(S.fy) < 0) S.fy = d.latestFy;
+      sel.value = S.fy;
 
       // Chart5 局部筛选下拉
       $('#topCat').innerHTML = '<option value="">All categories</option>' +
@@ -1165,15 +1427,23 @@
 
   /* ================================================ 事件 */
   function bind() {
+    // 页签切换
+    var tabs = $('#pgTabs');
+    if (tabs) tabs.addEventListener('click', function (e) {
+      var b = e.target.closest('.pg-tab');
+      if (b) goPage(b.dataset.page);
+    });
     // 筛选下拉
     $('#fbar').addEventListener('click', function (e) {
       var a = e.target.closest('a[data-act]');
       if (a) {
-        /* Clear 只作用于自己那一段（Region 的 Clear 不清 Company） */
+        /* All / Clear 只作用于自己那一段（Region 的按钮不清 Company） */
         var scope = a.closest('[data-k]');
         var k = scope.dataset.k;
-        setSel(k, []);
-        $$('input', scope).forEach(function (i) { i.checked = false; });
+        var all = a.dataset.act === 'all';
+        var list = all ? $$('input', scope).map(function (i) { return i.value; }) : [];
+        setSel(k, list);
+        $$('input', scope).forEach(function (i) { i.checked = all; });
         updateFilterLabels();
         if (k === 'region') refreshCompanyOptions();
         loadAll();
@@ -1210,19 +1480,58 @@
       var b = e.target.closest('button[data-k]');
       if (!b) return;
       var k = b.dataset.k, v = b.dataset.v;
+      /* 下钻态移除 method 或理由 → 整个下钻退出，回采购方式层 */
+      if (S.methodDrill && (k === 'method' || k === 'exempt_reason' || k === 'single_reason')) {
+        S.methodDrill = null;
+        delete S.sel.method; delete S.sel.exempt_reason; delete S.sel.single_reason;
+        clearHl(); renderFilters(); loadAll();
+        return;
+      }
+      /* 移掉子类别筛选 → 回到类别层（留在子类别层会把所有类别的子类别都摊出来） */
+      if (k === 'sub') S.subLevel = null;
+      clearHl();
       setSel(k, (S.sel[k] || []).filter(function (x) { return x !== v; }));
       renderFilters();
       if (k === 'region') refreshCompanyOptions();
       loadAll();
     });
 
-    // 视觉对象「返回」：只清掉这张图自己造成的那个维度
+    // 视觉对象「向上钻取」：层级退一级；已在顶层就清掉这张图自己造成的那个维度
     document.addEventListener('click', function (e) {
       var b = e.target.closest('.v-back');
       if (!b || b.hidden) return;
       var k = b.dataset.clear;
       if (!k) return;
       e.preventDefault();
+      /* 类目明细：展开态的上钻 = 收起全部子类别（回到类别层，不动类别筛选） */
+      var bcard = b.closest('.card');
+      if (bcard && bcard.querySelector('#chCat') && Object.keys(S.catSub || {}).length) {
+        S.catSub = {};
+        renderCatDetails(); updateVisualTools();
+        toast('Collapsed sub-categories');
+        return;
+      }
+      /* 下钻态：先退出下钻层，回到采购方式饼图 */
+      if (k === 'method' && S.methodDrill) {
+        var mk = S.methodDrill;
+        S.methodDrill = null;
+        delete S.sel.method; delete S.sel.exempt_reason; delete S.sel.single_reason;
+        clearHl(); renderFilters(); loadAll();
+        toast('Back to procurement method');
+        return;
+      }
+      /* 帕累托子类别层：先回类别层（保留类别筛选，PBI 退一级不动父级选择） */
+      if (k === 'category' && S.subLevel === 'sub' &&
+          bcard && bcard.querySelector('#chPareto')) {
+        S.subLevel = null;
+        clearHl();
+        setSel('sub', []);
+        renderFilters(); loadAll();
+        toast('Back to categories');
+        return;
+      }
+      clearHl();
+      if (k === 'category') { S.subLevel = null; setSel('sub', []); }
       setSel(k, []);
       renderFilters();
       if (k === 'region') refreshCompanyOptions();
@@ -1230,9 +1539,159 @@
       toast('Cleared ' + (BACK_LABEL[k] || k) + ' filter');
     });
 
+    /* ------------------- 视觉对象头部：下钻 / 展开 / 筛选浮层 / 突出显示 ------------------- */
+    function cardName(el) {
+      var f = el.closest('.card') && el.closest('.card').querySelector('.v-flt');
+      return f ? f.dataset.flt : '';
+    }
+    // 转至下一级
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('.v-down');
+      if (!b || b.hidden) return;
+      e.preventDefault();
+      var nm = cardName(b);
+      if (nm === 'methodDonut') {
+        var ms = (S.sel.method || []).filter(function (v) {
+          return v === 'SS-Exempt' || v === 'SS-Non Exempt';
+        });
+        if (!ms.length) { toast('Pick SS-Exempt or SS-Non Exempt first, then drill down'); return; }
+        S.methodDrill = ms[0];
+        clearHl(); renderMethodDonut(); updateVisualTools(); saveView();
+        loadMethodDrill(S.methodDrill, function () { renderMethodDonut(); });
+        return;
+      }
+      if (nm === 'pareto') {
+        if (!(S.sel.category || []).length) {
+          toast('Pick a category bar first, then drill down'); return;
+        }
+        S.subLevel = 'sub';
+        clearHl(); renderPareto(); updateVisualTools(); saveView();
+        toast('Drilled down to sub-categories');
+      }
+    });
+    // 展开层次中的所有下一级别（类目明细：一次展开全部子类别）
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('.v-exp');
+      if (!b || b.hidden || b.disabled) return;
+      e.preventDefault();
+      var pack = (S.data && S.data.pareto) || {};
+      var subs = pack.subsMap || {};
+      Object.keys(subs).forEach(function (k) {
+        if ((subs[k] || []).length > 1) S.catSub[k] = 1;
+      });
+      renderCatDetails(); updateVisualTools();
+      toast('Expanded all sub-categories');
+    });
+    // 突出显示 / 筛选 模式开关
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('.v-hl');
+      if (!b) return;
+      e.preventDefault();
+      S.hlOn = !S.hlOn;
+      try { localStorage.setItem('board-hl', S.hlOn ? '1' : '0'); } catch (err) { }
+      if (!S.hlOn) clearHl();
+      if (S.data) {
+        renderMonthly(); renderPareto(); renderCatDetails();
+        renderExpenseDonut(); renderMethodDonut();
+      }
+      updateVisualTools();
+      toast(S.hlOn ? 'Highlight on — click dims the others'
+        : 'Filter on — click hides the others');
+    });
+
+    /* 影响此视觉对象的筛选器与切片器（PBI 头部漏斗） */
+    var VT_LABEL = {
+      region: 'Region', company: 'Company', category: 'Category', sub: 'Sub-category',
+      expense: 'Expense Type', level: 'Supplier Category', method: 'Procurement Method',
+      brand: 'Brand', supplier: 'Supplier',
+      exempt_reason: 'Exemption Reason', single_reason: 'Single Source Reason'
+    };
+    var VT_OWN = { monthly: 'region', donut: 'expense', methodDonut: 'method',
+      pareto: 'category', catdetail: 'category' };
+    var VT_FUNNEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"' +
+      ' stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18l-7.2 8.4V20l-3.6-2v-4.6z"/></svg>';
+
+    function vtRow(k, v, mine) {
+      return '<div class="vt-row' + (mine ? ' mine' : '') + '"><b>' + esc(k) + '</b><span>' +
+        esc(v) + '</span></div>';
+    }
+    function vtLocal(name) {
+      var out = [];
+      if (name === 'top') {
+        if (S.topLocal.category) out.push(['Category', S.topLocal.category]);
+        if (S.topLocal.method) out.push(['Procurement Method', S.topLocal.method]);
+      } else if (name === 'contracts') {
+        if (S.fc.type) out.push(['Agreement type', S.fc.type]);
+        if (S.fc.status) out.push(['Status', S.fc.status]);
+        if (S.fc.df || S.fc.dt) out.push(['Start date', (S.fc.df || '…') + ' → ' + (S.fc.dt || '…')]);
+        if (S.fc.q) out.push(['Search contract', S.fc.q]);
+        if (S.fc.sup) out.push(['Search supplier', S.fc.sup]);
+      } else if (name === 'catdetail') {
+        var q = ($('#catQ') ? $('#catQ').value : '').trim();
+        if (q) out.push(['Search category', q]);
+        var open = Object.keys(S.catSub || {}).length;
+        if (open) out.push(['Sub-categories shown', nf(open, 0) + ' categories expanded']);
+      } else if (name === 'methodDonut') {
+        if (S.methodDrill) out.push(['Drill level', S.methodDrill + ' → reason']);
+      } else if (name === 'pareto') {
+        if (S.subLevel === 'sub') out.push(['Drill level', 'Category → Sub-category']);
+      }
+      return out;
+    }
+    function openVtPop(btn) {
+      var pop = $('#vtPop'), name = btn.dataset.flt;
+      if (!pop) return;
+      if (!pop.hidden && pop.dataset.for === name) { closeVtPop(); return; }
+      var h = '<div class="vt-h">' + VT_FUNNEL + 'Filters affecting this visual</div>';
+      h += '<div class="vt-g">Slicers</div>' +
+        vtRow('Fiscal year', S.fy || '—') +
+        vtRow('Currency', S.cur === 'RM' ? 'RM (÷ 1.5)' : 'RMB');
+
+      var keys = Object.keys(S.sel).filter(function (k) { return (S.sel[k] || []).length; });
+      h += '<div class="vt-g">Filters</div>';
+      if (name === 'contracts') {
+        /* 协议表是独立数据源（vw_fa_analysis），页面筛选确实不作用于它 */
+        h += '<div class="vt-none">Separate source — page filters do not apply</div>';
+      } else if (!keys.length) {
+        h += '<div class="vt-none">No page filters — showing everything</div>';
+      } else {
+        keys.forEach(function (k) {
+          h += vtRow(VT_LABEL[k] || k, S.sel[k].join(', '), VT_OWN[name] === k);
+        });
+      }
+      var loc = vtLocal(name);
+      if (loc.length) {
+        h += '<div class="vt-g">This visual</div>';
+        loc.forEach(function (r) { h += vtRow(r[0], r[1], true); });
+      }
+      pop.innerHTML = h;
+      pop.dataset.for = name;
+      pop.hidden = false;
+      var r = btn.getBoundingClientRect(), w = pop.offsetWidth || 268;
+      pop.style.top = Math.round(r.bottom + 6) + 'px';
+      pop.style.left = Math.round(Math.max(8, Math.min(r.right - w,
+        window.innerWidth - w - 8))) + 'px';
+    }
+    function closeVtPop() {
+      var pop = $('#vtPop');
+      if (pop && !pop.hidden) { pop.hidden = true; pop.dataset.for = ''; }
+    }
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('.v-flt');
+      if (b) { e.preventDefault(); openVtPop(b); return; }
+      if (!e.target.closest('#vtPop')) closeVtPop();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeVtPop();
+    });
+    window.addEventListener('scroll', function () {
+      if ($('#vtPop') && !$('#vtPop').hidden) closeVtPop();
+    }, true);
+
     // 重置
     $('#btnReset').addEventListener('click', function () {
       S.sel = {}; S.topLocal = { category: '', method: '' };
+      S.methodDrill = null; S.subLevel = null; clearHl();
       $('#topCat').value = ''; $('#topMth').value = '';
       renderFilters(); refreshCompanyOptions(); loadAll();
       toast('Filters reset');
@@ -1265,8 +1724,10 @@
       var m = btn.dataset.m;
       if (m === S.mMode) return;
       S.mMode = m;
+      clearHl();       // 切到双柱视图后 region 维度不再参与绘制，高亮态作废
       $$('#mSw button').forEach(function (x) { x.classList.toggle('on', x === btn); });
       if (S.data && S.data.monthly) renderMonthly();
+      saveView();
     });
 
     // 图表交互
@@ -1287,6 +1748,7 @@
       var list = (S.sel.region || []).slice();
       var i = list.indexOf(reg);
       if (i >= 0) list.splice(i, 1); else list.push(reg);
+      beginHl('monthly', 'region', list);
       setSel('region', list); renderFilters(); refreshCompanyOptions(); loadAll();
     });
     $('#chCat').addEventListener('click', function (e) {
@@ -1296,7 +1758,7 @@
         e.stopPropagation();
         var c = tog.dataset.sub;
         if (S.catSub[c]) delete S.catSub[c]; else S.catSub[c] = 1;
-        renderCatDetails();
+        renderCatDetails(); updateVisualTools();
         return;
       }
       var tr = e.target.closest('.cd-row');
@@ -1305,34 +1767,69 @@
       var list = (S.sel.category || []).slice();
       var i = list.indexOf(cat);
       if (i >= 0) list.splice(i, 1); else list.push(cat);
+      beginHl('catdetail', 'category', list);
       setSel('category', list); renderFilters(); loadAll();
     });
     $('#chPareto').addEventListener('click', function (e) {
       var r = e.target.closest('rect.pbar');
-      if (!r) return;
+      if (!r || r.dataset.other) return;
+      var key = S.subLevel === 'sub' ? 'sub' : 'category';
       var cat = r.dataset.cat;
-      var list = (S.sel.category || []).slice();
+      var list = (S.sel[key] || []).slice();
       var i = list.indexOf(cat);
       if (i >= 0) list.splice(i, 1); else list.push(cat);
-      setSel('category', list); renderFilters(); loadAll();
+      beginHl('pareto', key, list);
+      setSel(key, list); renderFilters(); loadAll();
     });
-    $('#chDonut').addEventListener('click', function (e) {
-      var p = e.target.closest('[data-exp]');
-      if (!p) return;
-      var v = p.dataset.exp;
-      var list = (S.sel.expense || []).slice();
-      var i = list.indexOf(v);
-      if (i >= 0) list.splice(i, 1); else list.push(v);
-      setSel('expense', list); renderFilters(); loadAll();
-    });
-    $('#donutLegend').addEventListener('click', function (e) {
-      var p = e.target.closest('[data-exp]');
-      if (!p) return;
-      var v = p.dataset.exp;
-      var list = (S.sel.expense || []).slice();
-      var i = list.indexOf(v);
-      if (i >= 0) list.splice(i, 1); else list.push(v);
-      setSel('expense', list); renderFilters(); loadAll();
+    function toggleSel(key, vals, src) {
+      var list = (S.sel[key] || []).slice(), hit = true;
+      vals.forEach(function (v) {
+        var i = list.indexOf(v);
+        if (i >= 0) list.splice(i, 1); else { list.push(v); hit = false; }
+      });
+      if (hit && !vals.length) { /* no-op */ }
+      beginHl(src, key, list);
+      setSel(key, list); renderFilters(); loadAll();
+    }
+    function bindDonut(chartId, legendId, key) {
+      [chartId, legendId].forEach(function (id) {
+        $('#' + id).addEventListener('click', function (e) {
+          var p = e.target.closest('[data-exp]');
+          if (!p) return;
+          toggleSel(key, [p.dataset.exp], chartId);
+        });
+      });
+    }
+    bindDonut('chDonut', 'donutLegend', 'expense');
+
+    /* 采购方式环形：第一层点 SS-Exempt / SS-Non Exempt 下钻到理由层；
+       理由层点扇区按该理由的原始值交叉筛选（并锁住对应采购方式）。 */
+    var MD_REASON_KEY = { 'SS-Exempt': 'exempt_reason', 'SS-Non Exempt': 'single_reason' };
+    function onMethodPick(v) {
+      if (!S.methodDrill) {
+        if (MD_REASON_KEY[v]) {
+          S.methodDrill = v;
+          renderMethodDonut(); updateBacks(); saveView();
+          loadMethodDrill(v, function () { renderMethodDonut(); });
+          return;
+        }
+        toggleSel('method', [v], 'chMethodDonut');
+        return;
+      }
+      var pack = S.drill[S.methodDrill];
+      var row = ((pack && pack.rows) || []).filter(function (x) { return x.k === v; })[0];
+      var raws = (row && row.raws && row.raws.length) ? row.raws : [v];
+      var key = MD_REASON_KEY[S.methodDrill];
+      /* 锁方式 + 理由：全页口径与下钻图一致（一次 loadAll，避免重复请求） */
+      S.sel.method = [S.methodDrill];
+      saveView();
+      toggleSel(key, raws, 'chMethodDonut');
+    }
+    ['chMethodDonut', 'methodDonutLegend'].forEach(function (id) {
+      $('#' + id).addEventListener('click', function (e) {
+        var p = e.target.closest('[data-exp]');
+        if (p) onMethodPick(p.dataset.exp);
+      });
     });
     $('#chTop').addEventListener('click', function (e) {
       var g = e.target.closest('.trow');
@@ -1371,7 +1868,8 @@
       var s = S.data.monthly.series.find(function (x) { return x.k === reg; });
       var v = s ? (s.vals[mi] || 0) : 0;
       var tot = S.data.monthly.cur[mi] || 1;
-      showTip('<b>' + esc(S.data.monthly.labels[mi]) + ' · ' + esc(reg) + '</b>' +
+      showTip('<b>' + esc(S.data.monthly.labels[mi]) + ' · ' +
+        esc(s && s.l ? s.l : reg) + '</b>' +
         '<div class="tip-row"><span>Amount</span><span>' + money(v, 1) + '</span></div>' +
         '<div class="tip-row"><span>Share</span><span>' + pct(v / tot) + '</span></div>' +
         '<div class="tip-row"><span>Month total</span><span>' + money(tot, 1) + '</span></div>',
@@ -1388,20 +1886,22 @@
         '<div class="tip-row"><span>Share</span><span>' +
         pct(row.v / (S.data.pareto.total || 1)) + '</span></div>' +
         '<div class="tip-row"><span>Cumulative</span><span>' + pct(row.cum) + '</span></div>' +
-        '<div class="tip-row"><span>PRs</span><span>' + nf(row.n, 0) + '</span></div>',
+        '<div class="tip-row"><span>Orders</span><span>' + nf(row.n, 0) + '</span></div>',
         e.clientX, e.clientY);
     });
-    // 悬浮提示（环形）
-    $('#chDonut').addEventListener('mousemove', function (e) {
-      var p = e.target.closest('[data-exp]');
-      if (!p || !S.data) { hideTip(); return; }
-      var row = (S.data.donut || []).find(function (x) { return x.k === p.dataset.exp; });
-      if (!row) { hideTip(); return; }
-      showTip('<b>' + esc(row.k) + '</b>' +
-        '<div class="tip-row"><span>Amount</span><span>' + money(row.v, 1) + '</span></div>' +
-        '<div class="tip-row"><span>Share</span><span>' + pct(row.share) + '</span></div>' +
-        '<div class="tip-row"><span>PRs</span><span>' + nf(row.n, 0) + '</span></div>',
-        e.clientX, e.clientY);
+    // 悬浮提示（两个环形图）
+    [['chDonut', 'donut'], ['chMethodDonut', 'methodDonut']].forEach(function (pair) {
+      $('#' + pair[0]).addEventListener('mousemove', function (e) {
+        var p = e.target.closest('[data-exp]');
+        if (!p || !S.data) { hideTip(); return; }
+        var row = (S.data[pair[1]] || []).find(function (x) { return x.k === p.dataset.exp; });
+        if (!row) { hideTip(); return; }
+        showTip('<b>' + esc(row.k) + '</b>' +
+          '<div class="tip-row"><span>Amount</span><span>' + money(row.v, 1) + '</span></div>' +
+          '<div class="tip-row"><span>Share</span><span>' + pct(row.share) + '</span></div>' +
+          '<div class="tip-row"><span>Orders</span><span>' + nf(row.n, 0) + '</span></div>',
+          e.clientX, e.clientY);
+      });
     });
     // 悬浮提示（热力 / 横条）
     $('#chHeat').addEventListener('mousemove', function (e) {
@@ -1423,12 +1923,12 @@
       if (!row) { hideTip(); return; }
       showTip('<b>' + esc(row.k) + '</b>' +
         '<div class="tip-row"><span>Amount</span><span>' + money(row.v, 1) + '</span></div>' +
-        '<div class="tip-row"><span>PRs</span><span>' + nf(row.n, 0) + '</span></div>' +
+        '<div class="tip-row"><span>Orders</span><span>' + nf(row.n, 0) + '</span></div>' +
         '<div class="tip-row"><span>Categories</span><span>' + nf(row.cats, 0) + '</span></div>' +
         '<div style="color:#A9C0D6;margin-top:3px">Click for details</div>',
         e.clientX, e.clientY);
     });
-    ['#chMonthly', '#chPareto', '#chDonut', '#chTop', '#chHeat'].forEach(function (sel) {
+    ['#chMonthly', '#chPareto', '#chDonut', '#chMethodDonut', '#chTop', '#chHeat'].forEach(function (sel) {
       $(sel).addEventListener('mouseleave', hideTip);
     });
 
@@ -1526,6 +2026,15 @@
       if (e.key === 'Escape') { closeDrawer(); $$('.fdrop').forEach(function (d) { d.classList.remove('open'); }); }
     });
 
+    /* 同一排的卡片高度会互相牵动（右侧热力卡更高时左卡被拉高）：
+       卡片尺寸一变就重铺一次类别表，合计行才始终贴着卡片底边 */
+    if (window.ResizeObserver) {
+      var catCard = $('#catCard');
+      if (catCard) new ResizeObserver(function () {
+        requestAnimationFrame(fitCatTable);
+      }).observe(catCard);
+    }
+
     // 自适应重绘
     var rt = null;
     window.addEventListener('resize', function () {
@@ -1533,7 +2042,7 @@
       rt = setTimeout(function () {
         if (!S.data) return;
         renderMonthly(); renderPareto(); renderCatDetails();
-        renderDonut(); renderHeat(); renderTop();
+        renderExpenseDonut(); renderMethodDonut(); renderHeat(); renderTop();
       }, 180);
     });
   }
@@ -1582,11 +2091,13 @@
     filter_brand: [],
     filter_category: [],
     filter_expense: [],
+    filter_method: [],
     filter_level: [],
     filter_region: [],
     filter_company: [],
     monthly: ['fiscal', 'yoy'],
     donut: [],
+    methodDonut: [],
     pareto: ['pareto'],
     top: [],
     heat: [],
@@ -1783,6 +2294,19 @@
         ['金额', '含增值税总价', SRC.prpo]
       ]
     },
+    methodDonut: {
+      title: '采购方式分布',
+      source: '数据来源：' + SRC.prpo,
+      notes: [
+        '把金额按采购方式（Procurement Method）分成若干块，空值归为 Unassigned。',
+        '每块百分比＝该方式金额 ÷ 当前筛选下的总金额。',
+        '点 SS-Exempt / SS-Non Exempt 会下钻到第二层：前者按「豁免单一来源的理由」、后者按「单一来源采购理由」，都经聚合映射表归一；再点理由扇区即按该理由交叉筛选。'
+      ],
+      fields: [
+        ['采购方式', 'Procurement Method', SRC.prpo],
+        ['金额', '含增值税总价', SRC.prpo]
+      ]
+    },
     catdetail: {
       title: '类别明细',
       source: '数据来源：' + SRC.prpo + ' + ' + SRC.catmap + '（与帕累托图同一份结果）',
@@ -1964,16 +2488,535 @@
     });
   }
 
+  /* ================================================ 页签 ↔ 页面切换
+     三页：Overview（原看板）/ Detail（大表格）/ Framework（协议卡独立成页）。
+     新页面：BoardPages.register(key, {label, enter, leave})。
+     页签高度固定 50px、下沿齐顶栏，且只改 class → 切页不顶动顶栏控件。 */
+  /* ---------------- 视图状态持久化（刷新后停在同一个层级） ----------------
+     存的东西：页签、财年、币种、全局筛选、方法饼图下钻层、帕累托子类别层、
+     类别明细已展开的类别、Detail 三级树展开态。
+     不存高亮（S.hl 依赖「点击前那份数据」，刷新后已无从还原）与方法下钻缓存（重拉一次）。
+     sessionStorage：同一标签页刷新/前进后退有效，新开标签页回到默认视图。 */
+  var VIEW_KEY = 'board-view-v1';
+  /* 刷新 / 关标签页前再存一次：饼图下钻、类目展开这些不经过 loadAll，
+     靠 pagehide 兜底，才不至于「改了层级一刷新就丢」 */
+  window.addEventListener('pagehide', function () { saveView(); });
+  window.addEventListener('beforeunload', function () { saveView(); });
+  function saveView() {
+    try {
+      sessionStorage.setItem(VIEW_KEY, JSON.stringify({
+        fy: S.fy || '', cur: S.cur, page: S.page,
+        sel: S.sel || {},
+        methodDrill: S.methodDrill || '',
+        subLevel: S.subLevel || '',
+        catSub: Object.keys(S.catSub || {}),
+        mMode: S.mMode,
+        expR: S.detail.expR || {},
+        expC: S.detail.expC || {}
+      }));
+    } catch (e) { /* 隐私模式 / 配额满：存不了也不影响使用 */ }
+  }
+  function readView() {
+    try {
+      var v = JSON.parse(sessionStorage.getItem(VIEW_KEY) || 'null');
+      return v && typeof v === 'object' ? v : null;
+    } catch (e) { return null; }
+  }
+  function restoreView(v) {
+    if (!v) return;
+    if (v.sel && typeof v.sel === 'object') {
+      Object.keys(v.sel).forEach(function (k) {
+        var vals = v.sel[k];
+        if (Object.prototype.toString.call(vals) === '[object Array]' && vals.length) S.sel[k] = vals;
+      });
+    }
+    if (v.methodDrill) S.methodDrill = v.methodDrill;
+    if (v.subLevel === 'sub') S.subLevel = 'sub';
+    (v.catSub || []).forEach(function (k) { S.catSub[k] = 1; });
+    if (v.mMode === 'pair') S.mMode = 'pair';
+    if (v.cur === 'RM' || v.cur === 'RMB') S.cur = v.cur;
+    if (v.fy) S.fy = v.fy;
+    if (v.expR && typeof v.expR === 'object') S.detail.expR = v.expR;
+    if (v.expC && typeof v.expC === 'object') S.detail.expC = v.expC;
+  }
+  /* 顶栏 / 图内的分段控件要跟着还原后的状态点亮（否则按钮和实际视图对不上） */
+  function syncControls() {
+    var cs = $('#curSeg');
+    if (cs) $$('button[data-cur]', cs).forEach(function (b) {
+      b.classList.toggle('on', b.dataset.cur === S.cur);
+    });
+    var ms = $('#mSw');
+    if (ms) $$('button[data-m]', ms).forEach(function (b) {
+      b.classList.toggle('on', b.dataset.m === S.mMode);
+    });
+  }
+
+  var PAGES = {
+    overview:  { label: 'Overview',
+                 enter: function () { $('#pgOverview').hidden = false; showChrome(true); },
+                 leave: function () { $('#pgOverview').hidden = true; } },
+    detail:    { label: 'Detail',    enter: enterDetail,   leave: leaveDetail },
+    framework: { label: 'Framework', enter: enterFramework, leave: leaveFramework }
+  };
+  function renderTabs() {
+    var box = $('#pgTabs');
+    if (!box) return;
+    box.innerHTML = Object.keys(PAGES).map(function (k) {
+      var p = PAGES[k], on = (k === S.page);
+      return '<button type="button" class="pg-tab' + (on ? ' on' : '') + '" data-page="' +
+        esc(k) + '"' + (on ? ' aria-current="page"' : '') + ' title="' +
+        esc(p.title || p.label) + '">' +
+        '<span class="pg-tab-top">' + esc(p.label) + '</span></button>';
+    }).join('');
+  }
+
+  /* 当前页签写进 URL hash（#detail / #framework）：刷新、收藏、离线单文件都停在原页面 */
+  function pageFromHash() {
+    var h = (location.hash || '').replace(/^#\/?/, '');
+    return PAGES[h] ? h : null;
+  }
+  function rememberPage(key) {
+    try {
+      if (window.history && history.replaceState) history.replaceState(null, '', '#' + key);
+      else location.hash = key;
+    } catch (e) { location.hash = key; }
+  }
+  function goPage(key, fromHash) {
+    if (!PAGES[key] || key === S.page) return false;
+    var old = PAGES[S.page];
+    if (old && old.leave) old.leave();
+    S.page = key;
+    renderTabs();
+    var next = PAGES[key];
+    if (next && next.enter) next.enter();
+    if (!fromHash) rememberPage(key);
+    saveView();
+    return true;
+  }
+
+  /* Overview 才显示固定区里的 KPI 行 + 全局筛选条；Detail/Framework 各有自己的表与局部筛选 */
+  function showChrome(show) {
+    var bar = $('.fbar'), kpis = $('#kpis');
+    if (bar) bar.hidden = !show;
+    if (kpis) kpis.hidden = !show;
+  }
+  function enterFramework() {
+    $('#pgFramework').hidden = false;
+    showChrome(false);
+  }
+  function leaveFramework() {
+    $('#pgFramework').hidden = true;
+    showChrome(true);
+  }
+  function enterDetail() {
+    $('#pgDetail').hidden = false;
+    showChrome(false);
+    if (!S.detail.loaded || S.detail.stale) loadDetail();
+  }
+  function leaveDetail() {
+    closeDtPop();
+    $('#pgDetail').hidden = true;
+    showChrome(true);
+  }
+
+  window.addEventListener('hashchange', function () {
+    var p = pageFromHash();
+    if (p && p !== S.page) goPage(p, true);
+  });
+
+  /* 给后续页面模块用：register 之后页签自动出现，go 可程序化切页 */
+  window.BoardPages = {
+    go: goPage,
+    register: function (key, def) { PAGES[key] = def || {}; renderTabs(); },
+    current: function () { return S.page; }
+  };
+
+  /* ================================================ Detail 大表格
+     后端 /api/board/detail 分页取数，合计按筛选全集算；每列：
+       · 点标题排序（数值默认降序、文本默认升序，再点反向）
+       · 点漏斗开浮层：文本列 = 搜索 + 取值勾选，数值列 = 最小/最大区间
+       · Clear filters 一次清掉所有列条件 */
+  /* 列宽按实测内容定（1600 视口 ≈1472px 表宽）：
+       短列只要放下表头 + 漏斗 + 一个分组行，余量全给 Supplier / Note；
+       Company / Category 再压一档（分组行仍放得下），多出来的宽度都给说明；
+       金额两列要容得下表头「PRPO Amount (RMB)」，否则表头被省略号截掉。 */
+  var DT_COLS = [
+    { k: 'region',   t: 'Region',              w: '6.25%' },
+    { k: 'company',  t: 'Company',             w: '8.43%' },
+    { k: 'category', t: 'Category',            w: '8.84%' },
+    { k: 'supplier', t: 'Supplier',            w: '18.7%' },
+    { k: 'method',   t: 'Procurement Method',  w: '10.94%' },
+    /* 豁免单一来源的理由 / 单一来源采购理由 不会同时出现，合并成一列 */
+    { k: 'reason',   t: 'Single Source Reason', w: '11.08%' },
+    /* 说明：一行显示 + 省略号（全文在悬停浮窗里），夹在理由与金额之间 */
+    { k: 'note',     t: 'Note',                w: '16.59%', long: 1 },
+    { k: 'amount',   t: 'PRPO Amount',         w: '10.81%', num: 1 },
+    { k: 'paid',     t: 'PO Paid',             w: '8.36%', num: 1 }
+  ];
+  var DT_TEXT = DT_COLS.filter(function (c) { return !c.num; });
+
+  function dtCol(key) {
+    for (var i = 0; i < DT_COLS.length; i++) if (DT_COLS[i].k === key) return DT_COLS[i];
+    return null;
+  }
+  function dtMoney(v) {
+    if (v == null || isNaN(v)) return '—';
+    return sym() + nf(v, 2);
+  }
+  function dtActive(k) {
+    var d = S.detail;
+    return !!(d.q[k] || (d.f[k] && d.f[k].length) || d.min[k] !== undefined || d.max[k] !== undefined);
+  }
+  function dtParams(extra) {
+    var p = qs(extra), d = S.detail;
+    p.set('sort', d.sort); p.set('dir', d.dir);
+    Object.keys(d.q).forEach(function (k) { if (d.q[k]) p.set('q_' + k, d.q[k]); });
+    Object.keys(d.f).forEach(function (k) {
+      if (d.f[k] && d.f[k].length) p.set('f_' + k, JSON.stringify(d.f[k]));
+    });
+    Object.keys(d.min).forEach(function (k) { if (d.min[k] !== '' && d.min[k] != null) p.set('min_' + k, d.min[k]); });
+    Object.keys(d.max).forEach(function (k) { if (d.max[k] !== '' && d.max[k] != null) p.set('max_' + k, d.max[k]); });
+    return p;
+  }
+  function loadDetail() {
+    var seq = ++S.detail.seq;
+    api('/api/board/detail', dtParams()).then(function (d) {
+      if (seq !== S.detail.seq) return;
+      S.detail.loaded = true; S.detail.stale = false; S.detail.data = d;
+      renderDetail(d);
+    }).catch(function (e) {
+      toast('Failed to load detail: ' + e.message, 4000);
+    });
+  }
+  function renderDtHead() {
+    var d = S.detail;
+    $('#dtTbl thead').innerHTML = '<tr>' + DT_COLS.map(function (c) {
+      var label = c.t + (c.num ? ' (' + S.cur + ')' : '');
+      var arrow = d.sort === c.k ? (d.dir === 'asc' ? '↑' : '↓') : '';
+      return '<th style="width:' + c.w + '"><div class="dt-th">' +
+        '<span class="dt-sort" data-sort="' + c.k + '" title="Sort by ' + esc(c.t) + '">' +
+        esc(label) + '<i class="dt-arrow">' + arrow + '</i></span>' +
+        '<button type="button" class="dt-funnel' + (dtActive(c.k) ? ' on' : '') +
+        '" data-col="' + c.k + '" title="Search / filter ' + esc(c.t) + '">▾</button>' +
+        '</div></th>';
+    }).join('') + '</tr>';
+  }
+  function dtCoKey(region, company) { return (region || '') + '\u0001' + (company || ''); }
+  /* -------- 单元格悬停浮窗 --------
+     只对被裁掉的内容浮窗：说明列永远单行，一定有浮窗；其余列按 scrollWidth 判断。
+     定位贴单元格下沿、越界翻到上方并夹在视口内；滚动 / 移出表格 / 重渲染都收起。 */
+  var dtTipEl = null, dtTipTd = null, dtTipTimer = null;
+  function hideDtTip() {
+    clearTimeout(dtTipTimer); dtTipTimer = null; dtTipTd = null;
+    if (dtTipEl) { dtTipEl.hidden = true; dtTipEl.textContent = ''; }
+  }
+  function placeDtTip(td) {
+    var txt = td.getAttribute('data-tip') || '';
+    if (!dtTipEl || !txt ||
+        (!td.classList.contains('dt-note') && td.scrollWidth <= td.clientWidth + 1)) {
+      hideDtTip(); return;
+    }
+    dtTipEl.textContent = txt;
+    dtTipEl.hidden = false;
+    var r = td.getBoundingClientRect(), pad = 8;
+    var w = dtTipEl.offsetWidth, h = dtTipEl.offsetHeight;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var x = Math.min(Math.max(pad, r.left), vw - w - pad);
+    var y = r.bottom + 6;
+    if (y + h > vh - pad) y = r.top - h - 6;
+    dtTipEl.style.left = Math.round(x) + 'px';
+    dtTipEl.style.top = Math.round(Math.max(pad, y)) + 'px';
+  }
+  function renderDetail(d) {
+    hideDtTip();
+    renderDtHead();
+    S.detail.data = d;
+    var max = { amount: 0, paid: 0 }, reg = {}, co = {}, tree = [];
+    (d.rows || []).forEach(function (r) {
+      ['amount', 'paid'].forEach(function (k) {
+        if (r[k] > max[k]) max[k] = r[k];
+      });
+    });
+    /* 分组小计：后端按筛选全集算；老快照没带就按全集兜底 */
+    (d.regionTotals || []).forEach(function (r) { reg[r.region || ''] = r; });
+    (d.companyTotals || []).forEach(function (r) { co[dtCoKey(r.region, r.company)] = r; });
+    if (!(d.regionTotals || []).length || !(d.companyTotals || []).length) {
+      (d.rows || []).forEach(function (r) {
+        var rk = r.region || '', ck = dtCoKey(rk, r.company);
+        var g = reg[rk] || (reg[rk] = { region: rk, n: 0, amount: 0, paid: 0 });
+        var h = co[ck] || (co[ck] = { region: rk, company: r.company || '', n: 0, amount: 0, paid: 0 });
+        g.n++; g.amount += r.amount || 0; g.paid += r.paid || 0;
+        h.n++; h.amount += r.amount || 0; h.paid += r.paid || 0;
+      });
+    }
+    /* 建区域→公司树；区域按采购额降序、公司按采购额降序（小计来自筛选全集），
+       明细行在组内保持后端排序。 */
+    var rmap = {};
+    (d.rows || []).forEach(function (r) {
+      var rk = r.region || '', ck = r.company || '';
+      var g = rmap[rk] || (rmap[rk] = { region: rk, cos: {}, order: [] });
+      if (!g.cos[ck]) { g.cos[ck] = []; g.order.push(ck); }
+      g.cos[ck].push(r);
+    });
+    Object.keys(rmap).forEach(function (rk) { tree.push(rmap[rk]); });
+    tree.sort(function (a, b) {
+      return (reg[b.region] ? reg[b.region].amount : 0) - (reg[a.region] ? reg[a.region].amount : 0);
+    });
+    tree.forEach(function (g) {
+      g.order.sort(function (x, y) {
+        var cx = co[dtCoKey(g.region, x)], cy = co[dtCoKey(g.region, y)];
+        return (cy ? cy.amount : 0) - (cx ? cx.amount : 0);
+      });
+    });
+    function numCell(v, key) {
+      var w = max[key] > 0 && v > 0 ? Math.min(100, Math.max(3, Math.round(v / max[key] * 100))) : 0;
+      return '<td class="num"><i class="dt-bar' + (key === 'paid' ? ' paid' : '') +
+        '" style="width:' + w + '%"></i><span>' + dtMoney(v) + '</span></td>';
+    }
+    var body = [];
+    tree.forEach(function (g) {
+      var rk = g.region, rg = reg[rk] || { n: 0, amount: 0, paid: 0 };
+      var rOpen = !!S.detail.expR[rk];
+      body.push('<tr class="dt-group" data-region="' + esc(rk) + '">' +
+        '<td data-tip="' + esc(rk) + '"><button type="button" class="dt-toggle" data-toggle-region="' + esc(rk) +
+        '" title="' + (rOpen ? 'Collapse' : 'Expand') + ' ' + esc(rk) + '">' +
+        (rOpen ? '−' : '+') + '</button>' + esc(rk || '(blank)') +
+        '<i class="dt-gn">' + nf(rg.n, 0) + '</i></td>' +
+        '<td colspan="6" class="dt-gmeta">region subtotal</td>' +
+        numCell(rg.amount, 'amount') + numCell(rg.paid, 'paid') + '</tr>');
+      if (!rOpen) return;
+      g.order.forEach(function (ckName) {
+        var key = dtCoKey(rk, ckName), cg = co[key] || { n: 0, amount: 0, paid: 0 };
+        var cOpen = !!S.detail.expC[key];
+        body.push('<tr class="dt-company" data-region="' + esc(rk) + '" data-company="' + esc(ckName) + '">' +
+          '<td class="dt-tree">└</td><td data-tip="' + esc(ckName) + '"><button type="button" class="dt-toggle" data-toggle-company="' +
+          esc(key) + '" title="' + (cOpen ? 'Collapse' : 'Expand') + ' ' + esc(ckName) + '">' +
+          (cOpen ? '−' : '+') + '</button>' + esc(ckName || '(blank)') +
+          '<i class="dt-gn">' + nf(cg.n, 0) + '</i></td>' +
+          '<td colspan="5" class="dt-gmeta">company subtotal</td>' +
+          numCell(cg.amount, 'amount') + numCell(cg.paid, 'paid') + '</tr>');
+        if (!cOpen) return;
+        g.cos[ckName].forEach(function (r) {
+          body.push('<tr class="dt-child">' + DT_COLS.map(function (c, i) {
+            var v = r[c.k];
+            if (c.num) return numCell(v, c.k);
+            if (i === 0) return '<td class="dt-tree">└</td>';
+            var tip = v == null ? '' : String(v);
+            /* 文本列把原值放进 data-tip，悬停时由浮窗给全文（说明保留换行、
+               供应商给中英文全称，宽度不够时不再靠浏览器原生 title） */
+            if (c.long) {
+              return '<td class="dt-note" data-tip="' + esc(tip) + '">' + esc(v || '—') + '</td>';
+            }
+            var disp = c.k === 'supplier' ? supEn(v) : (v || '—');
+            return '<td data-tip="' + esc(tip) + '">' + esc(disp) + '</td>';
+          }).join('') + '</tr>');
+        });
+      });
+    });
+    $('#dtTbl tbody').innerHTML = body.join('') || '<tr><td colspan="' + DT_COLS.length +
+      '" class="dt-empty">No rows match the current filters</td></tr>';
+    $('#dtTbl tfoot').innerHTML = '<tr>' + DT_COLS.map(function (c, i) {
+      if (c.num) return '<td class="num">' + dtMoney(d.sums[c.k]) + '</td>';
+      return '<td>' + (i === 0 ? 'Total' : '') + '</td>';
+    }).join('') + '</tr>';
+    $('#dtMeta').textContent = nf(d.total, 0) + ' rows · ' + d.fy + ' · ' + d.cur;
+  }
+
+  /* -------- 表头浮层 -------- */
+  function closeDtPop() {
+    var pop = $('#dtPop');
+    if (!pop) return;
+    pop.hidden = true; pop.innerHTML = '';
+    S.detail.pop = null; S.detail.tmp = null;
+  }
+  function openDtPop(key, btn) {
+    closeDtPop();
+    var c = dtCol(key);
+    if (!c) return;
+    var d = S.detail, pop = $('#dtPop');
+    d.pop = key;
+    if (c.num) {
+      d.tmp = { min: d.min[key] == null ? '' : d.min[key], max: d.max[key] == null ? '' : d.max[key] };
+      pop.innerHTML = '<div class="dt-pt">' + esc(c.t) + ' · range</div>' +
+        '<div class="dt-range"><span>Min</span><input type="number" data-f="min" value="' + esc(d.tmp.min) + '">' +
+        '<span>Max</span><input type="number" data-f="max" value="' + esc(d.tmp.max) + '"></div>' +
+        '<div class="dt-acts" style="margin-top:9px">' +
+        '<button type="button" class="btn ghost" data-act="clear">Clear</button>' +
+        '<button type="button" class="btn" data-act="apply">Apply</button></div>';
+    } else if (c.long) {
+      /* 长文本列（说明）：4 万多种取值，勾选没有意义，只给全文搜索 */
+      d.tmp = { search: d.q[key] || '' };
+      pop.innerHTML = '<div class="dt-pt">' + esc(c.t) + ' · search</div>' +
+        '<input type="search" data-f="search" placeholder="Search within note…" value="' + esc(d.tmp.search) + '">' +
+        '<div class="dt-none" style="margin:7px 0 0">Matches the whole PRPO note text (case-insensitive, contains).</div>' +
+        '<div class="dt-acts" style="margin-top:9px">' +
+        '<button type="button" class="btn ghost" data-act="clear">Clear</button>' +
+        '<button type="button" class="btn" data-act="apply">Apply</button></div>';
+    } else {
+      d.tmp = { search: d.q[key] || '', sel: (d.f[key] || []).slice(), list: [] };
+      pop.innerHTML = '<div class="dt-pt">' + esc(c.t) + ' · filter</div>' +
+        '<input type="search" data-f="search" placeholder="Search values…" value="' + esc(d.tmp.search) + '">' +
+        '<div class="dt-list"><div class="dt-none">Loading…</div></div>' +
+        '<div class="dt-acts">' +
+        '<button type="button" class="btn ghost sm" data-act="all">All</button>' +
+        '<button type="button" class="btn ghost" data-act="clear">Clear</button>' +
+        '<button type="button" class="btn" data-act="apply">Apply</button></div>';
+      fetchDtValues(key, d.tmp.search);
+    }
+    pop.hidden = false;
+    var r = btn.getBoundingClientRect();
+    pop.style.left = Math.max(8, Math.min(r.left - 8, innerWidth - 278)) + 'px';
+    pop.style.top = Math.max(8, Math.min(r.bottom + 4, innerHeight - 330)) + 'px';
+    var inp = pop.querySelector('input');
+    if (inp) inp.focus();
+  }
+  function fetchDtValues(key, search) {
+    var c0 = dtCol(key);
+    if (!key || !c0 || c0.long) return;      // 长文本列没有取值列表
+    var p = dtParams();
+    p.delete('q_' + key); p.delete('f_' + key);
+    p.delete('page'); p.delete('size'); p.delete('sort'); p.delete('dir');
+    if (search) p.set('q', search);
+    p.set('col', key);
+    api('/api/board/detail/values', p).then(function (list) {
+      if (S.detail.pop !== key) return;
+      var pop = $('#dtPop'), box = pop.querySelector('.dt-list');
+      if (!box) return;
+      var sel = S.detail.tmp.sel;
+      S.detail.tmp.list = (list || []).map(function (o) { return String(o.v); });
+      box.innerHTML = (list || []).length ? list.map(function (o) {
+        return '<label><input type="checkbox" value="' + esc(o.v) + '"' +
+          (sel.indexOf(String(o.v)) >= 0 ? ' checked' : '') + '><span>' + esc(o.v || '(blank)') +
+          '</span><i>' + nf(o.n, 0) + '</i></label>';
+      }).join('') : '<div class="dt-none">No matching value</div>';
+    }).catch(function () {
+      var box = $('#dtPop .dt-list');
+      if (box) box.innerHTML = '<div class="dt-none">Failed to load values</div>';
+    });
+  }
+  function applyDtPop() {
+    var d = S.detail, key = d.pop, pop = $('#dtPop'), c = dtCol(key);
+    if (!key || !c || !pop) return;
+    if (c.num) {
+      var mn = pop.querySelector('[data-f=min]').value, mx = pop.querySelector('[data-f=max]').value;
+      if (mn === '') delete d.min[key]; else d.min[key] = mn;
+      if (mx === '') delete d.max[key]; else d.max[key] = mx;
+    } else {
+      var q = pop.querySelector('[data-f=search]').value.trim();
+      var vals = [].slice.call(pop.querySelectorAll('.dt-list input:checked')).map(function (i) { return i.value; });
+      if (q) d.q[key] = q; else delete d.q[key];
+      if (vals.length) d.f[key] = vals; else delete d.f[key];
+    }
+    d.page = 1;
+    closeDtPop();
+    renderDtHead();
+    loadDetail();
+  }
+  function clearDtCol(key) {
+    var d = S.detail;
+    delete d.q[key]; delete d.f[key]; delete d.min[key]; delete d.max[key];
+    d.page = 1; closeDtPop(); renderDtHead(); loadDetail();
+  }
+  function bindDetail() {
+    var tbl = $('#dtTbl'), pop = $('#dtPop');
+    if (!tbl || !pop) return;
+    dtTipEl = $('#dtTip');
+    /* 悬停浮窗：同一格只在首次进入时启动，移动鼠标不重复定位 */
+    tbl.addEventListener('mouseover', function (e) {
+      /* 折叠按钮自己有 title，别和浮窗打架 */
+      if (e.target.closest('.dt-toggle')) { hideDtTip(); return; }
+      var td = e.target.closest('td[data-tip]');
+      if (!td) { hideDtTip(); return; }
+      if (td === dtTipTd) return;
+      dtTipTd = td;
+      clearTimeout(dtTipTimer);
+      dtTipTimer = setTimeout(function () { placeDtTip(td); }, 80);
+    });
+    tbl.addEventListener('mouseleave', hideDtTip);
+    /* 表格横竖滚动、页面滚动都会让浮窗位置失效，直接收起 */
+    document.addEventListener('scroll', hideDtTip, true);
+    tbl.addEventListener('click', function (e) {
+      var c = e.target.closest('[data-toggle-company]');
+      if (c) {
+        var key = c.dataset.toggleCompany;
+        S.detail.expC[key] = !S.detail.expC[key];
+        if (S.detail.data) renderDetail(S.detail.data);
+        saveView();
+        return;
+      }
+      var t = e.target.closest('[data-toggle-region]');
+      if (t) {
+        var rk = t.dataset.toggleRegion;
+        S.detail.expR[rk] = !S.detail.expR[rk];
+        if (S.detail.data) renderDetail(S.detail.data);
+        saveView();
+        return;
+      }
+      var s = e.target.closest('[data-sort]');
+      if (s) {
+        var k = s.dataset.sort, d = S.detail;
+        if (d.sort === k) d.dir = d.dir === 'asc' ? 'desc' : 'asc';
+        else { d.sort = k; d.dir = dtCol(k) && dtCol(k).num ? 'desc' : 'asc'; }
+        d.page = 1; loadDetail(); return;
+      }
+      var f = e.target.closest('.dt-funnel');
+      if (f) openDtPop(f.dataset.col, f);
+    });
+    $('#dtReset').addEventListener('click', function () {
+      var d = S.detail;
+      d.q = {}; d.f = {}; d.min = {}; d.max = {}; d.page = 1;
+      closeDtPop(); renderDtHead(); loadDetail();
+    });
+    pop.addEventListener('click', function (e) {
+      var a = e.target.closest('[data-act]');
+      if (!a) return;
+      if (a.dataset.act === 'apply') applyDtPop();
+      else if (a.dataset.act === 'clear') clearDtCol(S.detail.pop);
+      else if (a.dataset.act === 'all') {
+        var list = (S.detail.tmp && S.detail.tmp.list) || [];
+        $$('.dt-list input', pop).forEach(function (i) { i.checked = true; });
+        if (S.detail.tmp) S.detail.tmp.sel = list.slice();
+      }
+    });
+    var timer = null;
+    pop.addEventListener('input', function (e) {
+      var f = e.target.dataset.f;
+      if (f === 'min' || f === 'max') { S.detail.tmp[f] = e.target.value; return; }
+      if (f !== 'search') return;
+      S.detail.tmp.search = e.target.value;
+      clearTimeout(timer);
+      var cur = S.detail.pop, c2 = dtCol(cur);
+      /* 长文本列只有搜索、没有取值列表，不用去拉候选 */
+      if (!cur || !c2 || c2.long) return;
+      timer = setTimeout(function () {
+        if (S.detail.pop !== cur) return;   // 期间已 Apply/关闭，丢弃这次请求
+        fetchDtValues(cur, e.target.value);
+      }, 220);
+    });
+    document.addEventListener('click', function (e) {
+      if (!pop.hidden && !e.target.closest('.dt-pop') && !e.target.closest('.dt-funnel')) closeDtPop();
+    });
+  }
+
   /* ================================================ 启动 */
   function init() {
+    /* 先还原层级再发首个请求：筛选 / 下钻本来就要进 query，晚一步就是白跑一次全量 */
+    restoreView(readView());
+    renderTabs();
     bind();
+    bindDetail();
     bindSpec();
     /* options 与 data 互不依赖：data 不带 fy 时后端取最新财年（与 options.latestFy
        同一个口径），所以两个请求可以并行发，首屏少一个 300ms 的往返。 */
     Promise.all([
       loadOptions().catch(function (e) { console.error(e); }),
       loadAll()
-    ]).catch(function (e) {
+    ]).then(function () {
+      syncControls();
+      /* 首屏渲染完再切页：Overview 已经在可见状态下量过尺寸，切过去不会出现 0 宽度图表 */
+      var p = pageFromHash();
+      if (p && p !== S.page) goPage(p, true);
+    }).catch(function (e) {
       toast('Initialization failed: ' + e.message, 5000);
       console.error(e);
     });

@@ -31,6 +31,10 @@
     </div>
     <button class="btn" id="btnExport" title="Export purchase requisition detail for the current fiscal year and filters">Export View</button>
   </div>
+
+  <!-- 页签：多页面切换入口（Power BI 式视觉对象页头），后续新页面只需在
+       board.js 的 PAGES 里注册 label/sub/render，不用改这里 -->
+  <nav class="pg-tabs" id="pgTabs" aria-label="Dashboard pages"></nav>
 </header>
 
 <!-- KPI -->
@@ -50,8 +54,8 @@
 </div><!-- /.sticky-head -->
 
 <!-- 主区 -->
-<main class="grid">
-  <section class="card g9">
+<main class="grid" id="pgOverview">
+  <section class="card g6">
     <div class="card-h">
       <h2 id="mTitle">Monthly Spend by Region</h2>
       <div class="card-tools">
@@ -60,10 +64,16 @@
           <button type="button" data-m="pair">Total vs Framework</button>
         </div>
         <button class="spec-btn" data-spec="monthly" title="View calculation logic">?</button>
-        <span class="v-slot"><button type="button" class="v-back" data-clear="region" hidden
-                aria-label="Back" title="Back"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+        <span class="v-slot"><button type="button" class="v-ico v-back" data-clear="region" data-drill="up" hidden
+                aria-label="Drill up" title="Drill up"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
                stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
-               aria-hidden="true"><path d="M9 6 3 12l6 6"/><path d="M3 12h9.5a5.5 5.5 0 0 1 5.5 5.5V20"/></svg></button></span>
+               aria-hidden="true"><path d="M12 20V5"/><path d="m5 12 7-7 7 7"/></svg></button></span>
+        <span class="v-tools"><button type="button" class="v-ico v-flt" data-flt="monthly"
+                aria-label="Filters affecting this visual" title="Filters affecting this visual"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18l-7.2 8.4V20l-3.6-2v-4.6z"/></svg></button>
+        <button type="button" class="v-ico v-hl" data-hl="1"
+                aria-label="Highlight" title="Highlight: click a bar to dim the rest"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 20v-6M9 20V6M14 20v-9M19 20V9"/></svg></button></span>
       </div>
     </div>
     <div class="lg-row">
@@ -77,26 +87,73 @@
       <h2>Spend by Expense Type</h2>
       <div class="card-tools">
         <button class="spec-btn" data-spec="donut" title="View calculation logic">?</button>
-        <button type="button" class="v-back" data-clear="expense" hidden
-                aria-label="Back" title="Back"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
-               stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
-               aria-hidden="true"><path d="M9 6 3 12l6 6"/><path d="M3 12h9.5a5.5 5.5 0 0 1 5.5 5.5V20"/></svg></button>
+                <button type="button" class="v-ico v-back" data-clear="expense" data-drill="up" hidden aria-label="Drill up" title="Drill up">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M12 20V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+        <button type="button" class="v-ico v-flt" data-flt="donut" aria-label="Filters affecting this visual" title="Filters affecting this visual">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M3 5h18l-7.2 8.4V20l-3.6-2v-4.6z"/></svg></button>
+        <button type="button" class="v-ico v-hl" data-hl="1" aria-label="Highlight" title="Highlight: click a bar to dim the rest">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M4 20v-6M9 20V6M14 20v-9M19 20V9"/></svg></button>
       </div>
     </div>
     <div class="chart" id="chDonut" data-empty="No expense type data"></div>
     <div class="legend-list" id="donutLegend"></div>
   </section>
 
+  <section class="card g3">
+    <div class="card-h">
+      <h2 id="mDonutTitle">Spend by Method</h2>
+      <div class="card-tools">
+        <button class="spec-btn" data-spec="methodDonut" title="View calculation logic">?</button>
+                <button type="button" class="v-ico v-back" data-clear="method" data-drill="up" hidden aria-label="Drill up" title="Drill up">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M12 20V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+        <button type="button" class="v-ico v-down" data-drill="down" hidden aria-label="Go to next level" title="Go to next level">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M12 4v15"/><path d="m19 12-7 7-7-7"/></svg></button>
+        <button type="button" class="v-ico v-flt" data-flt="methodDonut" aria-label="Filters affecting this visual" title="Filters affecting this visual">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M3 5h18l-7.2 8.4V20l-3.6-2v-4.6z"/></svg></button>
+        <button type="button" class="v-ico v-hl" data-hl="1" aria-label="Highlight" title="Highlight: click a bar to dim the rest">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M4 20v-6M9 20V6M14 20v-9M19 20V9"/></svg></button>
+      </div>
+    </div>
+    <div class="chart" id="chMethodDonut" data-empty="No procurement method data"></div>
+    <div class="legend-list" id="methodDonutLegend"></div>
+  </section>
+
   <section class="card g7">
     <div class="card-h">
-      <h2>Category Spend (Pareto)</h2>
+      <h2 id="pTitle">Category Spend (Pareto)</h2>
       <div class="card-tools">
         <button class="spec-btn" data-spec="pareto" title="View calculation logic">?</button>
         <span class="hint">Bars = spend · line = cumulative %</span>
-        <button type="button" class="v-back" data-clear="category" hidden
-                aria-label="Back" title="Back"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
-               stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
-               aria-hidden="true"><path d="M9 6 3 12l6 6"/><path d="M3 12h9.5a5.5 5.5 0 0 1 5.5 5.5V20"/></svg></button>
+                <button type="button" class="v-ico v-back" data-clear="category" data-drill="up" hidden aria-label="Drill up" title="Drill up">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M12 20V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+        <button type="button" class="v-ico v-down" data-drill="down" hidden aria-label="Go to next level" title="Go to next level">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M12 4v15"/><path d="m19 12-7 7-7-7"/></svg></button>
+        <button type="button" class="v-ico v-flt" data-flt="pareto" aria-label="Filters affecting this visual" title="Filters affecting this visual">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M3 5h18l-7.2 8.4V20l-3.6-2v-4.6z"/></svg></button>
+        <button type="button" class="v-ico v-hl" data-hl="1" aria-label="Highlight" title="Highlight: click a bar to dim the rest">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M4 20v-6M9 20V6M14 20v-9M19 20V9"/></svg></button>
       </div>
     </div>
     <div class="chart" id="chPareto" data-empty="No category data"></div>
@@ -109,6 +166,10 @@
         <button class="spec-btn" data-spec="top" title="View calculation logic">?</button>
         <select id="topCat" class="mini-sel"><option value="">All categories</option></select>
         <select id="topMth" class="mini-sel"><option value="">All methods</option></select>
+        <button type="button" class="v-ico v-flt" data-flt="top" aria-label="Filters affecting this visual" title="Filters affecting this visual">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M3 5h18l-7.2 8.4V20l-3.6-2v-4.6z"/></svg></button>
       </div>
     </div>
     <div class="chart" id="chTop" data-empty="No supplier data"></div>
@@ -120,10 +181,22 @@
       <div class="card-tools">
         <input id="catQ" class="mini-inp" type="search" placeholder="Search category" title="Filter categories by name">
         <button class="spec-btn" data-spec="catdetail" title="View calculation logic">?</button>
-        <button type="button" class="v-back" data-clear="category" hidden
-                aria-label="Back" title="Back"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
-               stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
-               aria-hidden="true"><path d="M9 6 3 12l6 6"/><path d="M3 12h9.5a5.5 5.5 0 0 1 5.5 5.5V20"/></svg></button>
+                <button type="button" class="v-ico v-back" data-clear="category" data-drill="up" hidden aria-label="Drill up" title="Drill up">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M12 20V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+        <button type="button" class="v-ico v-exp" data-drill="expand" hidden aria-label="Expand all down one level" title="Expand all down one level">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M8 3v12m0 0-3.2-3.2M8 15l3.2-3.2"/><path d="M16 6v12m0 0-3.2-3.2M16 18l3.2-3.2"/></svg></button>
+        <button type="button" class="v-ico v-flt" data-flt="catdetail" aria-label="Filters affecting this visual" title="Filters affecting this visual">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M3 5h18l-7.2 8.4V20l-3.6-2v-4.6z"/></svg></button>
+        <button type="button" class="v-ico v-hl" data-hl="1" aria-label="Highlight" title="Highlight: click a bar to dim the rest">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M4 20v-6M9 20V6M14 20v-9M19 20V9"/></svg></button>
       </div>
     </div>
     <div class="cd-wrap" id="chCat"></div>
@@ -135,12 +208,37 @@
       <div class="card-tools">
         <button class="spec-btn" data-spec="heat" title="View calculation logic">?</button>
         <span class="hint">Cell shading = spend</span>
+        <button type="button" class="v-ico v-flt" data-flt="heat" aria-label="Filters affecting this visual" title="Filters affecting this visual">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M3 5h18l-7.2 8.4V20l-3.6-2v-4.6z"/></svg></button>
       </div>
     </div>
     <div class="chart heat-wrap" id="chHeat" data-empty="No cross data"></div>
   </section>
 
-  <section class="card g12" id="fcCard">
+</main>
+
+<!-- 第二页：Detail 大表格（每列可搜索 / 筛选 / 排序） -->
+<main class="page" id="pgDetail" hidden>
+  <section class="card dt-card">
+    <div class="card-h">
+      <h2>Detail</h2>
+      <div class="card-tools">
+        <span class="dt-meta" id="dtMeta"></span>
+        <button class="btn ghost" id="dtReset" title="Clear all column filters">Clear filters</button>
+      </div>
+    </div>
+    <div class="dt-wrap">
+      <table class="dt-tbl" id="dtTbl"><thead></thead><tbody></tbody><tfoot></tfoot></table>
+      <div class="dt-pop" id="dtPop" hidden></div>
+    </div>
+  </section>
+</main>
+
+<!-- 第三页：Framework（协议卡独立在这里，Overview 不再显示） -->
+<main class="page" id="pgFramework" hidden>
+  <section class="card" id="fcCard">
     <div class="card-h">
       <h2>Framework Agreements <span class="card-note">· Separate source · 190 agreements · PA counts framework-contract POs only</span></h2>
       <div class="card-tools">
@@ -161,6 +259,10 @@
         <input id="fcSup" class="mini-inp" type="search" placeholder="Search supplier">
         <button class="btn ghost sm" id="fcReset">Reset</button>
         <button class="btn ghost sm" id="fcExport">Export</button>
+        <button type="button" class="v-ico v-flt" data-flt="contracts" aria-label="Filters affecting this visual" title="Filters affecting this visual">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M3 5h18l-7.2 8.4V20l-3.6-2v-4.6z"/></svg></button>
       </div>
     </div>
     <div class="fc-summary" id="fcSummary"></div>
@@ -232,6 +334,12 @@
     </div>
   </div>
 </div>
+
+<!-- 视觉对象筛选浮层（PBI 头部漏斗）：列出影响这张图的切片器 / 全局筛选 / 本图局部筛选 -->
+<div class="vt-pop" id="vtPop" hidden></div>
+
+<!-- 单元格悬停浮窗：Detail 表格里被截断的内容（说明、供应商全称）给全文 -->
+<div class="dt-tip" id="dtTip" hidden></div>
 
 <script>window.__BOARD__ = { css: {{ v_css|tojson }}, js: {{ v_js|tojson }} };</script>
 <script src="{{ url_for('static', filename='board/board.js') }}?v={{ v_js }}"></script>
