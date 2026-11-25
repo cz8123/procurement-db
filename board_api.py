@@ -19,6 +19,7 @@ import sqlite3
 import time
 
 from flask import Blueprint, Response, jsonify, request
+from werkzeug.datastructures import MultiDict
 
 from supplier_name import split_en, clean_en, english_variants
 
@@ -1235,8 +1236,21 @@ def geo():
                       'LEFT JOIN loc ON loc.company=p."Company_cn" WHERE %s')
         cats, _ = sums(('p."Category" k', cat_sql), where, params)
         pcats, _ = sums(('p."Category" k', cat_sql), pwhere, pparams)
-        comps, cmeta = sums(('p."Company_cn" k', bubble_sql), where, params, True)
-        pcomps, _ = sums(('p."Company_cn" k', bubble_sql), pwhere, pparams, True)
+        # 公司列表不能吃 company 自己的筛选：否则勾一家后列表只剩这一家，无法继续多选。
+        # 其它全局筛选（区域 / 类别 / 支出类型…）照常生效。
+        args_nc = MultiDict((k, v) for k, v in request.args.items(multi=True) if k != "company")
+        where_nc, params_nc = _scope(args_nc, fy)
+        pwhere_nc, pparams_nc = (_scope(args_nc, pfy) if pfy else (None, None))
+        comps, cmeta = sums(('p."Company_cn" k', bubble_sql), where_nc, params_nc, True)
+        pcomps, _ = sums(('p."Company_cn" k', bubble_sql), pwhere_nc, pparams_nc, True)
+        # 表格自身点击类别时不能把其它行删掉（否则无法再点第二次取消）：
+        # categoriesAll 忽略 category 筛选，前端用它画全表并对未选中行做淡化。
+        args_nocat = MultiDict((k, v) for k, v in request.args.items(multi=True)
+                               if k != "category")
+        where_ac, params_ac = _scope(args_nocat, fy)
+        pwhere_ac, pparams_ac = (_scope(args_nocat, pfy) if pfy else (None, None))
+        cats_all, _ = sums(('p."Category" k', cat_sql), where_ac, params_ac)
+        pcats_all, _ = sums(('p."Category" k', cat_sql), pwhere_ac, pparams_ac)
 
         def rows(a, b, key, meta=None):
             out = []
@@ -1259,6 +1273,7 @@ def geo():
             "total": {"v": _num(total_v), "pv": _num(total_pv),
                       "yoy": _yoy(total_v, total_pv)},
             "categories": categories, "companies": companies, "bubbles": bubbles,
+            "categoriesAll": rows(cats_all, pcats_all, "cat"),
         })
     finally:
         c.close()

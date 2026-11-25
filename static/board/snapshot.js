@@ -740,7 +740,16 @@
     var list = pick(fy, f), plist = pfy ? pick(pfy, f) : [];
     var ca = geoAgg(list, metric, 'category').sums,
         cp = geoAgg(plist, metric, 'category').sums;
-    var co = geoAgg(list, metric, 'company'), po = geoAgg(plist, metric, 'company').sums;
+    /* 与在线一致：公司列表不吃 company 自身筛选，否则勾一家后列表只剩一家 */
+    var fCo = {}, fCat = {}, k;
+    for (k in f) {
+      if (k !== 'company') fCo[k] = f[k];
+      if (k !== 'category') fCat[k] = f[k];
+    }
+    var co = geoAgg(pick(fy, fCo), metric, 'company'),
+        po = geoAgg(pfy ? pick(pfy, fCo) : [], metric, 'company').sums;
+    var caAll = geoAgg(pick(fy, fCat), metric, 'category').sums,
+        cpAll = geoAgg(pfy ? pick(pfy, fCat) : [], metric, 'category').sums;
     var categories = geoRows(ca, cp, 'cat');
     var companies = geoRows(co.sums, po, 'company', co.meta);
     /* 一家公司一个气泡，坐标直接取公司经纬度表（同城不合并） */
@@ -753,7 +762,8 @@
     return { metric: metric, label: GEO_LABELS[metric], fy: fy, pyFy: pfy,
              cur: cur, rate: rateOf(cur), fys: S.options.fy || [],
              total: { v: r2(tv), pv: r2(pv), yoy: pv ? r2((tv - pv) / pv) : null },
-             categories: categories, companies: companies, bubbles: bubbles };
+             categories: categories, categoriesAll: geoRows(caAll, cpAll, 'cat'),
+             companies: companies, bubbles: bubbles };
   }
 
   /* ---------- fetch 垫片 ---------- */

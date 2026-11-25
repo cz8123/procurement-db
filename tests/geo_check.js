@@ -202,7 +202,7 @@ function latestSnap() {
     }
     chk('四个指标金额各不相同', new Set(seen).size === 4, seen);
 
-    console.log('=== 4. 公司筛选联动 ===');
+    console.log('=== 4. 公司多选联动 ===');
     const before = await page.evaluate(() => ({
       first: document.querySelector('#geoTbl tbody .z-amt .zv').textContent.trim(),
       comps: document.querySelectorAll('#geoCompList label').length
@@ -215,13 +215,57 @@ function latestSnap() {
       const el = document.querySelector('#geoTbl tbody .z-amt .zv');
       return el && el.textContent.trim() !== old;
     }, { timeout: 20000 }, before.first).catch(() => {});
-    const after = await page.evaluate(() => ({
-      first: document.querySelector('#geoTbl tbody .z-amt .zv').textContent.trim(),
-      checked: document.querySelectorAll('#geoCompList input:checked').length
+    const mid = await page.evaluate(() => ({
+      checked: document.querySelectorAll('#geoCompList input:checked').length,
+      comps: document.querySelectorAll('#geoCompList label').length
     }));
-    chk('公司列表非空', before.comps > 0, before);
-    chk('勾选公司后同比表变化', after.checked === 1 && after.first !== before.first,
-      { before, after });
+    chk('勾选一家后公司列表仍完整', before.comps > 40 && mid.comps >= before.comps - 1,
+      { before: before.comps, mid });
+    await page.evaluate(() => {
+      const ls = [...document.querySelectorAll('#geoCompList label')];
+      const l = ls.find(x => !x.querySelector('input').checked);
+      if (l) l.querySelector('input').click();
+    });
+    await page.waitForFunction(() =>
+      document.querySelectorAll('#geoCompList input:checked').length === 2,
+      { timeout: 20000 }).catch(() => {});
+    await sleep(700);
+    const after = await page.evaluate(() => ({
+      checked: document.querySelectorAll('#geoCompList input:checked').length,
+      rows: document.querySelectorAll('#geoTbl tbody tr').length
+    }));
+    chk('可以连续多选公司', after.checked === 2, after);
+    chk('多选后同比表仍有 11 行', after.rows === 11, after);
+
+    console.log('=== 4b. Zebra 行点击联动 ===');
+    await page.evaluate(() => {
+      const tr = document.querySelector('#geoTbl tbody tr.z-row');
+      const cat = tr.dataset.cat;
+      tr.click();
+      return cat;
+    });
+    await sleep(1400);
+    const z1 = await page.evaluate(() => ({
+      on: document.querySelectorAll('#geoTbl tbody tr.z-row.on').length,
+      dim: document.querySelectorAll('#geoTbl tbody tr.z-row.dim').length,
+      rows: document.querySelectorAll('#geoTbl tbody tr').length,
+      chips: document.querySelectorAll('#chips .chip').length
+    }));
+    chk('点击行后高亮该行、其余淡化',
+      z1.on === 1 && z1.dim === z1.rows - 1, z1);
+    chk('行点击联动全局筛选（出现 chip）', z1.chips > 0, z1);
+    await page.evaluate(() => {
+      const tr = [...document.querySelectorAll('#geoTbl tbody tr.z-row.on')][0];
+      if (tr) tr.click();
+    });
+    await sleep(1400);
+    const z2 = await page.evaluate(() => ({
+      on: document.querySelectorAll('#geoTbl tbody tr.z-row.on').length,
+      dim: document.querySelectorAll('#geoTbl tbody tr.z-row.dim').length,
+      rows: document.querySelectorAll('#geoTbl tbody tr').length
+    }));
+    chk('再次点击取消筛选、恢复整表', z2.on === 0 && z2.dim === 0 && z2.rows === 11, z2);
+    chk('点击期间无报错', errs.length === 0, errs.slice(0, 3));
 
     console.log('=== 5. 刷新保层级 / 不闪回 ===');
     await page.reload({ waitUntil: 'networkidle2', timeout: 60000 });
@@ -234,7 +278,7 @@ function latestSnap() {
     }));
     chk('刷新后仍在 Geo 页', restored.page === 'geo', restored);
     chk('刷新后指标与勾选保持',
-      restored.metric === 'prpo' && restored.checked === 1, restored);
+      restored.metric === 'prpo' && restored.checked === 2, restored);
     chk('刷新后同比表就绪', restored.rows === 11, restored);
 
     console.log('=== 6. 地图容器与 Key 提示 ===');

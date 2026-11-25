@@ -2578,29 +2578,40 @@
     renderGeoMap(d);
   }
   function renderGeoCompanies(d) {
+    /* 记住未筛选时的完整公司清单：别的筛选（类别等）把已勾选公司暂时筛掉时，
+       仍要在列表里保留它，否则勾上之后取消不掉。 */
+    if (!(S.geo.selected || []).length) S.geo.baseCompanies = (d.companies || []).slice();
+    var rows = (d.companies || []).slice();
+    var have = {};
+    rows.forEach(function (r) { have[r.company] = 1; });
+    (S.geo.selected || []).forEach(function (name) {
+      if (have[name]) return;
+      var b = (S.geo.baseCompanies || []).filter(function (x) { return x.company === name; })[0];
+      rows.push({ company: name, abbr: b ? b.abbr : name, v: null, miss: true });
+    });
     var q = (S.geo.q || '').trim().toLowerCase();
-    var rows = (d.companies || []).filter(function (r) {
+    rows = rows.filter(function (r) {
       return !q || (r.company || '').toLowerCase().indexOf(q) >= 0 ||
         (r.abbr || '').toLowerCase().indexOf(q) >= 0;
     });
     $('#geoCompCount').textContent = nf(rows.length, 0) + ' / ' + nf((d.companies || []).length, 0);
     $('#geoCompList').innerHTML = rows.length ? rows.map(function (r) {
       var on = (S.geo.selected || []).indexOf(r.company) >= 0;
-      return '<label><input type="checkbox" data-company="' + esc(r.company) + '"' +
+      return '<label' + (r.miss ? ' class="miss"' : '') +
+        '><input type="checkbox" data-company="' + esc(r.company) + '"' +
         (on ? ' checked' : '') + '><span title="' + esc(r.company) + ' · ' +
         esc(r.abbr || '') + '">' + esc(r.abbr || r.company) + '</span><i>' +
-        esc(geoNum(r.v, 1)) + '</i></label>';
+        (r.miss ? '—' : esc(geoNum(r.v, 1))) + '</i></label>';
     }).join('') : '<div class="geo-comp-none">No matching company</div>';
   }
   /* Zebra BI 1:1：PY 右对齐数字 / AC 深灰条数值贴尾 / ΔPY 中心零线左右红绿条 /
      ΔPY% 细线 + 黑心圆点。数值统一深色，不用彩色字。 */
-  function zebraSide(kind, diff, ratio, txt) {
-    var zero = kind === 'pct' && Math.abs(parseFloat(txt)) < 0.5;
+  function zebraSide(kind, diff, ratio, txt, zero) {
     var bar = kind === 'pct'
       ? '<i class="zb-line" style="width:' + ratio.toFixed(1) + '%"></i>'
       : '<i class="zb-bar" style="width:' + ratio.toFixed(1) + '%"></i>';
     return '<div class="z-side ' + (diff >= 0 ? 'pos' : 'neg') + (zero ? ' zero' : '') + '">' +
-      bar + '<span class="zv">' + esc(txt) + '</span></div>';
+      bar + (txt ? '<span class="zv">' + esc(txt) + '</span>' : '') + '</div>';
   }
   function zebra(v, pv, kind, max) {
     if (kind === 'py') {
@@ -2614,15 +2625,21 @@
     }
     var diff = v - pv;
     var val = kind === 'pct' ? (pv ? diff / pv : 0) : diff;
-    var ratio = Math.min(85, Math.abs(val) / (max || 1) * 85);
+    var cap = kind === 'pct' ? 34 : 42;
+    var ratio = Math.min(cap, Math.abs(val) / (max || 1) * cap);
+    var zero = kind === 'pct' && Math.abs(val) < 0.0005;
+    /* 参考图：ΔPY% 为 0 时只留零线上的点，不写 +0.0% */
     var txt = kind === 'pct'
-      ? (pv ? (diff >= 0 ? '+' : '-') + Math.abs(diff / pv * 100).toFixed(1) + '%' : '')
+      ? (pv && !zero ? (diff >= 0 ? '+' : '-') + Math.abs(diff / pv * 100).toFixed(1) + '%' : '')
       : zbSigned(diff);
     return '<td><div class="z-br' + (kind === 'pct' ? ' z-pct' : '') + '">' +
-      zebraSide(kind, diff, ratio, txt) + '</div></td>';
+      zebraSide(kind, diff, ratio, txt, zero) + '</div></td>';
   }
   function renderGeoTable(d) {
-    var cats = (d.categories || []).slice().sort(function (a, b) { return b.v - a.v; });
+    /* 表格点击类别时保留整张表（未选中行淡化），否则行被筛掉就没法再点一次取消 */
+    var picked = S.sel.category || [];
+    var src = (picked.length && d.categoriesAll) ? d.categoriesAll : (d.categories || []);
+    var cats = src.slice().sort(function (a, b) { return b.v - a.v; });
     var maxV = 0, maxD = 0, maxP = 0;
     cats.forEach(function (r) {
       maxV = Math.max(maxV, Math.abs(r.v));
@@ -2634,8 +2651,12 @@
     $('#geoTbl thead').innerHTML = '<tr><th>Category</th><th>PY</th><th>AC ↓</th>' +
       '<th>ΔPY</th><th>ΔPY%</th></tr>';
     $('#geoTbl tbody').innerHTML = cats.map(function (r, i) {
-      return '<tr' + (i === 5 ? ' class="z-group"' : '') +
-        '><td title="' + esc(r.cat) + '">' + esc(r.cat) + '</td>' +
+      var on = picked.indexOf(r.cat) >= 0;
+      var dim = picked.length > 0 && !on;
+      return '<tr class="z-row' + (on ? ' on' : '') + (dim ? ' dim' : '') +
+        (i === 5 ? ' z-group' : '') +
+        '" data-cat="' + esc(r.cat) + '" title="Click to filter this category">' +
+        '<td title="' + esc(r.cat) + '">' + esc(r.cat) + '</td>' +
         zebra(r.v, r.pv, 'py', 1) +
         zebra(r.v, r.pv, 'amount', maxV) +
         zebra(r.v, r.pv, 'delta', maxD) +
@@ -2771,6 +2792,18 @@
       var name = el.dataset.company, i = S.geo.selected.indexOf(name);
       if (el.checked && i < 0) S.geo.selected.push(name);
       if (!el.checked && i >= 0) S.geo.selected.splice(i, 1);
+      loadGeo();
+    });
+    /* Zebra 行点击 = 全页类别交叉筛选（再点取消），与其它视觉对象一致 */
+    $('#geoTbl tbody').addEventListener('click', function (e) {
+      var tr = e.target.closest('tr.z-row');
+      if (!tr || !tr.dataset.cat) return;
+      var list = (S.sel.category || []).slice();
+      var i = list.indexOf(tr.dataset.cat);
+      if (i >= 0) list.splice(i, 1); else list.push(tr.dataset.cat);
+      setSel('category', list);
+      renderFilters();
+      loadAll();
       loadGeo();
     });
     window.addEventListener('resize', function () {
