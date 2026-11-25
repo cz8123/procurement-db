@@ -56,10 +56,11 @@ async function waitFor(page, fn, timeout, label) {
     const headerBottom = await page.evaluate(() =>
       Math.round(document.querySelector('.hd').getBoundingClientRect().bottom));
     console.log('    ' + JSON.stringify(tabs.map(t => [t.page, t.label, t.on])));
-    chk('三个页签且首签为 Overview',
-      tabs.length === 3 && tabs[0].page === 'overview' && tabs[0].label === 'Overview', tabs);
+    chk('四个页签且首签为 Overview',
+      tabs.length === 4 && tabs[0].page === 'overview' && tabs[0].label === 'Overview', tabs);
     chk('只保留大标题：无小标题行', subCount === 0 &&
-      tabs[1].label === 'Detail' && tabs[2].label === 'Framework', { subCount, tabs });
+      tabs[1].label === 'Detail' && tabs[2].label === 'Framework' &&
+      tabs[3].label === 'Geo Spend', { subCount, tabs });
     chk('选中页白底深字 + 圆角上沿',
       tabs[0].topBg === 'rgb(255, 255, 255)' && tabs[0].topColor === 'rgb(14, 23, 32)' &&
       tabs[0].radius !== '0px', tabs[0]);
@@ -69,7 +70,7 @@ async function waitFor(page, fn, timeout, label) {
     chk('页签下沿与顶栏下沿对齐', tabs.every(t => Math.abs(t.bottom - headerBottom) <= 1),
       { headerBottom, bottoms: tabs.map(t => t.bottom) });
 
-    console.log('=== 2. 三个页签都能真正切换 ===');
+    console.log('=== 2. 页签都能真正切换 ===');
     const before = await page.evaluate(() => {
       const p = s => { const b = document.querySelector(s).getBoundingClientRect(); return [Math.round(b.x), Math.round(b.y)]; };
       return { hd: Math.round(document.querySelector('.hd').getBoundingClientRect().height),
@@ -125,12 +126,12 @@ async function waitFor(page, fn, timeout, label) {
       return { added, on, label, hits, back: window.BoardPages.current() };
     });
     console.log('    ' + JSON.stringify(reg));
-    chk('register 后自动多一个页签', reg.added.length === 4 && reg.added[3] === 'demo', reg.added);
+    chk('register 后自动多一个页签', reg.added.length === 5 && reg.added[4] === 'demo', reg.added);
     chk('go 切换选中态并调用 enter', reg.on.length === 1 && reg.on[0] === 'demo' && reg.label === 'Demo Page' && reg.hits === 1, reg);
     chk('可切回 Overview', reg.back === 'overview', reg.back);
 
     console.log('=== 4. 多宽度不溢出、顶栏高度稳定 ===');
-    /* 上面注册了一个测试页（4 个页签），重载回到正式的三页签再量版式 */
+    /* 上面注册了一个测试页（5 个页签），重载回到正式的四个页签再量版式 */
     await page.goto(BASE + '/dash?t=' + Date.now(), { waitUntil: 'networkidle0' });
     await waitFor(page, () => document.querySelectorAll('#chHeat .hcell').length > 0, 15000, 'reload');
     for (const w of [1440, 1280]) {

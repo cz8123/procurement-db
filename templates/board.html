@@ -6,10 +6,12 @@
 <title>Procurement Data Dashboard</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='board/board.css') }}?v={{ v_css }}">
 <script>
-/* 刷新落在 Detail/Framework 时，首帧就别画 Overview（board.js 早切完成后移除 class） */
+/* 腾讯地图 Key：由部署方通过 TMAP_KEY 环境变量注入，未配置时只显示数据与提示 */
+window.TMAP_KEY = {{ tmap_key|default('', true)|tojson }};
+/* 刷新落在非 Overview 页时，首帧就别画 Overview（board.js 早切完成后移除 class） */
 (function () {
   var h = (location.hash || '').replace(/^#\/?/, '');
-  if (h !== 'detail' && h !== 'framework') return;
+  if (h !== 'detail' && h !== 'framework' && h !== 'geo') return;
   var el = document.documentElement;
   el.classList.add('boot-other');
   setTimeout(function () { el.classList.remove('boot-other'); }, 3000);
@@ -283,6 +285,43 @@
       </table>
     </div>
     <div class="pager" id="fcPager"></div>
+  </section>
+</main>
+
+<!-- 第四页：地图气泡 + Zebra BI 式 Category 同比 -->
+<main class="page" id="pgGeo" hidden>
+  <section class="card geo-card">
+    <div class="card-h">
+      <h2>Spend Map <span class="card-note" id="geoSub">· company city · YoY</span></h2>
+      <div class="card-tools">
+        <label class="geo-metric"><span>Metric</span>
+          <select id="geoMetric" class="mini-sel">
+            <option value="prpo">PRPO Spend</option>
+            <option value="paid">PO Paid</option>
+            <option value="micro">Micro Purchase</option>
+            <option value="inadequate">SS - Inadequate Competition</option>
+          </select>
+        </label>
+        <button type="button" class="spec-btn" data-spec="geo" title="View calculation logic">?</button>
+      </div>
+    </div>
+    <div class="geo-kpis" id="geoKpis"></div>
+    <div class="geo-top">
+      <div class="geo-map-pane">
+        <div id="geoMap"></div>
+        <div class="geo-map-msg" id="geoMapMsg" hidden></div>
+        <div class="geo-legend" id="geoLegend"></div>
+      </div>
+      <div class="geo-comp-pane">
+        <div class="geo-comp-h"><span id="geoCompTitle">Company Search</span><span id="geoCompCount"></span></div>
+        <input id="geoSearch" class="mini-inp" type="search" placeholder="Search company">
+        <div class="geo-comp-list" id="geoCompList"></div>
+      </div>
+    </div>
+    <div class="geo-yoy">
+      <div class="geo-yoy-h"><h3>Category Amount YoY Variance</h3><span id="geoYoyNote"></span></div>
+      <table class="geo-tbl" id="geoTbl"><thead></thead><tbody></tbody></table>
+    </div>
   </section>
 </main>
 

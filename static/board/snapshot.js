@@ -699,6 +699,76 @@
       .slice(0, 200);
   }
 
+  /* GET /api/board/geo：地图气泡 + Category 同比（离线按行复算） */
+  var GEO_LABELS = { prpo: 'PRPO Spend', paid: 'PO Paid',
+                     micro: 'Micro Purchase', inadequate: 'SS - Inadequate Competition' };
+  function geoVal(r, metric) {
+    if (metric === 'paid') return r.poPaid || 0;
+    if (metric === 'micro') return r.method === 'Micro' ? (r.amount || 0) : 0;
+    if (metric === 'inadequate') return r.ssr === 'Inadequate Competition' ? (r.amount || 0) : 0;
+    return r.amount || 0;
+  }
+  function geoAgg(list, metric, keyName) {
+    var m = {}, meta = {}, loc = S.geoLoc || {};
+    list.forEach(function (r) {
+      var k = r[keyName] || 'Others';
+      m[k] = (m[k] || 0) + geoVal(r, metric);
+      if (keyName === 'company' && !meta[k]) meta[k] = loc[k] || {};
+    });
+    return { sums: m, meta: meta };
+  }
+  function geoRows(a, b, key, meta) {
+    var keys = Object.keys(a).concat(Object.keys(b).filter(function (k) { return !(k in a); }));
+    keys.sort(function (x, y) { return (a[y] || 0) - (a[x] || 0); });
+    return keys.map(function (k) {
+      var v = a[k] || 0, pv = b[k] || 0, o = {};
+      o[key] = k; o.v = r2(v); o.pv = r2(pv);
+      o.yoy = pv ? r2((v - pv) / pv) : null;
+      if (meta) {
+        var m = meta[k] || {};
+        o.lng = m.lng; o.lat = m.lat; o.color = m.color;
+        o.region = m.region; o.city = m.city;
+      }
+      return o;
+    });
+  }
+  function geoResp(sp) {
+    var metric = sp.get('metric') || 'prpo';
+    if (!GEO_LABELS[metric]) metric = 'prpo';
+    var fy = sp.get('fy') || S.options.latestFy, pfy = prevOf(fy);
+    var cur = (sp.get('cur') || 'RMB').toUpperCase(), f = readFilters(sp);
+    var list = pick(fy, f), plist = pfy ? pick(pfy, f) : [];
+    var ca = geoAgg(list, metric, 'category').sums,
+        cp = geoAgg(plist, metric, 'category').sums;
+    var co = geoAgg(list, metric, 'company'), po = geoAgg(plist, metric, 'company').sums;
+    var categories = geoRows(ca, cp, 'cat');
+    var companies = geoRows(co.sums, po, 'company', co.meta);
+    var cityV = {}, cityPV = {}, cityMeta = {};
+    companies.forEach(function (r) {
+      if (!r.city) return;
+      if (r.v >= (cityV[r.city] == null ? -1 : cityV[r.city])) {
+        cityV[r.city] = r.v; cityPV[r.city] = r.pv || 0;
+        cityMeta[r.city] = { lng: r.lng, lat: r.lat, color: r.color, region: r.region };
+      }
+    });
+    var bubbles = Object.keys(cityV).sort(function (a, b) {
+      return cityV[b] - cityV[a];
+    }).map(function (k) {
+      var o = { city: k, v: cityV[k], pv: cityPV[k] || 0,
+                yoy: cityPV[k] ? r2((cityV[k] - cityPV[k]) / cityPV[k]) : null };
+      var m = cityMeta[k] || {};
+      o.lng = m.lng; o.lat = m.lat; o.color = m.color; o.region = m.region;
+      return o;
+    });
+    var tv = 0, pv = 0;
+    Object.keys(ca).forEach(function (k) { tv += ca[k]; });
+    Object.keys(cp).forEach(function (k) { pv += cp[k]; });
+    return { metric: metric, label: GEO_LABELS[metric], fy: fy, pyFy: pfy,
+             cur: cur, rate: rateOf(cur), fys: S.options.fy || [],
+             total: { v: r2(tv), pv: r2(pv), yoy: pv ? r2((tv - pv) / pv) : null },
+             categories: categories, companies: companies, bubbles: bubbles };
+  }
+
   /* ---------- fetch 垫片 ---------- */
   var _fetch = window.fetch ? window.fetch.bind(window) : null;
   var PREFIX = '/api/board/';
@@ -720,6 +790,7 @@
     else if (path === 'detail') out = detailResp(sp);
     else if (path === 'detail/values') out = detailValuesResp(sp);
     else if (path === 'method-drill') out = methodDrillResp(sp);
+    else if (path === 'geo') out = geoResp(sp);
     else out = {};
     return Promise.resolve(new Response(JSON.stringify(out), {
       status: 200, headers: { 'Content-Type': 'application/json' }

@@ -157,6 +157,19 @@ def build_reason_map(con):
     }
 
 
+def build_geo_loc(con):
+    """离线地图气泡需要的公司 → 坐标 / 区域色 / 城市映射。"""
+    out = {}
+    try:
+        for r in con.execute('SELECT "Company_cn", longitude, latitude, "Color", "Region", "市" '
+                             'FROM fct_company_location'):
+            out[r[0]] = {"lng": r[1], "lat": r[2], "color": r[3],
+                         "region": r[4], "city": r[5]}
+    except sqlite3.Error:
+        pass
+    return out
+
+
 def build_snapshot():
     con = sqlite3.connect(DB)
     try:
@@ -164,6 +177,7 @@ def build_snapshot():
         contracts = build_contracts(con)
         en_fix = build_en_fix(con)
         reason_map = build_reason_map(con)
+        geo_loc = build_geo_loc(con)
     finally:
         con.close()
 
@@ -184,6 +198,7 @@ def build_snapshot():
         "enFix": en_fix,
         "reasonMap": reason_map,
         "regionEn": REGION_EN,
+        "geoLoc": geo_loc,
     }
 
 

@@ -579,6 +579,9 @@ def dash_page():
         "board.html",
         v_css=_stamp("board/board.css"),
         v_js=_stamp("board/board.js"),
+        # 地图底图走腾讯地图，Key 由部署方自己申请后从环境变量注入；
+        # 代码里不预置任何有效 Key，未配置时前端只显示数据、地图区给出提示。
+        tmap_key=(os.environ.get("TMAP_KEY", "") or "").strip(),
     ))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     return resp

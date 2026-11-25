@@ -158,3 +158,20 @@
 - **明细第 6 列 `Single Source Reason`**：两字段 `豁免单一来源的理由` / `单一来源采购理由` 同时非空 **0 条**（FY2627 e_only 2,616 / s_only 210），可以合并。`DETAIL_BASE` 加 `LEFT JOIN fct_prpo f ON f.表单编号=p.No.`（主键唯一 46,013/46,013，不放大行数）+ 两张 `dim_agg_* ON 原始值`；`DETAIL_EXPR['reason']` = `COALESCE(mx.聚合, f.原文, ms.聚合, f.原文)`，映射表没覆盖的原始值回落原文。加进 `DETAIL_TEXT` → 自动获得排序、LIKE 搜索、表头取值勾选（16 个聚合名）；**改了 `DETAIL_BASE` 会让 `/detail`、`/detail/values`、合计/分组小计 4 类 SQL 都带上 JOIN**，实测冷 0.165s / 缓存 0.044s、响应 3.90MB，金额守恒 ¥221,626,955。离线 `board_export.ROW_SQL` 同款 LEFT JOIN + 新增 `reason` 列，`snapshot.js` 的 `DETAIL_KEYS` 加 `reason`，单文件 12.25→12.34MB。
 - **9 列列宽**：表头 9 个文字本征宽合计 + 漏斗/箭头/内边距 = 1471px，几乎无余量。收紧 `thead th` padding → `0 2px 0 8px`、`.dt-th gap` → 2、`.dt-arrow` → 8px，最终 % 6.25/8.43/8.84/18.7/10.94/11.08/16.59/10.81/8.36（1600 视口 92/124/130/275/161/163/244/159/123），**9 个表头 0 截断**（长表头各留 3-6px，避免字体回退时又出省略号）。分组行 colspan 5→6、4→5；`tfoot`/测试里所有硬编码列号 6/7 → 7/8。
 - **测试**：board 294/0（月份断言改缩写）、detail 30/0（`nth-child(7)`→8、9 列断言）、snapshot 64/0（临时 `--out` 验 12.34MB 单文件）、page_tabs 20/0、visual_tools 31/0、ui_focus 38/0、perf 11/0。
+
+## 35 刷新闪回 Overview 修复（11-25 上午）
+- **症状**：刷新 `#detail` / `#framework` 时先闪一下 Overview，逐帧采样窗口约 87ms（46→133ms）。
+- **根因**：`init()` 只 `restoreView()` 恢复筛选 / 下钻 / 展开态，不恢复 `page`；`renderTabs()` 先画 Overview，`goPage(hash)` 被放在 `Promise.all` 之后。
+- **修复**：`init` 在 `bind` 后按 `pageFromHash()` 早切页（改 `S.page` + 调 `enter` + 隐藏 Overview）；`<head>` 内联脚本按 hash 给 `<html>` 加 `boot-other`，CSS 隐藏 `#pgOverview` / `#kpis` / `.fbar`，3s 超时兜底，早切完成后移除；`loadDetail` 加 `pending` 去重；概览渲染封装 `renderOverviewVisuals()`，隐藏态渲染置 `S.overviewHiddenRender`，`PAGES.overview.enter` 双 rAF 后重画（隐藏时 `chartW()` 只能拿 fallback 737→实际 737 验证一致）。
+- **测试**：`page_tabs_check` 加 4 条逐帧断言（刷新全程无 Overview + 最终停在目标页），24/24。
+
+## 36 第四页 Geo Spend：地图 + Category 同比（11-25 下午）
+- **参考图**：用户给的 Power BI 截图 = Protomaps/OpenStreetMap 深色气泡地图 + Zebra BI 式 Category Amount YoY Variance（灰条当前值 / ΔPY 正负条 / ΔPY% 点线）。**底图合规红线**：截图里的 OSM 海外瓦片不能直接用，白名单只有腾讯 / 高德 / 百度 / 天地图，本页默认腾讯地图 GL JS。
+- **Key 不走前端硬编码**：`app.py` 的 `/dash` 从环境变量 `TMAP_KEY` 注入 `window.TMAP_KEY`，模板 `<head>` 用 `tojson` 输出；未配置时地图区显示配置提示，公司列表与同比表照常可用。用户申请腾讯位置服务个人 Key 后设 `TMAP_KEY` 并重启即可。前端动态加载 `https://map.qq.com/api/gljs?v=1.exp&key=…`（非默认场景、用户自备 Key），建议在开放平台配 Referer 白名单。坐标是 GCJ-02，腾讯 SDK 直接吃。
+- **四个口径**（都在 `board_api.GEO_METRICS`）：`prpo` = `SUM(dash_po."Total Price")` ¥221.6M；`paid` = `SUM(PO Paid)` ¥84.6M；`micro` = `Procurement Method='Micro'` ¥5.7M；`inadequate` = `fct_prpo."单一来源采购理由"='Inadequate Competition'` ¥36.7M（**走 `p."No." IN (SELECT 表单编号 …)` 子查询，不 JOIN，避免放大行数**）。FY2627 当前 vs FY2526 上期，FY2627 进行中→整体降幅偏大，副标题与 spec 都注明。
+- **接口**：`GET /api/board/geo?metric=&fy=&cur=&<全局筛选>`，纳入 `_JSON_CACHE_PATHS`。返回 `total/categories/companies/bubbles`，气泡按城市合并（坐标与颜色取该城金额最大公司），底图 `TMap.MultiCircle`，半径 `28000 + sqrt(v/max)*300000` 米，颜色取 `fct_company_location.Color`，点击气泡切换该城公司的筛选。61 家公司在坐标表 100% 匹配、全部在中国境内。
+- **前端**：`PAGES.geo` 第四页；`S.geo={metric,data,selected,q,...}`；`sessionStorage` 多存 `geoMetric/geoSelected/geoQ`；`bindGeo()` 处理下拉 / 搜索 / 复选 / resize；Zebra 表 `.zb-bar` 灰条 = 当前值，`.zb-split` 中心线 + `.zb-pos/.zb-neg` 正负条，`geoSigned()` 把负号放在币种前面（`-¥56.1 M`）。`hash=#geo` 也进首帧防闪类。
+- **顶栏**：第四页签后 1280 下顶栏溢出 34px；`.pg-tab` 从 `clamp(132px,9vw,176px)` 收到 `clamp(120px,8.6vw,176px)`、≤1280 从 112px 收到 92px，1440/1280 都回到 68px 且 0 溢出（四个页签仍不截断）。
+- **离线单文件**：`board_export.build_geo_loc()` 把公司→坐标/区域色/城市写进 `__SNAP__.geoLoc`，`snapshot.js` 新增 `geoResp()` 按行复算（用 `r.category` 不是 `r.cat`，第一版踩过只出 1 行的坑），`fetch` 垫片加 `path==='geo'` 分支。单文件 12.37MB。
+- **测试**：新增 `tests/geo_check.js` 在线 / 离线各 **22/0**；board 294/0（spec 按钮 22→23、覆盖 9→10 个对象）、page_tabs 24/0、detail 30/0、snapshot 64/0、visual_tools 31/0、ui_focus 38/0、perf 11/0、grid_sum 14/0、colfilter 34/0。
+- **已知无关失败**：`tf_click_check` 3 项 / `tf_qb_check` 2 项仍沿用旧硬编码 44,987 行与「金额列实存文本」假设（现库 46,013 行且金额已物化为数值），与 Geo 页改动无关，未在本轮修改。

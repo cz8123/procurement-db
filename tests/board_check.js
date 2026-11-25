@@ -704,11 +704,11 @@ async function waitFor(pg, fn, timeout, label) {
     await page.click('.pg-tab[data-page=overview]');
     await sleep(350);
     const specBtns = await page.$$eval('.spec-btn', a => a.map(e => e.dataset.spec));
-    /* 视觉对象 8 个（含 methodDonut）+ 整页 1 + KPI 卡 7 + 筛选下拉 6 = 22 */
-    chk('每个视觉对象都有说明按钮', specBtns.length === 22, specBtns);
-    chk('按钮覆盖 9 个对象',
+    /* 视觉对象 9 个（含 methodDonut + geo）+ 整页 1 + KPI 卡 7 + 筛选下拉 6 = 23 */
+    chk('每个视觉对象都有说明按钮', specBtns.length === 23, specBtns);
+    chk('按钮覆盖 10 个对象',
       ['global', 'monthly', 'donut', 'methodDonut', 'pareto', 'catdetail',
-       'top', 'heat', 'contracts']
+       'top', 'heat', 'contracts', 'geo']
         .every(k => specBtns.indexOf(k) >= 0), specBtns);
     chk('7 张 KPI 卡各有说明按钮',
       ['amount', 'cp', 'poSpend', 'txn', 'suppliers', 'stores', 'days']

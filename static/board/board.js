@@ -55,6 +55,8 @@
     fc: { page: 1, size: 50, sort: 'start', dir: 'desc',
           q: '', sup: '', type: '', df: '', dt: '', status: '' },
     drawer: { page: 1, size: 50, q: '', filters: null },
+    geo: { metric: 'prpo', data: null, selected: [], q: '',
+           loaded: false, stale: true, seq: 0, map: null, overlay: null },
     detail: { sort: 'region', dir: 'asc',
               q: {}, f: {}, min: {}, max: {}, expR: {}, expC: {},
               loaded: false, stale: true, seq: 0, pop: null, tmp: null },
@@ -1336,6 +1338,7 @@
     var keepHl = S.hlFresh;
     S.hlFresh = false;
     S.detail.stale = true;          // 全局筛选变了：下次进 Detail 页重新取数
+    S.geo.stale = true;             // 地图 / 同比同样依赖全局筛选
     S.drill = {};                   // 下钻数据依赖筛选，一起失效
     saveView();                     // 筛选 / 下钻 / 财年 / 币种的任何变化都在这里落盘
     if (S.page === 'detail' && !$('#pgDetail').hidden) loadDetail();
@@ -2137,6 +2140,25 @@
       ]
     },
 
+    /* ---------------- 地图 / 同比页 ---------------- */
+    geo: {
+      title: '地图与类别同比口径',
+      source: '数据来源：dash_po（PRPO 打底）+ fct_prpo（理由）+ fct_company_location（坐标）',
+      notes: [
+        '地图上一个气泡＝一家公司所在的城市；同一城市有多家公司时合并成一个气泡，坐标与颜色取该城金额最大那家店。',
+        '下拉四个口径：PRPO 采购额＝Total Price；PO Paid＝已关联 PO 的实付合计；小额采购＝采购方式为 Micro；竞争力不足＝单一来源采购理由为 Inadequate Competition（只在 fct_prpo 里，按单号关联，不会放大行数）。',
+        '下方 Category 同比拿当前财年与上一财年各算一次，ΔPY＝本期－上期，ΔPY%＝ΔPY÷上期；绿色代表增加、红色代表减少。',
+        '当前财年还在进行中，和完整上一财年比，整体降幅会偏大，这是数据进度差异、不是采购骤降。',
+        '顶栏的财年、币种和全局筛选同样作用于这一页；公司列表里勾选会同时筛选地图和同比表。'
+      ],
+      fields: [
+        ['地图气泡金额', '含增值税总价 / 实付合计', SRC.prpo],
+        ['竞争力不足', '单一来源采购理由', SRC.prpo + ' → fct_prpo'],
+        ['城市 / 坐标', '经度、纬度、市', SRC.comp],
+        ['类别', '采购类别（归并后 11 类）', SRC.prpo + ' → ' + SRC.catmap]
+      ]
+    },
+
     /* ---------------- KPI 卡片（每张卡单独说明） ---------------- */
     kpi_amount: {
       title: 'KPI · 采购总额',
@@ -2498,6 +2520,221 @@
     });
   }
 
+  /* ================================================ Geo 页：地图气泡 + Category 同比
+     地图底图用腾讯地图 GL JS；Key 由部署方 TMAP_KEY 注入，未配置只显示数据。
+     气泡 = 公司所在城市（同一城市合并），颜色 = 该城金额最大公司的区域色。 */
+  var GEO_LABELS = { prpo: 'PRPO Spend', paid: 'PO Paid',
+                     micro: 'Micro Purchase', inadequate: 'SS - Inadequate Competition' };
+  function geoParams() {
+    var p = qs({ metric: S.geo.metric });
+    (S.geo.selected || []).forEach(function (v) { p.append('company', v); });
+    return p;
+  }
+  function enterGeo() {
+    $('#pgGeo').hidden = false;
+    showChrome(false);
+    if (!S.geo.loaded || S.geo.stale) loadGeo();
+  }
+  function leaveGeo() { $('#pgGeo').hidden = true; }
+  function loadGeo() {
+    var seq = ++S.geo.seq;
+    S.geo.stale = false;
+    saveView();
+    return api('/api/board/geo', geoParams()).then(function (d) {
+      if (seq !== S.geo.seq) return;
+      S.geo.data = d; S.geo.loaded = true;
+      renderGeo(d);
+    }).catch(function (e) {
+      toast('Failed to load map data: ' + e.message, 4000);
+    });
+  }
+  function geoSigned(v, d) {
+    if (v == null || isNaN(v)) return '—';
+    return (v < 0 ? '-' : (v > 0 ? '+' : '')) + money(Math.abs(v), d);
+  }
+  function renderGeo(d) {
+    $('#geoSub').textContent = '· ' + d.fy + ' vs ' + (d.pyFy || '—') +
+      ' · bubble = company city · FY in progress, so YoY looks low';
+    $('#geoMetric').value = d.metric;
+    var t = d.total, cls = t.yoy == null ? '' : (t.yoy >= 0 ? 'up' : 'dn');
+    $('#geoKpis').innerHTML = [
+      [GEO_LABELS[d.metric] + ' · ' + d.fy, money(t.v, 1), ''],
+      [d.pyFy || 'Previous FY', money(t.pv, 1), ''],
+      ['ΔPY', geoSigned(t.v - t.pv, 1), cls],
+      ['ΔPY%', (t.yoy == null ? '—' : pct(t.yoy)), cls]
+    ].map(function (k) {
+      return '<div class="geo-kpi"><div class="gk-l">' + esc(k[0]) + '</div>' +
+        '<div class="gk-v">' + esc(k[1]) + '</div>' +
+        (k[2] ? '<div class="gk-y ' + k[2] + '">' + esc(k[2] === 'up' ? '▲' : '▼') +
+          ' vs ' + esc(d.pyFy || 'PY') + '</div>' : '') + '</div>';
+    }).join('');
+    renderGeoCompanies(d);
+    renderGeoTable(d);
+    renderGeoMap(d);
+  }
+  function renderGeoCompanies(d) {
+    var q = (S.geo.q || '').trim().toLowerCase();
+    var rows = (d.companies || []).filter(function (r) {
+      return !q || (r.company || '').toLowerCase().indexOf(q) >= 0;
+    });
+    $('#geoCompCount').textContent = nf(rows.length, 0) + ' / ' + nf((d.companies || []).length, 0);
+    $('#geoCompList').innerHTML = rows.length ? rows.map(function (r) {
+      var on = (S.geo.selected || []).indexOf(r.company) >= 0;
+      return '<label><input type="checkbox" data-company="' + esc(r.company) + '"' +
+        (on ? ' checked' : '') + '><span title="' + esc(r.company) + '">' +
+        esc(r.company) + '</span><i>' + esc(money(r.v, 1)) + '</i></label>';
+    }).join('') : '<div class="geo-comp-none">No matching company</div>';
+  }
+  function zebra(v, pv, kind, max) {
+    var diff = v - pv, pos = diff >= 0;
+    if (kind === 'amount') {
+      var w = Math.min(100, Math.abs(v) / (max || 1) * 100);
+      return '<td><div class="zb"><i class="zb-bar" style="width:' + w.toFixed(1) + '%"></i>' +
+        '<em>' + esc(money(v, 1)) + '</em></div></td>';
+    }
+    var ratio = Math.min(50, Math.abs(kind === 'pct' ? (pv ? diff / pv : 0) : diff) /
+      (max || 1) * 50);
+    var txt = kind === 'pct' ? (pv ? pct(diff / pv) : '—') : geoSigned(diff, 1);
+    return '<td><div class="zb ' + (pos ? 'up' : 'dn') + '"><i class="zb-split"></i>' +
+      '<i class="' + (pos ? 'zb-pos' : 'zb-neg') + '" style="width:' + ratio.toFixed(1) + '%"></i>' +
+      '<em class="em">' + esc(txt) + '</em></div></td>';
+  }
+  function renderGeoTable(d) {
+    var cats = (d.categories || []).slice().sort(function (a, b) { return b.v - a.v; });
+    var maxV = 0, maxD = 0, maxP = 0;
+    cats.forEach(function (r) {
+      maxV = Math.max(maxV, Math.abs(r.v));
+      maxD = Math.max(maxD, Math.abs(r.v - r.pv));
+      if (r.pv) maxP = Math.max(maxP, Math.abs((r.v - r.pv) / r.pv));
+    });
+    $('#geoYoyNote').textContent = (d.pyFy || 'PY') + ' → ' + d.fy +
+      ' · green = increase, red = decrease · FY in progress';
+    $('#geoTbl thead').innerHTML = '<tr><th>Category</th><th>Amount</th><th>ΔPY</th><th>ΔPY%</th></tr>';
+    $('#geoTbl tbody').innerHTML = cats.map(function (r) {
+      return '<tr><td title="' + esc(r.cat) + '">' + esc(r.cat) + '</td>' +
+        zebra(r.v, r.pv, 'amount', maxV) +
+        zebra(r.v, r.pv, 'delta', maxD) +
+        zebra(r.v, r.pv, 'pct', maxP) + '</tr>';
+    }).join('');
+  }
+  function ensureMapSDK(cb) {
+    var key = window.TMAP_KEY || '';
+    var msg = $('#geoMapMsg');
+    if (!key || key.indexOf('请到') === 0 || key.indexOf('Please apply') === 0) {
+      msg.textContent = '地图底图需要腾讯位置服务 Key。请在服务端设置 TMAP_KEY 环境变量后重启；' +
+        '下方的公司列表与 Category 同比不受影响。';
+      msg.hidden = false;
+      return;
+    }
+    if (window.TMap) { msg.hidden = true; cb(); return; }
+    if (window.__tmapQueue) { window.__tmapQueue.push(cb); return; }
+    window.__tmapQueue = [cb];
+    var s = document.createElement('script');
+    s.src = 'https://map.qq.com/api/gljs?v=1.exp&key=' + encodeURIComponent(key);
+    s.onload = function () {
+      msg.hidden = true;
+      var q = window.__tmapQueue.slice(); window.__tmapQueue = null;
+      q.forEach(function (f) { f(); });
+    };
+    s.onerror = function () {
+      msg.textContent = '腾讯地图 SDK 加载失败，请检查网络连通性与 Key 的域名白名单设置。';
+      msg.hidden = false;
+      window.__tmapQueue = null;
+    };
+    document.head.appendChild(s);
+  }
+  function initGeoMap() {
+    S.geo.map = new window.TMap.Map('geoMap', {
+      center: new window.TMap.LatLng(34.6, 106.4), zoom: 4.2, pitch: 0
+    });
+    S.geo.overlay = new window.TMap.MultiCircle({
+      map: S.geo.map, styles: {}, geometries: []
+    });
+    S.geo.overlay.on('click', function (e) {
+      var g = e.geometry;
+      if (!g || !g.id) return;
+      var city = g.id;
+      var d = S.geo.data;
+      var names = (d.companies || []).filter(function (r) { return r.city === city; })
+        .map(function (r) { return r.company; });
+      if (!names.length) return;
+      var all = names.every(function (n) { return S.geo.selected.indexOf(n) >= 0; });
+      names.forEach(function (n) {
+        var i = S.geo.selected.indexOf(n);
+        if (all && i >= 0) S.geo.selected.splice(i, 1);
+        else if (!all && i < 0) S.geo.selected.push(n);
+      });
+      loadGeo();
+    });
+  }
+  function renderGeoMap(d) {
+    ensureMapSDK(function () {
+      try {
+      if (!S.geo.map) initGeoMap();
+      var bubbles = (d.bubbles || []).filter(function (b) {
+        return b.lat != null && b.lng != null;
+      });
+      var max = 0;
+      bubbles.forEach(function (b) { max = Math.max(max, Math.abs(b.v)); });
+      var styles = {}, geoms = {}, legend = {};
+      bubbles.forEach(function (b) {
+        var c = b.color || '#3B5E96';
+        var key = 'g_' + c.replace('#', '');
+        if (!styles[key]) {
+          var m = /^#?([0-9a-f]{6})$/i.exec(c || '');
+          var rgb = m ? parseInt(m[1], 16) : 0x3B5E96;
+          var fill = 'rgba(' + ((rgb >> 16) & 255) + ',' + ((rgb >> 8) & 255) +
+            ',' + (rgb & 255) + ',.70)';
+          styles[key] = new window.TMap.CircleStyle({
+            color: fill, showBorder: true, borderColor: c, borderWidth: 1.5
+          });
+          legend[c] = b.region || '';
+        }
+        var radius = 28000 + Math.sqrt(Math.abs(b.v) / (max || 1)) * 300000;
+        (geoms[key] || (geoms[key] = [])).push({
+          id: b.city, styleId: key,
+          center: new window.TMap.LatLng(b.lat, b.lng), radius: radius
+        });
+      });
+      S.geo.overlay.setStyles(styles);
+      S.geo.overlay.setGeometries([].concat.apply([], Object.keys(geoms).map(function (k) {
+        return geoms[k];
+      })));
+      $('#geoLegend').innerHTML = Object.keys(legend).map(function (c) {
+        return '<span><i style="background:' + esc(c) + '"></i>' +
+          esc(legend[c] || 'Region') + '</span>';
+      }).join('');
+      } catch (e) {
+        console.error(e);
+        $('#geoMapMsg').textContent = '地图渲染失败：' + e.message +
+          '（下方公司列表与同比表仍可使用）';
+        $('#geoMapMsg').hidden = false;
+      }
+    });
+  }
+  function bindGeo() {
+    $('#geoMetric').addEventListener('change', function (e) {
+      S.geo.metric = e.target.value;
+      loadGeo();
+    });
+    $('#geoSearch').addEventListener('input', function (e) {
+      S.geo.q = e.target.value;
+      if (S.geo.data) renderGeoCompanies(S.geo.data);
+      saveView();
+    });
+    $('#geoCompList').addEventListener('change', function (e) {
+      var el = e.target;
+      if (!el.dataset || !el.dataset.company) return;
+      var name = el.dataset.company, i = S.geo.selected.indexOf(name);
+      if (el.checked && i < 0) S.geo.selected.push(name);
+      if (!el.checked && i >= 0) S.geo.selected.splice(i, 1);
+      loadGeo();
+    });
+    window.addEventListener('resize', function () {
+      if (S.page === 'geo' && S.geo.map) S.geo.map.resize();
+    });
+  }
+
   /* ================================================ 页签 ↔ 页面切换
      三页：Overview（原看板）/ Detail（大表格）/ Framework（协议卡独立成页）。
      新页面：BoardPages.register(key, {label, enter, leave})。
@@ -2521,6 +2758,9 @@
         subLevel: S.subLevel || '',
         catSub: Object.keys(S.catSub || {}),
         mMode: S.mMode,
+        geoMetric: S.geo.metric,
+        geoSelected: S.geo.selected || [],
+        geoQ: S.geo.q || '',
         expR: S.detail.expR || {},
         expC: S.detail.expC || {}
       }));
@@ -2544,6 +2784,11 @@
     if (v.subLevel === 'sub') S.subLevel = 'sub';
     (v.catSub || []).forEach(function (k) { S.catSub[k] = 1; });
     if (v.mMode === 'pair') S.mMode = 'pair';
+    if (GEO_LABELS[v.geoMetric]) S.geo.metric = v.geoMetric;
+    if (Object.prototype.toString.call(v.geoSelected) === '[object Array]') {
+      S.geo.selected = v.geoSelected.filter(function (x) { return typeof x === 'string'; });
+    }
+    if (typeof v.geoQ === 'string') S.geo.q = v.geoQ;
     if (v.cur === 'RM' || v.cur === 'RMB') S.cur = v.cur;
     if (v.fy) S.fy = v.fy;
     if (v.expR && typeof v.expR === 'object') S.detail.expR = v.expR;
@@ -2575,7 +2820,8 @@
                  },
                  leave: function () { $('#pgOverview').hidden = true; } },
     detail:    { label: 'Detail',    enter: enterDetail,   leave: leaveDetail },
-    framework: { label: 'Framework', enter: enterFramework, leave: leaveFramework }
+    framework: { label: 'Framework', enter: enterFramework, leave: leaveFramework },
+    geo:       { label: 'Geo Spend', enter: enterGeo,      leave: leaveGeo }
   };
   function renderTabs() {
     var box = $('#pgTabs');
@@ -3029,6 +3275,7 @@
     bind();
     bindDetail();
     bindSpec();
+    bindGeo();
     /* 首帧就落在 hash 指定的页：旧逻辑要等 data 回来才切，刷新时会先闪一下 Overview。
        这里只切可见性与页签，加载仍由下面的 loadAll / enterDetail 负责。 */
     var bootPage = pageFromHash();
