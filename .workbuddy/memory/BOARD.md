@@ -175,3 +175,15 @@
 - **离线单文件**：`board_export.build_geo_loc()` 把公司→坐标/区域色/城市写进 `__SNAP__.geoLoc`，`snapshot.js` 新增 `geoResp()` 按行复算（用 `r.category` 不是 `r.cat`，第一版踩过只出 1 行的坑），`fetch` 垫片加 `path==='geo'` 分支。单文件 12.37MB。
 - **测试**：新增 `tests/geo_check.js` 在线 / 离线各 **22/0**；board 294/0（spec 按钮 22→23、覆盖 9→10 个对象）、page_tabs 24/0、detail 30/0、snapshot 64/0、visual_tools 31/0、ui_focus 38/0、perf 11/0、grid_sum 14/0、colfilter 34/0。
 - **已知无关失败**：`tf_click_check` 3 项 / `tf_qb_check` 2 项仍沿用旧硬编码 44,987 行与「金额列实存文本」假设（现库 46,013 行且金额已物化为数值），与 Geo 页改动无关，未在本轮修改。
+
+## 37 Geo 页按参考图 1:1 调整（11-25 傍晚）
+- **删 KPI 卡**：模板去掉 `#geoKpis`，`renderGeo()` 不再写四张卡；地图区从 `flex:0 0 46%` 提到 52%（高度归给地图）。数字口径仍由表格与公司列表承载。
+- **气泡缩小**：`MultiCircle` 半径从 `28000 + sqrt(v/max)*300000` 米改成 `15000 + sqrt(v/max)*110000` 米，实测城市气泡不再互相盖住。
+- **Zebra BI 1:1**：参考图是深色矩阵（截图 Protomaps 那张的下半部），所以表格改深色 `#0D1B2A` + 白字，外套 `.geo-tbl-wrap` 滚动。三列视觉编码：
+  - 金额 = 灰条从左起 `#8897A8`，数值贴条尾（`geoNum()` 输出 `46.8 M`，**不带币种符号**）；
+  - ΔPY = `.z-br::after` 中心 1px 零线，`.z-side.pos` 从 50% 向右绿条、`.z-side.neg` 从 50% 向左红条，数值贴条尾；
+  - ΔPY% = 1px 细线 + `::after` 7px 实心圆点（正绿右端 / 负红左端）+ 线尾百分比。
+  - 条宽相对半列，最多 85%（金额 82%），留空间给数值；数值格式 `+30.7` / `-35.0` / `-35.7%`。
+  - 类别列右对齐贴灰条，列间 1px 竖线，行间细横线——与截图一致。
+- **测试**：`geo_check` 扩到 25/0（新增 KPI 已删、深色底、金额灰条、细线圆点、中心零线断言），在线 + 离线各 25/0；board 294、page_tabs 24、detail 30、snapshot 64、visual_tools 31、ui_focus 38、perf 11、grid_sum 14、colfilter 34 全绿。
+- **离线 Key**：`board_export.py` 从进程环境读 `TMAP_KEY` 注入单文件；导出时没设该变量，离线文件地图区就显示配置提示（表格照常用），这符合预期。

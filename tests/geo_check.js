@@ -54,72 +54,88 @@ function latestSnap() {
     chk('当前页 = geo', on === 'geo', on);
     const head = await page.evaluate(() => ({
       sub: document.getElementById('geoSub').textContent,
-      kpis: [...document.querySelectorAll('.geo-kpi')].map(e => e.textContent.trim()),
+      noKpi: !document.querySelector('.geo-kpi'),
       metric: document.getElementById('geoMetric').value
     }));
     chk('同比两财年都在副标题', /FY\d{4} vs FY\d{4}/.test(head.sub), head.sub);
-    chk('四张 KPI 卡', head.kpis.length === 4, head.kpis);
+    chk('顶部 KPI 卡已移除', head.noKpi, head);
     chk('默认指标 prpo', head.metric === 'prpo', head.metric);
 
-    console.log('=== 2. Category 同比表（Zebra BI 式）===');
+    console.log('=== 2. Category 同比表（Zebra BI 1:1）===');
     const tbl = await page.evaluate(() => {
       const rows = [...document.querySelectorAll('#geoTbl tbody tr')].map(tr => {
         const tds = [...tr.children];
         return {
           cat: tds[0].textContent.trim(),
-          amount: tds[1].querySelector('.zb em')?.textContent.trim(),
-          delta: tds[2].querySelector('.zb em')?.textContent.trim(),
-          pct: tds[3].querySelector('.zb em')?.textContent.trim(),
-          up: tds[2].querySelectorAll('.zb-pos').length,
-          dn: tds[2].querySelectorAll('.zb-neg').length
+          amount: tds[1].querySelector('.z-amt .zv')?.textContent.trim(),
+          gray: !!tds[1].querySelector('.zb-gray'),
+          delta: tds[2].querySelector('.z-side .zv')?.textContent.trim(),
+          pct: tds[3].querySelector('.z-side .zv')?.textContent.trim(),
+          up: tds[2].querySelectorAll('.z-side.pos').length,
+          dn: tds[2].querySelectorAll('.z-side.neg').length,
+          dot: !!tds[3].querySelector('.zb-line')
         };
       });
-      return { cols: document.querySelectorAll('#geoTbl thead th').length, rows };
+      return {
+        cols: document.querySelectorAll('#geoTbl thead th').length, rows,
+        dark: getComputedStyle(document.querySelector('.geo-tbl-wrap')).backgroundColor,
+        zero: getComputedStyle(document.querySelector('.z-br'), '::after').width
+      };
     });
     chk('表头四列', tbl.cols === 4, tbl.cols);
     chk('11 个类别', tbl.rows.length === 11, tbl.rows.length);
     chk('每行金额/ΔPY/ΔPY% 都有值',
       tbl.rows.every(r => r.amount && r.delta && r.pct), tbl.rows.slice(0, 2));
+    chk('深色矩阵背景', tbl.dark === 'rgb(13, 27, 42)', tbl.dark);
+    chk('金额列灰条 + ΔPY% 细线圆点',
+      tbl.rows.every(r => r.gray && r.dot), tbl.rows.slice(0, 2));
+    chk('ΔPY 中心零线', tbl.zero === '1px', tbl.zero);
     chk('ΔPY 条形方向与符号一致', tbl.rows.every(r =>
       (r.delta.startsWith('-') ? r.dn === 1 && r.up === 0 : r.up === 1 && r.dn === 0)),
       tbl.rows.filter(r => r.dn !== 1).slice(0, 3));
 
     console.log('=== 3. 四指标下拉 ===');
     const seen = [];
+    let prev = await page.evaluate(() =>
+      document.querySelector('#geoTbl tbody .z-amt .zv').textContent.trim());
     for (const m of ['paid', 'micro', 'inadequate', 'prpo']) {
       await page.select('#geoMetric', m);
-      await waitFor(page, () => !document.body.classList.contains('loading') &&
-        document.querySelector('.geo-kpi .gk-v')?.textContent.length > 1, 20000, m);
-      await sleep(250);
+      await page.waitForFunction((old) => {
+        const el = document.querySelector('#geoTbl tbody .z-amt .zv');
+        return el && el.textContent.trim() !== old;
+      }, { timeout: 20000 }, prev).catch(() => {});
+      await sleep(200);
       const v = await page.evaluate(() => ({
         metric: document.getElementById('geoMetric').value,
-        kpi: document.querySelector('.geo-kpi .gk-v').textContent.trim(),
+        first: document.querySelector('#geoTbl tbody .z-amt .zv').textContent.trim(),
         cats: document.querySelectorAll('#geoTbl tbody tr').length
       }));
-      seen.push(v.metric + ':' + v.kpi);
-      chk('切到 ' + m + ' 后 KPI 与类别表更新',
-        v.metric === m && v.cats === 11, v);
+      seen.push(v.metric + ':' + v.first);
+      chk('切到 ' + m + ' 后金额与类别表更新',
+        v.metric === m && v.cats === 11 && v.first !== prev, v);
+      prev = v.first;
     }
     chk('四个指标金额各不相同', new Set(seen).size === 4, seen);
 
     console.log('=== 4. 公司筛选联动 ===');
     const before = await page.evaluate(() => ({
-      kpi: document.querySelector('.geo-kpi .gk-v').textContent.trim(),
+      first: document.querySelector('#geoTbl tbody .z-amt .zv').textContent.trim(),
       comps: document.querySelectorAll('#geoCompList label').length
     }));
     await page.evaluate(() => {
       const l = document.querySelector('#geoCompList label');
       if (l) l.querySelector('input').click();
     });
-    await page.waitForFunction((old) =>
-      document.querySelector('.geo-kpi .gk-v')?.textContent.trim() !== old,
-      { timeout: 20000 }, before.kpi).catch(() => {});
+    await page.waitForFunction((old) => {
+      const el = document.querySelector('#geoTbl tbody .z-amt .zv');
+      return el && el.textContent.trim() !== old;
+    }, { timeout: 20000 }, before.first).catch(() => {});
     const after = await page.evaluate(() => ({
-      kpi: document.querySelector('.geo-kpi .gk-v')?.textContent.trim(),
+      first: document.querySelector('#geoTbl tbody .z-amt .zv').textContent.trim(),
       checked: document.querySelectorAll('#geoCompList input:checked').length
     }));
     chk('公司列表非空', before.comps > 0, before);
-    chk('勾选公司后 KPI 变化', after.checked === 1 && after.kpi !== before.kpi,
+    chk('勾选公司后同比表变化', after.checked === 1 && after.first !== before.first,
       { before, after });
 
     console.log('=== 5. 刷新保层级 / 不闪回 ===');

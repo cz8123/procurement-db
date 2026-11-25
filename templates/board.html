@@ -305,7 +305,6 @@ window.TMAP_KEY = {{ tmap_key|default('', true)|tojson }};
         <button type="button" class="spec-btn" data-spec="geo" title="View calculation logic">?</button>
       </div>
     </div>
-    <div class="geo-kpis" id="geoKpis"></div>
     <div class="geo-top">
       <div class="geo-map-pane">
         <div id="geoMap"></div>
@@ -320,7 +319,9 @@ window.TMAP_KEY = {{ tmap_key|default('', true)|tojson }};
     </div>
     <div class="geo-yoy">
       <div class="geo-yoy-h"><h3>Category Amount YoY Variance</h3><span id="geoYoyNote"></span></div>
-      <table class="geo-tbl" id="geoTbl"><thead></thead><tbody></tbody></table>
+      <div class="geo-tbl-wrap">
+        <table class="geo-tbl" id="geoTbl"><thead></thead><tbody></tbody></table>
+      </div>
     </div>
   </section>
 </main>

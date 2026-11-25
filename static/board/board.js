@@ -2548,26 +2548,22 @@
       toast('Failed to load map data: ' + e.message, 4000);
     });
   }
+  /* Zebra BI 贴的是纯数值 + M/K，不带币种符号 */
+  function geoNum(v, d) {
+    if (v == null || isNaN(v)) return '—';
+    var x = Math.abs(v) / S.rate;
+    if (x >= 1e6) return nf(x / 1e6, d == null ? 1 : d) + ' M';
+    if (x >= 1e3) return nf(x / 1e3, 0) + ' K';
+    return nf(x, 0);
+  }
   function geoSigned(v, d) {
     if (v == null || isNaN(v)) return '—';
-    return (v < 0 ? '-' : (v > 0 ? '+' : '')) + money(Math.abs(v), d);
+    return (v < 0 ? '-' : (v > 0 ? '+' : '')) + geoNum(v, d);
   }
   function renderGeo(d) {
     $('#geoSub').textContent = '· ' + d.fy + ' vs ' + (d.pyFy || '—') +
       ' · bubble = company city · FY in progress, so YoY looks low';
     $('#geoMetric').value = d.metric;
-    var t = d.total, cls = t.yoy == null ? '' : (t.yoy >= 0 ? 'up' : 'dn');
-    $('#geoKpis').innerHTML = [
-      [GEO_LABELS[d.metric] + ' · ' + d.fy, money(t.v, 1), ''],
-      [d.pyFy || 'Previous FY', money(t.pv, 1), ''],
-      ['ΔPY', geoSigned(t.v - t.pv, 1), cls],
-      ['ΔPY%', (t.yoy == null ? '—' : pct(t.yoy)), cls]
-    ].map(function (k) {
-      return '<div class="geo-kpi"><div class="gk-l">' + esc(k[0]) + '</div>' +
-        '<div class="gk-v">' + esc(k[1]) + '</div>' +
-        (k[2] ? '<div class="gk-y ' + k[2] + '">' + esc(k[2] === 'up' ? '▲' : '▼') +
-          ' vs ' + esc(d.pyFy || 'PY') + '</div>' : '') + '</div>';
-    }).join('');
     renderGeoCompanies(d);
     renderGeoTable(d);
     renderGeoMap(d);
@@ -2582,22 +2578,32 @@
       var on = (S.geo.selected || []).indexOf(r.company) >= 0;
       return '<label><input type="checkbox" data-company="' + esc(r.company) + '"' +
         (on ? ' checked' : '') + '><span title="' + esc(r.company) + '">' +
-        esc(r.company) + '</span><i>' + esc(money(r.v, 1)) + '</i></label>';
+        esc(r.company) + '</span><i>' + esc(geoNum(r.v, 1)) + '</i></label>';
     }).join('') : '<div class="geo-comp-none">No matching company</div>';
   }
+  /* Zebra BI：金额灰条贴条尾写数值；ΔPY 以中心竖线为零线左右伸缩；
+     ΔPY% 用 1px 细线 + 末端圆点，数值贴在线尾。条宽百分比相对半列，留余量给文字。 */
+  function zebraSide(kind, diff, ratio, txt) {
+    var bar = kind === 'pct'
+      ? '<i class="zb-line" style="width:' + ratio.toFixed(1) + '%"></i>'
+      : '<i class="zb-bar" style="width:' + ratio.toFixed(1) + '%"></i>';
+    return '<div class="z-side ' + (diff >= 0 ? 'pos' : 'neg') + '">' + bar +
+      '<span class="zv">' + esc(txt) + '</span></div>';
+  }
   function zebra(v, pv, kind, max) {
-    var diff = v - pv, pos = diff >= 0;
     if (kind === 'amount') {
-      var w = Math.min(100, Math.abs(v) / (max || 1) * 100);
-      return '<td><div class="zb"><i class="zb-bar" style="width:' + w.toFixed(1) + '%"></i>' +
-        '<em>' + esc(money(v, 1)) + '</em></div></td>';
+      var w = Math.min(82, Math.abs(v) / (max || 1) * 82);
+      return '<td><div class="z-amt"><i class="zb-gray" style="width:' +
+        w.toFixed(1) + '%"></i><span class="zv">' + esc(geoNum(v, 1)) +
+        '</span></div></td>';
     }
-    var ratio = Math.min(50, Math.abs(kind === 'pct' ? (pv ? diff / pv : 0) : diff) /
-      (max || 1) * 50);
-    var txt = kind === 'pct' ? (pv ? pct(diff / pv) : '—') : geoSigned(diff, 1);
-    return '<td><div class="zb ' + (pos ? 'up' : 'dn') + '"><i class="zb-split"></i>' +
-      '<i class="' + (pos ? 'zb-pos' : 'zb-neg') + '" style="width:' + ratio.toFixed(1) + '%"></i>' +
-      '<em class="em">' + esc(txt) + '</em></div></td>';
+    var diff = v - pv;
+    var val = kind === 'pct' ? (pv ? diff / pv : 0) : diff;
+    var ratio = Math.min(85, Math.abs(val) / (max || 1) * 85);
+    var txt = kind === 'pct'
+      ? (pv ? (diff >= 0 ? '+' : '-') + Math.abs(diff / pv * 100).toFixed(1) + '%' : '—')
+      : geoSigned(diff, 1);
+    return '<td><div class="z-br">' + zebraSide(kind, diff, ratio, txt) + '</div></td>';
   }
   function renderGeoTable(d) {
     var cats = (d.categories || []).slice().sort(function (a, b) { return b.v - a.v; });
@@ -2690,7 +2696,7 @@
           });
           legend[c] = b.region || '';
         }
-        var radius = 28000 + Math.sqrt(Math.abs(b.v) / (max || 1)) * 300000;
+        var radius = 15000 + Math.sqrt(Math.abs(b.v) / (max || 1)) * 110000;
         (geoms[key] || (geoms[key] = [])).push({
           id: b.city, styleId: key,
           center: new window.TMap.LatLng(b.lat, b.lng), radius: radius
