@@ -161,10 +161,12 @@ def build_geo_loc(con):
     """离线地图气泡需要的公司 → 坐标 / 区域色 / 城市映射。"""
     out = {}
     try:
-        for r in con.execute('SELECT "Company_cn", longitude, latitude, "Color", "Region", "市" '
-                             'FROM fct_company_location'):
+        for r in con.execute(
+                'SELECT l."Company_cn", l.longitude, l.latitude, l."Color", l."Region", '
+                'l."市", m."CompanyAbbreviationEN" FROM fct_company_location l '
+                'LEFT JOIN dim_company_map m ON m."CompanyAbbreviation"=l."Company_cn"'):
             out[r[0]] = {"lng": r[1], "lat": r[2], "color": r[3],
-                         "region": r[4], "city": r[5]}
+                         "region": r[4], "city": r[5], "abbr": r[6] or r[0]}
     except sqlite3.Error:
         pass
     return out

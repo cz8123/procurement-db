@@ -193,3 +193,12 @@
 - **三栏横向铺满**：模板把原来的「上地图+公司、下同比表」改成单个 `.geo-body`，`flex:1 1 auto` 撑满卡片余高；三栏 `地图 48% / 同比表 37% / 公司筛选 15%`（≤1280 为 46/39/15）。地图最宽、公司最窄，三栏上下沿齐平，下面不留空带。
 - **亮色 Zebra**：`.geo-tbl-wrap` 白底 + `--line` 描边，表头回到 `--hdr-bg:#8CAACD` + 深字；灰条 `#A0B0C4`，中心零线 `#B4C0CF`，列间 `1px --line`，类别列右对齐深藏青。红绿与看板令牌一致：条 `--up:#3ECA74` / `--red:#EA1313`，文字 `#17834A` / `#C62828`，ΔPY% 细线圆点用稍深的 `#2CA967` / `#D93A3A`（白底上更清晰）。金额仍无币种符号、数值贴条尾；ΔPY 中心零线左右伸缩；ΔPY% 1px 线 + 7px 圆点。
 - **测试**：`geo_check` 扩到 28/0（新增三栏并排、铺满卡片、占比顺序、亮色主题断言），在线 + 离线各 28/0；board 294、page_tabs 24、detail 30、snapshot 64、visual_tools 31、ui_focus 38、perf 11（首屏 URL 偶发 1 次未捕获，复跑全绿）、grid_sum 14、colfilter 34 全绿。
+
+## 39 Geo 页公司级气泡 / 华南默认视角 / 布局溢出修复（11-25 夜）
+- **白名单澄清**：腾讯位置服务 JS API GL 的 Key 编辑弹窗里**没有域名白名单字段**（截图确认），域名白名单只属于 WebServiceAPI（浏览器 JSONP 场景）；看板只用 JS GL，无需配置。
+- **公司级气泡**：`_GEO_LOC` 改成 `fct_company_location l LEFT JOIN dim_company_map m ON m.CompanyAbbreviation=l.Company_cn`，一家公司一行、坐标直接取表；后端不再按城市合并，`bubbles = 有经纬度的 companies`。深圳同城 13 家 → 13 个独立气泡。FY2627 有 58 家发生交易，其中 6 家是**上财年才有交易且坐标表未收录**的历史公司（v=0、lat/lng 为空），不画气泡但保留在筛选列表。
+- **英文简称**：`dim_company_map.CompanyAbbreviationEN` 63/63 全覆盖，气泡与筛选列表都带 `abbr`，列表显示简称、title 给中文全称，搜索同时匹配两者。
+- **缩放联动半径**：`MultiCircle.radius` 是米制，天然随缩放变化；再在 `zoom` 事件里按 `scale=2^((zoom-5.6)*0.5)` 重画一次，基准 zoom 5.6 下 3~28px。半径从 15000+sqrt*110000 改为 `(4000+sqrt*38000)*scale`，避免聚焦华南后气泡过大。
+- **默认视角**：中心 `[113.5, 22.9]`（珠三角），zoom 5.6，不再一上来铺全中国；`#geoMap.dataset.zoom/center` 记录初始值便于回归断言。
+- **布局修复**：三栏原用 `flex:0 0 48%/37%/15%`，百分比合计 100% **再加 2×12px gap** 导致公司筛选栏右边界溢出画布 23px；改成 `flex:48 1 0 / 37 1 0 / 15 1 0`（≤1280 为 46/39/15），gap 自动从剩余空间扣。`.geo-comp-pane` 加 `overflow:hidden`、列表用 grid `13px minmax(0,1fr) auto` 防溢出；`.geo-tbl-wrap` 改 `overflow-x:hidden; overflow-y:auto`，横向滚动条消失。`fitGeoTbl()` 按容器高度摊 11 行行高（上限 120px），三栏纵向齐平。
+- **测试**：`geo_check` 在线 36/0、离线 35/0（离线无 Key 时跳过地图视角断言）；board 294、page_tabs 24、detail 30、snapshot 64、visual_tools 31、ui_focus 38、perf 11、grid_sum 14、colfilter 34 全绿。

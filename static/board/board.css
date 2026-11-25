@@ -1003,7 +1003,7 @@ html.boot-other #pgOverview, html.boot-other #kpis, html.boot-other .fbar{ displ
 .geo-metric{ display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:700; color:var(--muted); }
 /* 三栏并排铺满卡片余高：地图 48% / 同比表 37% / 公司筛选 15% */
 .geo-body{ display:flex; gap:12px; flex:1 1 auto; min-height:0; }
-.geo-map-pane{ position:relative; flex:0 0 48%; min-width:0; border:1px solid var(--line); background:#EDF1F5; }
+.geo-map-pane{ position:relative; flex:48 1 0; min-width:0; border:1px solid var(--line); background:#EDF1F5; }
 #geoMap{ position:absolute; inset:0; }
 .geo-map-msg{
   position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -1017,23 +1017,25 @@ html.boot-other #pgOverview, html.boot-other #kpis, html.boot-other .fbar{ displ
   font-size:10.5px; color:var(--ink-2); pointer-events:none;
 }
 .geo-legend i{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:4px; vertical-align:-1px; }
-.geo-comp-pane{ flex:0 0 15%; display:flex; flex-direction:column; min-height:0; min-width:0; border:1px solid var(--line); background:#fff; }
-.geo-comp-h{ display:flex; justify-content:space-between; align-items:center; padding:7px 9px; background:var(--hdr-bg); color:#122745; font-size:11.5px; font-weight:700; }
-.geo-comp-pane > input{ margin:7px 8px 4px; width:calc(100% - 16px); }
-.geo-comp-list{ flex:1 1 auto; min-height:0; overflow:auto; padding:0 4px 6px; }
-.geo-comp-list label{ display:flex; align-items:center; gap:5px; padding:2px 5px; font-size:11px; color:var(--ink-2); cursor:pointer; white-space:nowrap; }
+.geo-comp-pane{ flex:15 1 0; display:flex; flex-direction:column; min-height:0; min-width:0; border:1px solid var(--line); background:#fff; overflow:hidden; }
+.geo-comp-h{ display:flex; justify-content:space-between; align-items:center; gap:4px; padding:7px 7px; background:var(--hdr-bg); color:#122745; font-size:11px; font-weight:700; white-space:nowrap; overflow:hidden; }
+.geo-comp-h span{ min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.geo-comp-h span:last-child{ flex:0 0 auto; }
+.geo-comp-pane > input{ margin:7px 7px 4px; width:calc(100% - 14px); box-sizing:border-box; }
+.geo-comp-list{ flex:1 1 auto; min-height:0; overflow-x:hidden; overflow-y:auto; padding:0 4px 6px; }
+.geo-comp-list label{ display:grid; grid-template-columns:13px minmax(0,1fr) auto; align-items:center; gap:4px; padding:2px 4px; font-size:10.5px; color:var(--ink-2); cursor:pointer; }
 .geo-comp-list label:hover{ background:#F1F5FA; }
-.geo-comp-list label span{ flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; }
-.geo-comp-list label i{ font-style:normal; color:var(--faint); font-size:10px; }
+.geo-comp-list label span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.geo-comp-list label i{ font-style:normal; color:var(--faint); font-size:9.5px; white-space:nowrap; }
 .geo-comp-list label input{ margin:0; accent-color:var(--blue); }
 .geo-comp-none{ padding:12px; font-size:11px; color:var(--note); text-align:center; }
-.geo-yoy{ flex:0 0 37%; min-width:0; min-height:0; display:flex; flex-direction:column; }
+.geo-yoy{ flex:37 1 0; min-width:0; min-height:0; display:flex; flex-direction:column; }
 .geo-yoy-h{ display:flex; align-items:baseline; gap:8px; padding-bottom:6px; flex:0 0 auto; }
 .geo-yoy-h h3{ margin:0; font-size:12.5px; font-weight:700; color:var(--title); white-space:nowrap; }
 .geo-yoy-h span{ font-size:9.5px; color:var(--note); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 /* Zebra BI 视觉语言 + 看板亮色令牌：灰条 / 中心零线 / 红绿条 / 细线圆点 */
-.geo-tbl-wrap{ flex:1 1 auto; min-height:0; overflow:auto; background:#fff; border:1px solid var(--line); }
-.geo-tbl{ width:100%; border-collapse:collapse; table-layout:fixed; color:var(--ink-2); }
+.geo-tbl-wrap{ flex:1 1 auto; min-height:0; min-width:0; overflow-x:hidden; overflow-y:auto; background:#fff; border:1px solid var(--line); }
+.geo-tbl{ width:100%; table-layout:fixed; border-collapse:collapse; color:var(--ink-2); }
 .geo-tbl th{
   position:sticky; top:0; z-index:2; background:var(--hdr-bg); color:#122745;
   font-size:10px; font-weight:700; text-align:right; padding:5px 6px;
@@ -1048,13 +1050,13 @@ html.boot-other #pgOverview, html.boot-other #kpis, html.boot-other .fbar{ displ
 .geo-tbl td+td, .geo-tbl th+th{ border-left:1px solid var(--line); }
 .geo-tbl tbody tr:hover{ background:#F2F6FB; }
 /* 金额：主题灰蓝条从左起，数值贴条尾 */
-.z-amt{ display:flex; align-items:center; height:18px; }
+.z-amt{ display:flex; align-items:center; height:100%; }
 .z-amt .zb-gray{ height:9px; flex:0 0 auto; background:#A0B0C4; }
 .z-amt .zv{ padding-left:4px; white-space:nowrap; color:var(--ink-2); font-variant-numeric:tabular-nums; }
 /* ΔPY / ΔPY%：中心竖线即零线，正右侧绿条、负左侧红条，数值贴条尾 */
-.z-br{ position:relative; height:18px; }
+.z-br{ position:relative; height:100%; }
 .z-br::after{ content:""; position:absolute; left:50%; top:1px; bottom:1px; width:1px; background:#B4C0CF; }
-.z-side{ position:absolute; top:0; height:18px; width:50%; display:flex; align-items:center; }
+.z-side{ position:absolute; top:0; height:100%; width:50%; display:flex; align-items:center; }
 .z-side.pos{ left:50%; justify-content:flex-start; }
 .z-side.neg{ right:50%; justify-content:flex-end; flex-direction:row-reverse; }
 .z-side .zv{ flex:0 0 auto; padding:0 3px; font-size:9.5px; font-variant-numeric:tabular-nums; white-space:nowrap; }
@@ -1072,8 +1074,8 @@ html.boot-other #pgOverview, html.boot-other #kpis, html.boot-other .fbar{ displ
 .z-side.neg .zb-line::after{ left:-3px; background:#D93A3A; }
 @media (max-width:1280px){
   .geo-body{ gap:8px; }
-  .geo-map-pane{ flex-basis:46%; }
-  .geo-yoy{ flex-basis:39%; }
-  .geo-comp-pane{ flex-basis:15%; }
+  .geo-map-pane{ flex:46 1 0; }
+  .geo-yoy{ flex:39 1 0; }
+  .geo-comp-pane{ flex:15 1 0; }
   .geo-yoy-h span{ display:none; }
 }

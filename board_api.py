@@ -1183,11 +1183,13 @@ GEO_METRICS = {
                    'WHERE "单一来源采购理由"=\'Inadequate Competition\') '
                    'THEN p."Total Price" ELSE 0 END)'),
 }
-# 坐标按公司去重后再按城市聚合：同一城市多家店共用一个气泡，颜色取该城金额最大公司的色
+# 坐标表一家公司一行（63 行 63 家），不再按城市合并；英文简称取 dim_company_map
 _GEO_LOC = ('WITH loc AS ('
-            'SELECT "Company_cn" company, AVG(longitude) lng, AVG(latitude) lat, '
-            'MAX("Color") color, MAX("Region") region, MAX("市") city '
-            'FROM fct_company_location GROUP BY "Company_cn") ')
+            'SELECT l."Company_cn" company, l.longitude lng, l.latitude lat, '
+            'l."Color" color, l."Region" region, l."市" city, '
+            'm."CompanyAbbreviationEN" abbr '
+            'FROM fct_company_location l '
+            'LEFT JOIN dim_company_map m ON m."CompanyAbbreviation"=l."Company_cn") ')
 
 
 @board_bp.get("/geo")
@@ -1215,7 +1217,7 @@ def geo():
                 return {}, {}
             sel, rest = group
             if with_loc:
-                sel += ', loc.lng, loc.lat, loc.color, loc.region, loc.city'
+                sel += ', loc.lng, loc.lat, loc.color, loc.region, loc.city, loc.abbr'
             sql = ((_GEO_LOC if with_loc else '') +
                    'SELECT %s, %s v %s GROUP BY 1' % (sel, expr, rest % w))
             out, meta = {}, {}
@@ -1225,7 +1227,7 @@ def geo():
                 if with_loc:
                     meta[k] = {"lng": r["lng"], "lat": r["lat"],
                                "color": r["color"], "region": r["region"],
-                               "city": r["city"]}
+                               "city": r["city"], "abbr": r["abbr"] or k}
             return out, meta
 
         cat_sql = 'FROM dash_po p JOIN dash_calendar c ON p."Date"=c."Date" WHERE %s'
@@ -1247,20 +1249,9 @@ def geo():
             return out
 
         categories = rows(cats, pcats, "cat")
+        # 一家公司一个气泡：坐标直接取公司经纬度表，同城 15 家店就是 15 个气泡
         companies = rows(comps, pcomps, "company", cmeta)
-        # 城市级气泡：坐标取该城金额最大公司的坐标，颜色同理
-        city_v, city_pv, city_meta = {}, {}, {}
-        for k, r in zip([r["company"] for r in companies], companies):
-            city = r.get("city")
-            if not city:
-                continue
-            if r["v"] >= city_v.get(city, -1):
-                city_v[city] = r["v"]
-                city_pv[city] = r["pv"]
-                city_meta[city] = {x: r.get(x) for x in ("lng", "lat", "color", "region")}
-        bubbles = [dict({"city": k, "v": _num(city_v[k]), "pv": _num(city_pv[k]),
-                         "yoy": _yoy(city_v[k], city_pv[k])}, **city_meta[k])
-                   for k in sorted(city_v, key=lambda x: -city_v[x])]
+        bubbles = [r for r in companies if r.get("lat") is not None and r.get("lng") is not None]
         total_v, total_pv = sum(cats.values()), sum(pcats.values())
         return jsonify({
             "metric": metric, "label": label, "fy": fy, "pyFy": pfy,

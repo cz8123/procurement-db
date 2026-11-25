@@ -727,7 +727,7 @@
       if (meta) {
         var m = meta[k] || {};
         o.lng = m.lng; o.lat = m.lat; o.color = m.color;
-        o.region = m.region; o.city = m.city;
+        o.region = m.region; o.city = m.city; o.abbr = m.abbr;
       }
       return o;
     });
@@ -743,22 +743,9 @@
     var co = geoAgg(list, metric, 'company'), po = geoAgg(plist, metric, 'company').sums;
     var categories = geoRows(ca, cp, 'cat');
     var companies = geoRows(co.sums, po, 'company', co.meta);
-    var cityV = {}, cityPV = {}, cityMeta = {};
-    companies.forEach(function (r) {
-      if (!r.city) return;
-      if (r.v >= (cityV[r.city] == null ? -1 : cityV[r.city])) {
-        cityV[r.city] = r.v; cityPV[r.city] = r.pv || 0;
-        cityMeta[r.city] = { lng: r.lng, lat: r.lat, color: r.color, region: r.region };
-      }
-    });
-    var bubbles = Object.keys(cityV).sort(function (a, b) {
-      return cityV[b] - cityV[a];
-    }).map(function (k) {
-      var o = { city: k, v: cityV[k], pv: cityPV[k] || 0,
-                yoy: cityPV[k] ? r2((cityV[k] - cityPV[k]) / cityPV[k]) : null };
-      var m = cityMeta[k] || {};
-      o.lng = m.lng; o.lat = m.lat; o.color = m.color; o.region = m.region;
-      return o;
+    /* 一家公司一个气泡，坐标直接取公司经纬度表（同城不合并） */
+    var bubbles = companies.filter(function (r) {
+      return r.lat != null && r.lng != null;
     });
     var tv = 0, pv = 0;
     Object.keys(ca).forEach(function (k) { tv += ca[k]; });

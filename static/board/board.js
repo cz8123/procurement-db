@@ -2571,14 +2571,16 @@
   function renderGeoCompanies(d) {
     var q = (S.geo.q || '').trim().toLowerCase();
     var rows = (d.companies || []).filter(function (r) {
-      return !q || (r.company || '').toLowerCase().indexOf(q) >= 0;
+      return !q || (r.company || '').toLowerCase().indexOf(q) >= 0 ||
+        (r.abbr || '').toLowerCase().indexOf(q) >= 0;
     });
     $('#geoCompCount').textContent = nf(rows.length, 0) + ' / ' + nf((d.companies || []).length, 0);
     $('#geoCompList').innerHTML = rows.length ? rows.map(function (r) {
       var on = (S.geo.selected || []).indexOf(r.company) >= 0;
       return '<label><input type="checkbox" data-company="' + esc(r.company) + '"' +
-        (on ? ' checked' : '') + '><span title="' + esc(r.company) + '">' +
-        esc(r.company) + '</span><i>' + esc(geoNum(r.v, 1)) + '</i></label>';
+        (on ? ' checked' : '') + '><span title="' + esc(r.company) + ' · ' +
+        esc(r.abbr || '') + '">' + esc(r.abbr || r.company) + '</span><i>' +
+        esc(geoNum(r.v, 1)) + '</i></label>';
     }).join('') : '<div class="geo-comp-none">No matching company</div>';
   }
   /* Zebra BI：金额灰条贴条尾写数值；ΔPY 以中心竖线为零线左右伸缩；
@@ -2622,6 +2624,19 @@
         zebra(r.v, r.pv, 'delta', maxD) +
         zebra(r.v, r.pv, 'pct', maxP) + '</tr>';
     }).join('');
+    fitGeoTbl();
+  }
+  /* 表格只有 11 行，按容器可用高度摊开行高，让三栏纵向长度一致、下方不留大片空白 */
+  function fitGeoTbl() {
+    var wrap = $('.geo-tbl-wrap'), tbl = $('#geoTbl');
+    if (!wrap || !tbl || !tbl.tHead || !tbl.tBodies[0]) return;
+    var n = tbl.tBodies[0].rows.length;
+    if (!n) return;
+    var headH = tbl.tHead.getBoundingClientRect().height;
+    var h = Math.max(20, Math.min(120, Math.floor((wrap.clientHeight - headH - 2) / n)));
+    Array.prototype.forEach.call(tbl.tBodies[0].rows, function (tr) {
+      Array.prototype.forEach.call(tr.cells, function (td) { td.style.height = h + 'px'; });
+    });
   }
   function ensureMapSDK(cb) {
     var key = window.TMAP_KEY || '';
@@ -2649,67 +2664,75 @@
     };
     document.head.appendChild(s);
   }
+  var GEO_CENTER = [113.5, 22.9], GEO_ZOOM = 5.6;   // 默认聚焦珠三角（门店最密）
   function initGeoMap() {
     S.geo.map = new window.TMap.Map('geoMap', {
-      center: new window.TMap.LatLng(34.6, 106.4), zoom: 4.2, pitch: 0
+      center: new window.TMap.LatLng(GEO_CENTER[1], GEO_CENTER[0]),
+      zoom: GEO_ZOOM, pitch: 0
     });
+    /* 记录初始视角，便于回归断言默认落在华南 */
+    $('#geoMap').dataset.zoom = String(GEO_ZOOM);
+    $('#geoMap').dataset.center = GEO_CENTER.join(',');
     S.geo.overlay = new window.TMap.MultiCircle({
       map: S.geo.map, styles: {}, geometries: []
     });
     S.geo.overlay.on('click', function (e) {
       var g = e.geometry;
       if (!g || !g.id) return;
-      var city = g.id;
-      var d = S.geo.data;
-      var names = (d.companies || []).filter(function (r) { return r.city === city; })
-        .map(function (r) { return r.company; });
-      if (!names.length) return;
-      var all = names.every(function (n) { return S.geo.selected.indexOf(n) >= 0; });
-      names.forEach(function (n) {
-        var i = S.geo.selected.indexOf(n);
-        if (all && i >= 0) S.geo.selected.splice(i, 1);
-        else if (!all && i < 0) S.geo.selected.push(n);
-      });
+      var name = g.id, i = S.geo.selected.indexOf(name);
+      if (i >= 0) S.geo.selected.splice(i, 1);
+      else S.geo.selected.push(name);
       loadGeo();
     });
+    /* MultiCircle 的 radius 是米：地图缩放时气泡随地理尺度同步放大 / 缩小。
+       zoom 变化时按当前档位重算一次，保证视觉变化连贯。 */
+    S.geo.map.on('zoom', function () {
+      if (S.geo.data) drawGeoBubbles(S.geo.data);
+    });
+  }
+  function drawGeoBubbles(d) {
+    var bubbles = (d.bubbles || []).filter(function (b) {
+      return b.lat != null && b.lng != null;
+    });
+    var max = 0;
+    bubbles.forEach(function (b) { max = Math.max(max, Math.abs(b.v)); });
+    var zoom = S.geo.map.getZoom() || GEO_ZOOM;
+    /* 基准 zoom 5.6 下 3~28px；zoom 越高半径按地理尺度放大，随缩放同步变化 */
+    var scale = Math.pow(2, (zoom - GEO_ZOOM) * 0.5);
+    var styles = {}, geoms = {}, legend = {};
+    bubbles.forEach(function (b) {
+      var c = b.color || '#3B5E96';
+      var key = 'g_' + c.replace('#', '');
+      if (!styles[key]) {
+        var m = /^#?([0-9a-f]{6})$/i.exec(c || '');
+        var rgb = m ? parseInt(m[1], 16) : 0x3B5E96;
+        var fill = 'rgba(' + ((rgb >> 16) & 255) + ',' + ((rgb >> 8) & 255) +
+          ',' + (rgb & 255) + ',.70)';
+        styles[key] = new window.TMap.CircleStyle({
+          color: fill, showBorder: true, borderColor: c, borderWidth: 2
+        });
+        legend[c] = b.region || '';
+      }
+      var radius = (4000 + Math.sqrt(Math.abs(b.v) / (max || 1)) * 38000) * scale;
+      (geoms[key] || (geoms[key] = [])).push({
+        id: b.company, styleId: key,
+        center: new window.TMap.LatLng(b.lat, b.lng), radius: radius
+      });
+    });
+    S.geo.overlay.setStyles(styles);
+    S.geo.overlay.setGeometries([].concat.apply([], Object.keys(geoms).map(function (k) {
+      return geoms[k];
+    })));
+    $('#geoLegend').innerHTML = Object.keys(legend).map(function (c) {
+      return '<span><i style="background:' + esc(c) + '"></i>' +
+        esc(legend[c] || 'Region') + '</span>';
+    }).join('');
   }
   function renderGeoMap(d) {
     ensureMapSDK(function () {
       try {
-      if (!S.geo.map) initGeoMap();
-      var bubbles = (d.bubbles || []).filter(function (b) {
-        return b.lat != null && b.lng != null;
-      });
-      var max = 0;
-      bubbles.forEach(function (b) { max = Math.max(max, Math.abs(b.v)); });
-      var styles = {}, geoms = {}, legend = {};
-      bubbles.forEach(function (b) {
-        var c = b.color || '#3B5E96';
-        var key = 'g_' + c.replace('#', '');
-        if (!styles[key]) {
-          var m = /^#?([0-9a-f]{6})$/i.exec(c || '');
-          var rgb = m ? parseInt(m[1], 16) : 0x3B5E96;
-          var fill = 'rgba(' + ((rgb >> 16) & 255) + ',' + ((rgb >> 8) & 255) +
-            ',' + (rgb & 255) + ',.70)';
-          styles[key] = new window.TMap.CircleStyle({
-            color: fill, showBorder: true, borderColor: c, borderWidth: 2
-          });
-          legend[c] = b.region || '';
-        }
-        var radius = 15000 + Math.sqrt(Math.abs(b.v) / (max || 1)) * 110000;
-        (geoms[key] || (geoms[key] = [])).push({
-          id: b.city, styleId: key,
-          center: new window.TMap.LatLng(b.lat, b.lng), radius: radius
-        });
-      });
-      S.geo.overlay.setStyles(styles);
-      S.geo.overlay.setGeometries([].concat.apply([], Object.keys(geoms).map(function (k) {
-        return geoms[k];
-      })));
-      $('#geoLegend').innerHTML = Object.keys(legend).map(function (c) {
-        return '<span><i style="background:' + esc(c) + '"></i>' +
-          esc(legend[c] || 'Region') + '</span>';
-      }).join('');
+        if (!S.geo.map) initGeoMap();
+        drawGeoBubbles(d);
       } catch (e) {
         console.error(e);
         $('#geoMapMsg').textContent = '地图渲染失败：' + e.message +
@@ -2737,7 +2760,9 @@
       loadGeo();
     });
     window.addEventListener('resize', function () {
-      if (S.page === 'geo' && S.geo.map) S.geo.map.resize();
+      if (S.page !== 'geo') return;
+      if (S.geo.map) S.geo.map.resize();
+      fitGeoTbl();
     });
   }
 

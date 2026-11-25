@@ -75,8 +75,49 @@ function latestSnap() {
     chk('三栏铺满卡片下方',
       [layout.map, layout.yoy, layout.comp].every(b =>
         Math.abs(b.bottom - layout.card.bottom) <= 12 && b.h > 400), layout);
+    const fit = await page.evaluate(() => {
+      const w = document.querySelector('.geo-tbl-wrap').getBoundingClientRect();
+      const last = document.querySelector('#geoTbl tbody tr:last-child').getBoundingClientRect();
+      return { gap: Math.round(w.bottom - last.bottom), h: Math.round(w.height) };
+    });
+    chk('同比表行高铺满、三栏纵向齐平', fit.gap < 40 && fit.h > 300, fit);
     chk('地图占比最大、筛选栏最窄',
       layout.map.w > layout.yoy.w && layout.yoy.w > layout.comp.w, layout);
+
+    console.log('=== 1c. 公司级气泡 / 英文简称 / 华南视角 ===');
+    const gd = await page.evaluate(async () =>
+      await (await fetch('/api/board/geo?metric=prpo')).json());
+    chk('气泡按公司而非按城市合并',
+      gd.bubbles.length > 40 &&
+      new Set(gd.bubbles.map(b => b.company)).size === gd.bubbles.length,
+      { bubbles: gd.bubbles.length, companies: gd.companies.length });
+    chk('同城每家公司各有坐标',
+      gd.bubbles.filter(b => b.city === '深圳市').length >= 10,
+      gd.bubbles.filter(b => b.city === '深圳市').length);
+    chk('气泡与列表都带英文简称',
+      gd.bubbles.every(b => b.abbr && b.company), gd.bubbles.slice(0, 2));
+    const labels = await page.evaluate(() =>
+      [...document.querySelectorAll('#geoCompList label span')].slice(0, 6)
+        .map(e => e.textContent.trim()));
+    chk('公司列表显示英文简称',
+      labels.length > 0 && labels.every(x => /^[A-Z]/.test(x)), labels);
+    const view = await page.evaluate(() => {
+      const el = document.getElementById('geoMap');
+      return { zoom: +el.dataset.zoom, center: el.dataset.center };
+    });
+    if (!SNAP) {
+      chk('默认聚焦华南', view.zoom >= 5.5 &&
+        parseFloat(view.center.split(',')[1]) < 25, view);
+    }
+    const overflow = await page.evaluate(() => {
+      const w = document.querySelector('.geo-tbl-wrap'),
+            p = document.querySelector('.geo-comp-pane').getBoundingClientRect(),
+            card = document.querySelector('#pgGeo .geo-card').getBoundingClientRect();
+      return { xScroll: w.scrollWidth - w.clientWidth,
+               compRight: Math.round(p.right - card.right) };
+    });
+    chk('同比表无横向滚动条', overflow.xScroll <= 1, overflow);
+    chk('公司筛选框未跑出画布', overflow.compRight <= 1, overflow);
 
     console.log('=== 2. Category 同比表（Zebra 视觉 + 亮色主题）===');
     const tbl = await page.evaluate(() => {
