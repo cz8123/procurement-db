@@ -31,7 +31,6 @@
     { k: 'company', t: 'Company', w: 230 },
     { k: 'region', t: 'Region', w: 84 },
     { k: 'n', t: 'Orders', num: 1, w: 68 },
-    { k: 'sup', t: 'Suppliers', num: 1, w: 88 },
     { k: 'amount', t: 'Spend', num: 1, w: 108 },
     { k: 'poPaid', t: 'PO Paid', num: 1, w: 108 },
     { k: 'days', t: 'Avg Days', num: 1, w: 82 }
@@ -248,11 +247,14 @@
     var sgn = x < 0 ? '-' : (x > 0 ? '+' : '');
     return sgn + kpiVal(k, Math.abs(x));
   }
-  /** KPI 右侧的一行差额：ΔPY +4.2M ▲（红）/ -1.9M ▼（绿） */
+  /** KPI 右侧的一行差额：ΔPY +4.2M ↑ / -1.9M ↓（真正的箭头，不是三角） */
   function kDelta(label, txt, dir) {
-    var arrow = dir === 'up' ? '▲' : (dir === 'down' ? '▼' : '•');
+    var up = dir === 'up';
+    var path = up ? 'M4 0.6 L7.4 4.1 H5.45 V7.4 H2.55 V4.1 H0.6 Z'
+                  : 'M4 7.4 L0.6 3.9 H2.55 V0.6 H5.45 V3.9 H7.4 Z';
     return '<span class="k-delta ' + dir + '"><b>' + esc(label) + '</b>' +
-      '<em>' + esc(txt) + '</em><i class="k-bd">' + arrow + '</i></span>';
+      '<em>' + esc(txt) + '</em><i class="k-bd"><svg viewBox="0 0 8 8" width="6.6" ' +
+      'height="6.6" aria-hidden="true"><path d="' + path + '" fill="#fff"/></svg></i></span>';
   }
 
   function renderKpis() {
@@ -273,11 +275,6 @@
         pills = kDelta('ΔPY', kpiSigned(k, diff), dir) +
           kDelta('Δ%', yoyTxt, dir);
       }
-      var sub = k.sub ? '<span class="k-sub">· ' + esc(k.sub) + '</span>' : '';
-      var prev = hasPrev
-        ? '<div class="k-prev">vs ' + esc(pFy) + ' ' + esc(kpiVal(k, k.pv)) + sub + '</div>'
-        : (sub ? '<div class="k-prev">' + sub + '</div>' : '');
-
       return '<div class="kpi" data-k="' + k.k + '" style="--c:' +
         KPI_COLORS[0] + '">' +
         '<button class="spec-btn kpi-spec" data-spec="kpi_' + k.k + '" ' +
@@ -289,7 +286,6 @@
         '<div class="k-val">' + kpiVal(k, k.v) + '</div>' +
         (pills ? '<div class="k-bot">' + pills + '</div>' : '') +
         '</div>' +
-        prev +
         '</div>';
     }).join('');
 
@@ -886,7 +882,10 @@
       var smax = sl[0].v || 1;
       var items = sl.map(function (s) {
         var ss = r.v ? (s.v || 0) / r.v : 0;
-        return '<li><span class="cs-k" title="' + esc(s.k) + '">' + esc(s.k) + '</span>' +
+        var sOn = (S.sel.sub || []).indexOf(s.k) >= 0;
+        return '<li class="cs-item' + (sOn ? ' on' : '') + '" data-subcat="' +
+          esc(s.k) + '" title="Click to filter this sub-category">' +
+          '<span class="cs-k" title="' + esc(s.k) + '">' + esc(s.k) + '</span>' +
           '<i class="cs-bar"><b style="width:' + Math.max(2, (s.v / smax) * 100).toFixed(1) +
           '%;background:#8FB3D9"></b></i>' +
           '<span class="cs-v">' + money(s.v, 1) + '</span>' +
@@ -1170,7 +1169,6 @@
         '<td class="strong" title="' + esc(r.company) + '">' + esc(r.company || '—') + '</td>' +
         '<td>' + esc(r.region || '—') + '</td>' +
         '<td class="num">' + nf(r.n, 0) + '</td>' +
-        '<td class="num">' + nf(r.sup, 0) + '</td>' +
         '<td class="num">' + money(r.amount, 1) + '</td>' +
         '<td class="num">' + money(r.poPaid, 1) + '</td>' +
         '<td class="num">' + (r.days == null ? '—' : Number(r.days).toFixed(1)) + '</td>' +
@@ -1723,12 +1721,6 @@
     // 财年 / 货币
     $('#fySel').addEventListener('change', function (e) {
       S.fy = e.target.value; S.fc.page = 1;
-      /* 日期范围是当前财年内的切片器：换财年清空，避免落在空区间 */
-      if (S.detail.from || S.detail.to) {
-        S.detail.from = ''; S.detail.to = '';
-        if ($('#dtFrom')) $('#dtFrom').value = '';
-        if ($('#dtTo')) $('#dtTo').value = '';
-      }
       loadAll();
     });
     $('#curSeg').addEventListener('click', function (e) {
@@ -1789,6 +1781,17 @@
         var c = tog.dataset.sub;
         if (S.catSub[c]) delete S.catSub[c]; else S.catSub[c] = 1;
         renderCatDetails(); updateVisualTools();
+        return;
+      }
+      /* 展开后的子类别行也可点：按 Sub-category 交叉筛选 */
+      var li = e.target.closest('li[data-subcat]');
+      if (li) {
+        var sv = li.dataset.subcat;
+        var slist = (S.sel.sub || []).slice();
+        var si = slist.indexOf(sv);
+        if (si >= 0) slist.splice(si, 1); else slist.push(sv);
+        beginHl('catdetail', 'sub', slist);
+        setSel('sub', slist); renderFilters(); loadAll();
         return;
       }
       var tr = e.target.closest('.cd-row');
@@ -3105,7 +3108,8 @@
     renderDtHead();
     S.detail.data = d;
     /* 日期切片器回填 + 用数据整体范围限制可选区间 */
-    var dF = $('#dtFrom'), dT = $('#dtTo'), rg = (S.data && S.data.range) || {};
+    var dF = $('#dtFrom'), dT = $('#dtTo'),
+      rg = (S.options && S.options.range) || (S.data && S.data.range) || {};
     if (dF && dT) {
       dF.value = S.detail.from || '';
       dT.value = S.detail.to || '';
@@ -3200,7 +3204,10 @@
       if (c.num) return '<td class="num">' + dtMoney(d.sums[c.k]) + '</td>';
       return '<td>' + (i === 0 ? 'Total' : '') + '</td>';
     }).join('') + '</tr>';
-    $('#dtMeta').textContent = nf(d.total, 0) + ' rows · ' + d.fy + ' · ' + d.cur;
+    $('#dtMeta').textContent = nf(d.total, 0) + ' rows · ' +
+      ((S.detail.from || S.detail.to)
+        ? ((S.detail.from || '…') + ' ~ ' + (S.detail.to || '…'))
+        : d.fy) + ' · ' + d.cur;
   }
 
   /* -------- 表头浮层 -------- */

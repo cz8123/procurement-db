@@ -117,17 +117,18 @@ async function waitFor(pg, fn, timeout, label) {
         const em = e.querySelector('em'), bd = e.querySelector('.k-bd');
         return { l: e.querySelector('b').textContent, v: em.textContent,
                  cls: e.className, color: getComputedStyle(em).color,
-                 bg: getComputedStyle(bd).backgroundColor, arrow: bd.textContent };
+                 bg: getComputedStyle(bd).backgroundColor,
+                 arrow: bd.querySelector('svg path') ? 'svg' : bd.textContent };
       });
     });
     chk('KPI 右侧两行 Δ 指标（ΔPY / Δ%）',
       kd.length === 2 && kd[0].l === 'ΔPY' && kd[1].l === 'Δ%', kd.map(x => x.l));
-    chk('KPI 增减色：增加红 / 减少绿，圆标同色',
+    chk('KPI 增减色：增加绿 / 减少红，圆标同色',
       kd.every(r => (r.cls.indexOf('up') >= 0 &&
-        r.color === 'rgb(216, 52, 31)' && r.bg === 'rgb(216, 52, 31)') ||
+        r.color === 'rgb(27, 138, 75)' && r.bg === 'rgb(27, 138, 75)') ||
         (r.cls.indexOf('down') >= 0 &&
-        r.color === 'rgb(120, 190, 60)' && r.bg === 'rgb(120, 190, 60)')), kd);
-    chk('每行都带圆形方向箭头', kd.every(r => /[▲▼]/.test(r.arrow)), kd);
+        r.color === 'rgb(198, 40, 40)' && r.bg === 'rgb(198, 40, 40)')), kd);
+    chk('圆标里是居中箭头（SVG path）', kd.every(r => r.arrow === 'svg'), kd);
 
     console.log('=== 3. 支出类型（dash_build 字段错位修复） ===');
     const exps = await page.evaluate(() =>
@@ -330,13 +331,23 @@ async function waitFor(pg, fn, timeout, label) {
     chk('抽屉按公司聚合（表头）', dHeads[0] === 'Company' && dHeads.indexOf('Avg Days') >= 0, dHeads);
     chk('抽屉不显示 PRPO 单号', dHeads.indexOf('PR No.') < 0 &&
       dHeads.indexOf('No.') < 0 && dHeads.indexOf('Date') < 0, dHeads);
-    chk('抽屉表头 7 列', dHeads.length === 7, dHeads);
+    chk('抽屉表头 6 列且去掉 Suppliers', dHeads.length === 6 && dHeads.indexOf('Suppliers') < 0, dHeads);
     const firstRow = await page.$$eval('#drawerTbl tbody tr:first-child td',
       a => a.map(e => e.textContent.trim()));
-    chk('抽屉一行一家公司', firstRow.length === 7 && firstRow[0].length > 1, firstRow);
-    chk('公司行有单数与金额', /^\d+$/.test(firstRow[2] || '') && /[¥R]/.test(firstRow[4] || ''), firstRow);
+    chk('抽屉一行一家公司', firstRow.length === 6 && firstRow[0].length > 1, firstRow);
+    chk('公司行有单数与金额', /^\d+$/.test(firstRow[2] || '') && /[¥R]/.test(firstRow[3] || ''), firstRow);
     chk('抽屉小标题写 companies',
       /companies/.test(await num('#drawerSub') || ''), await num('#drawerSub'));
+    const dBox = await page.$eval('#drawer', e => {
+      const b = e.getBoundingClientRect();
+      return { w: Math.round(b.width), h: Math.round(b.height),
+               right: Math.round(innerWidth - b.right), top: Math.round(b.top),
+               vh: innerHeight,
+               radius: parseFloat(getComputedStyle(e).borderTopLeftRadius) };
+    });
+    chk('抽屉是有边界的浮动面板（不是整页高）',
+      dBox.w <= 760 && dBox.h <= 560 && dBox.h < dBox.vh - 100 &&
+      dBox.right >= 15 && dBox.top >= 60 && dBox.radius >= 6, dBox);
     chk('抽屉打开时背景不滚动',
       await page.evaluate(() => getComputedStyle(document.body).overflow === 'hidden'));
     chk('抽屉无横向滚动条', await page.evaluate(() => {
@@ -500,6 +511,28 @@ async function waitFor(pg, fn, timeout, label) {
       8000, 'cat table reset');
     chk('再点一次取消筛选', await count('#chCat .cd-row') === 11,
       await count('#chCat .cd-row'));
+
+    await page.evaluate(() => document.querySelector('#chCat .cs-tog').click());
+    await waitFor(page, () => document.querySelectorAll('#chCat li[data-subcat]').length > 0,
+      6000, 'sub rows');
+    const subPick = await page.evaluate(() => {
+      const li = document.querySelector('#chCat li[data-subcat]');
+      const v = li.dataset.subcat; li.click(); return v;
+    });
+    await waitFor(page, () => document.querySelectorAll('.chip').length === 1 &&
+      /Sub-category/.test(document.querySelector('.chip').textContent),
+      10000, 'sub chip');
+    chk('子类别可点击联动（chip=Sub-category）',
+      /Sub-category/.test(await num('.chip') || ''), await num('.chip'));
+    await waitFor(page, () => document.querySelectorAll('#chCat li.cs-item.on').length === 1,
+      10000, 'sub highlighted').catch(() => {});
+    chk('被选子类别行高亮',
+      await count('#chCat li.cs-item.on') === 1, await count('#chCat li.cs-item.on'));
+    await page.evaluate(() => document.querySelector('#chCat li.cs-item.on').click());
+    await waitFor(page, () => document.querySelectorAll('.chip').length === 0,
+      8000, 'sub reset');
+    chk('再点一次取消子类别筛选', (await count('.chip')) === 0 &&
+      (await count('#chCat li.cs-item.on')) === 0);
 
     console.log('=== 8.7 月度图两种图示切换 ===');
     chk('有图示切换控件', await count('#mSw button') === 2, await count('#mSw button'));

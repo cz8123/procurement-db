@@ -313,8 +313,10 @@ def _scope(args, fy, extra=None):
     if d2:
         parts.append('p."Date" <= ?')
         params.append(d2)
-    w = ['c."FiscalYearName" = ?'] + parts + list(extra or [])
-    return " AND ".join(w), [fy] + params
+    # 指定了日期范围就以日期为准，不再叠加财年（Detail 的日期切片器可跨财年）
+    has_date = bool(d1 or d2)
+    w = ([] if has_date else ['c."FiscalYearName" = ?']) + parts + list(extra or [])
+    return " AND ".join(w), ([] if has_date else [fy]) + params
 
 
 def _fy_list(c):

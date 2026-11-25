@@ -230,3 +230,10 @@
 - **Detail 日期范围切片器**：卡头新增 `#dtFrom/#dtTo`（`type=date`，min/max 取 `/data` 的 range）。后端 `_scope()` 统一认 `dateFrom/dateTo`（`p."Date" >=/<= ?`，ISO 闭区间），Detail 的行、区域/公司小计、表头取值面板全部生效；离线 `snapshot.js` 的 `detailResp` 也按 `r.date` 过滤。日期是 Detail 局部筛选，不影响 KPI/其它页；换财年自动清空；`Clear filters` 一并清空；`sessionStorage` 记 `dFrom/dTo`。
 - **loadDetail 并发修复**：原来 `pending` 时直接丢弃新请求，连续改日期/筛选会丢掉最后一次。改为记 `queued`，当前请求回来后再补一次。
 - **测试**：page_tabs 25/0（页签高度 40、新增切回概览 Top10 宽度断言）；board 297/0（KPI 两行 Δ、红/绿与圆标同色、箭头字符）；detail 33/0（日期切片器生效=C 同区间、Clear 同时清空）；geo 在线 45/0、离线 42/0；snapshot 64/0、visual 31/0、ui_focus 38/0、grid_sum 14/0、colfilter 34/0；perf 复跑 11/0（首次跑偶发只抓到 2 个请求，属冷启动抖动）。
+
+## 44 KPI 箭头 / 抽屉浮动化 / 子类别可点 / 日期跨财年（11-26 中午）
+- **KPI 增减标**：箭头改内联 SVG（带杆箭头，朝上/朝下），`viewBox 0 0 8 8` 在 12px 圆标里天然居中；颜色改成**增加绿 #1B8A4B、减少红 #C62828**（圆标同色），两行右对齐（`.k-bot{align-items:flex-end}`）；删掉卡内 `vs FY… · sub` 小字。
+- **抽屉改浮动面板**：`.drawer` 从整页右侧 1080 宽改为 `right:20px; top:86px; 720×520（不超过视口）`、圆角 8 + 阴影，标题/副标题单行省略；表格删除 `Suppliers` 列（AG_COLS 7→6，rowsHtml 同步），列宽合计 680 适配 720。
+- **Category Details 子类别可点**：`li.cs-item[data-subcat]` 点击按 `S.sel.sub` 交叉筛选（`beginHl('catdetail','sub',…)`、`setSel/renderFilters/loadAll`），选中行 `.on` 高亮；再点取消。chip 走既有 `EXTRA_CHIP_LABEL.sub = Sub-category`。
+- **Detail 日期切片器跨财年**：`_scope()` 里只要带 `dateFrom/dateTo` 就不再追加 `c."FiscalYearName"=?`，日期按 ISO 闭区间；财年切换不再清空日期；换财年后 `dtMeta` 显示 `起 ~ 止` 而不是 FY；可选范围取 `/options.range`（全库范围，不受当前财年限制）。实测 2026-03-01~09-30 跨 FY2526/FY2627 返回 10,301 行，同区间限 FY2627 为 4,136 行。
+- **测试**：board 301/0（KPI 绿升红降 + SVG 箭头、抽屉 6 列/浮动尺寸、子类别点击与取消）、detail 35/0（跨财年、换财年不清空）、page_tabs 25/0、geo 45/0+42/0、snapshot 64/0、visual 31/0、ui_focus 38/0、grid 14/0、colfilter 34/0、perf 11/0。

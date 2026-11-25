@@ -348,6 +348,26 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       document.getElementById('dtMeta').textContent));
     chk('日期范围生效（行数=接口同区间）', dateMeta === expect && dateMeta < base.total,
       { dateMeta, expect, all: base.total });
+
+    const xyr = await page.evaluate(async () => {
+      const a = await (await fetch('/api/board/detail?dateFrom=2026-03-01&dateTo=2026-09-30')).json();
+      const b = await (await fetch('/api/board/detail?fy=FY2627&dateFrom=2026-07-01&dateTo=2026-09-30')).json();
+      return { all: a.total, inFy: b.total };
+    });
+    chk('日期范围可跨财年（指定日期时不再叠加财年）', xyr.all > xyr.inFy * 1.5, xyr);
+    const fy0 = await page.$eval('#fySel', e => e.value);
+    const fyOther = await page.$$eval('#fySel option', o => o.map(x => x.value))
+      .then(a => a.find(v => v !== fy0));
+    if (fyOther) {
+      await page.select('#fySel', fyOther);
+      await sleep(1500);
+      chk('换财年不清空日期范围', await page.evaluate(() =>
+        document.getElementById('dtFrom').value === '2026-11-01' &&
+        document.getElementById('dtTo').value === '2026-11-15' &&
+        /~/.test(document.getElementById('dtMeta').textContent)));
+      await page.select('#fySel', fy0);
+      await sleep(1500);
+    }
     await page.click('#dtReset');
     await waitFor(page, t => Number(document.getElementById('dtMeta')
       .textContent.split(' ')[0].replace(/,/g, '')) === t,
