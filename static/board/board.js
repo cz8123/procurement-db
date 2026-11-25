@@ -2686,7 +2686,7 @@
           var fill = 'rgba(' + ((rgb >> 16) & 255) + ',' + ((rgb >> 8) & 255) +
             ',' + (rgb & 255) + ',.70)';
           styles[key] = new window.TMap.CircleStyle({
-            color: fill, showBorder: true, borderColor: c, borderWidth: 1.5
+            color: fill, showBorder: true, borderColor: c, borderWidth: 2
           });
           legend[c] = b.region || '';
         }
