@@ -302,8 +302,17 @@ def _filters(args):
 
 
 def _scope(args, fy, extra=None):
-    """返回 (WHERE 片段, 参数)，已带财年"""
+    """返回 (WHERE 片段, 参数)，已带财年。
+    dateFrom / dateTo 是 Detail 页的日期范围切片器（ISO 字符串，闭区间）。"""
     parts, params = _filters(args)
+    d1 = (args.get("dateFrom") or "").strip()
+    d2 = (args.get("dateTo") or "").strip()
+    if d1:
+        parts.append('p."Date" >= ?')
+        params.append(d1)
+    if d2:
+        parts.append('p."Date" <= ?')
+        params.append(d2)
     w = ['c."FiscalYearName" = ?'] + parts + list(extra or [])
     return " AND ".join(w), [fy] + params
 

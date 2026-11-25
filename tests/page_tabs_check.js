@@ -66,7 +66,7 @@ async function waitFor(page, fn, timeout, label) {
       tabs[0].radius !== '0px', tabs[0]);
     chk('未选中页灰底', tabs[1].topBg === 'rgb(169, 177, 188)', tabs[1]);
     chk('选中页有 aria-current', tabs[0].current === 'page' && !tabs[1].current, tabs);
-    chk('页签高度 50px（顶栏内容高）', tabs.every(t => t.h === 50), tabs.map(t => t.h));
+    chk('页签高度 40px（比原先紧凑）', tabs.every(t => t.h === 40), tabs.map(t => t.h));
     chk('页签下沿与顶栏下沿对齐', tabs.every(t => Math.abs(t.bottom - headerBottom) <= 1),
       { headerBottom, bottoms: tabs.map(t => t.bottom) });
 
@@ -159,6 +159,27 @@ async function waitFor(page, fn, timeout, label) {
         Math.abs(g.edgeGap - g.pad) <= 2 &&
         g.controlsMiddle > w * 0.35 && g.controlsMiddle < w * 0.7, g);
     }
+
+    console.log('\n=== 6b. 切回概览时 Top10 不被放大 ===');
+    await page.setViewport({ width: 1600, height: 1000 });
+    await sleep(350);
+    const fy0 = await page.$eval('#fySel', s => s.value);
+    const fyList = await page.$$eval('#fySel option', o => o.map(x => x.value));
+    const fy1 = fyList.find(f => f !== fy0);
+    await page.click('.pg-tab[data-page="detail"]');
+    await sleep(500);
+    if (fy1) { await page.select('#fySel', fy1); await sleep(1600); }
+    await page.click('.pg-tab[data-page="overview"]');
+    await sleep(1600);
+    const top = await page.evaluate(() => {
+      const svg = document.querySelector('#chTop svg');
+      if (!svg) return null;
+      const box = document.getElementById('chTop');
+      return { w: +svg.getAttribute('width'), box: Math.round(box.clientWidth) };
+    });
+    chk('Top10 SVG 宽度=容器宽度（没被 width:100% 放大）',
+      !!top && Math.abs(top.w - top.box) <= 2, top);
+    if (fy1) { await page.select('#fySel', fy0); await sleep(1200); }
 
     console.log('\n=== 7. 刷新首帧不闪回 Overview ===');
     for (const hash of ['detail', 'framework']) {

@@ -222,3 +222,11 @@
 - **公司多选修复**：`/api/board/geo` 的 `companies` 改为忽略 `company` 自身筛选（其它筛选照吃），勾一家后列表仍是 58 家可继续勾；离线 `snapshot.js` 同步用 `fCo/fCat` 两份筛选副本复算。另外前端缓存 `S.geo.baseCompanies`：其它筛选把已勾选公司暂时筛掉时，仍以斜体 + `—` 保留在列表里，保证能取消。
 - **栏宽**：筛选 15% / 地图 37% / Zebra 48%（≤1280 为 16/38/46），地图比上一版 +65px、Zebra −90px；表头列宽 19/10/29/21/21，类别列不再截断。
 - **测试**：`geo_check` 在线 45/0（新增公司多选、行点击高亮/淡化/chip、再次点取消）、离线 42/0；board 294、page_tabs 24、detail 30、snapshot 64、visual_tools 31、ui_focus 38、perf 11、grid_sum 14、colfilter 34 全绿。
+
+## 43 首页 KPI 增减样式 / 页签收紧 / Detail 日期切片器 / Top10 放大修复（11-26 上午）
+- **Top10 偶发放大**：概览隐藏时 `loadAll/loadTop` 仍会渲染，`chartW('chTop',480)` 拿不到宽度只能落 480；而 CSS `.chart svg{width:100%}` 会把 viewBox=480 的图拉满卡片 → 字和图一起变大。原先 `renderOverviewVisuals()` 漏了 `renderTop`，所以切回概览只有它不重画。现在 `renderOverviewVisuals` 里补 `if (S.data.top.length) renderTop()`，配合原有双 rAF，切回即按真实宽度重画（实测 SVG width 610 = 容器 610）。
+- **页签收紧**：高度 50→40px、宽度 `clamp(104px,7.4vw,150px)`、字号 14→12.5（≤1280 宽度 86、字号 11.5）；`.hd` 加 `min-height:68px` 保证顶栏不被压矮，`.pg-tabs` 偏移 `top:14px` 让下沿仍齐顶栏底边。
+- **KPI 增减标按参考图**：右侧两行 `ΔPY`（绝对差额）/ `Δ%`（同比百分比），灰色小标签 + 彩色数值 + 12px 圆形箭头（▲/▼）；颜色按国内习惯**增加红 #D8341F、减少绿 #78BE3C**，圆标与数值同色。替换原来的两枚胶囊 `.k-pill`。
+- **Detail 日期范围切片器**：卡头新增 `#dtFrom/#dtTo`（`type=date`，min/max 取 `/data` 的 range）。后端 `_scope()` 统一认 `dateFrom/dateTo`（`p."Date" >=/<= ?`，ISO 闭区间），Detail 的行、区域/公司小计、表头取值面板全部生效；离线 `snapshot.js` 的 `detailResp` 也按 `r.date` 过滤。日期是 Detail 局部筛选，不影响 KPI/其它页；换财年自动清空；`Clear filters` 一并清空；`sessionStorage` 记 `dFrom/dTo`。
+- **loadDetail 并发修复**：原来 `pending` 时直接丢弃新请求，连续改日期/筛选会丢掉最后一次。改为记 `queued`，当前请求回来后再补一次。
+- **测试**：page_tabs 25/0（页签高度 40、新增切回概览 Top10 宽度断言）；board 297/0（KPI 两行 Δ、红/绿与圆标同色、箭头字符）；detail 33/0（日期切片器生效=C 同区间、Clear 同时清空）；geo 在线 45/0、离线 42/0；snapshot 64/0、visual 31/0、ui_focus 38/0、grid_sum 14/0、colfilter 34/0；perf 复跑 11/0（首次跑偶发只抓到 2 个请求，属冷启动抖动）。

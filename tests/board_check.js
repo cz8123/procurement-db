@@ -111,6 +111,23 @@ async function waitFor(pg, fn, timeout, label) {
     chk('单据数与库一致', k0.txn === fmtI(kv('txn').v), k0.txn + ' / ' + fmtI(kv('txn').v));
     chk('供应商数与库一致', k0.suppliers === fmtI(kv('suppliers').v), k0.suppliers + ' / ' + fmtI(kv('suppliers').v));
     chk('中位周期按天展示', /\bd$/.test(k0.days || ''), k0.days);
+    const kd = await page.evaluate(() => {
+      const box = document.querySelector('.kpi[data-k=amount]');
+      return [...box.querySelectorAll('.k-delta')].map(e => {
+        const em = e.querySelector('em'), bd = e.querySelector('.k-bd');
+        return { l: e.querySelector('b').textContent, v: em.textContent,
+                 cls: e.className, color: getComputedStyle(em).color,
+                 bg: getComputedStyle(bd).backgroundColor, arrow: bd.textContent };
+      });
+    });
+    chk('KPI 右侧两行 Δ 指标（ΔPY / Δ%）',
+      kd.length === 2 && kd[0].l === 'ΔPY' && kd[1].l === 'Δ%', kd.map(x => x.l));
+    chk('KPI 增减色：增加红 / 减少绿，圆标同色',
+      kd.every(r => (r.cls.indexOf('up') >= 0 &&
+        r.color === 'rgb(216, 52, 31)' && r.bg === 'rgb(216, 52, 31)') ||
+        (r.cls.indexOf('down') >= 0 &&
+        r.color === 'rgb(120, 190, 60)' && r.bg === 'rgb(120, 190, 60)')), kd);
+    chk('每行都带圆形方向箭头', kd.every(r => /[▲▼]/.test(r.arrow)), kd);
 
     console.log('=== 3. 支出类型（dash_build 字段错位修复） ===');
     const exps = await page.evaluate(() =>

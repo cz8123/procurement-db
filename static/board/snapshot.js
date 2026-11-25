@@ -622,6 +622,13 @@
     var cur = (sp.get('cur') || 'RMB').toUpperCase();
     var rate = cur === 'RM' ? 1.5 : 1;
     var list = rows.filter(function (r) { return detailPass(r, sp, fy, f, null); });
+    /* 日期范围切片器：ISO 字符串闭区间比较即可 */
+    var d1 = (sp.get('dateFrom') || '').trim(), d2 = (sp.get('dateTo') || '').trim();
+    if (d1 || d2) {
+      list = list.filter(function (r) {
+        return (!d1 || r.date >= d1) && (!d2 || r.date <= d2);
+      });
+    }
     var sa = 0, sp_ = 0;
     list.forEach(function (r) { sa += r.amount || 0; sp_ += r.poPaid || 0; });
     var field = { region: 'region', company: 'company', category: 'category',

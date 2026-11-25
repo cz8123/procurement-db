@@ -237,6 +237,11 @@ window.TMAP_KEY = {{ tmap_key|default('', true)|tojson }};
     <div class="card-h">
       <h2>Detail</h2>
       <div class="card-tools">
+        <label class="dt-date"><span>Date</span>
+          <input type="date" id="dtFrom" class="dt-date-in" aria-label="From date">
+          <span class="dt-date-sep">~</span>
+          <input type="date" id="dtTo" class="dt-date-in" aria-label="To date">
+        </label>
         <span class="dt-meta" id="dtMeta"></span>
         <button class="btn ghost" id="dtReset" title="Clear all column filters">Clear filters</button>
       </div>

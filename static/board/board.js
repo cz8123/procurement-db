@@ -59,6 +59,7 @@
            loaded: false, stale: true, seq: 0, map: null, overlay: null },
     detail: { sort: 'region', dir: 'asc',
               q: {}, f: {}, min: {}, max: {}, expR: {}, expC: {},
+              from: '', to: '',
               loaded: false, stale: true, seq: 0, pop: null, tmp: null },
     seq: 0, rowSeq: 0, drawerSeq: 0
   };
@@ -247,6 +248,12 @@
     var sgn = x < 0 ? '-' : (x > 0 ? '+' : '');
     return sgn + kpiVal(k, Math.abs(x));
   }
+  /** KPI 右侧的一行差额：ΔPY +4.2M ▲（红）/ -1.9M ▼（绿） */
+  function kDelta(label, txt, dir) {
+    var arrow = dir === 'up' ? '▲' : (dir === 'down' ? '▼' : '•');
+    return '<span class="k-delta ' + dir + '"><b>' + esc(label) + '</b>' +
+      '<em>' + esc(txt) + '</em><i class="k-bd">' + arrow + '</i></span>';
+  }
 
   function renderKpis() {
     var d = S.data, box = $('#kpis');
@@ -257,14 +264,14 @@
       var diff = hasPrev ? (k.v - k.pv) : null;
       var dir = diff == null ? '' : (diff < 0 ? 'down' : (diff > 0 ? 'up' : 'flat'));
 
-      /* 两枚胶囊：左侧差额、右侧百分比（同参考样式），没上期就不显示 */
+      /* 参考图样式：右侧两行 ΔPY / Δ%，每行「灰色标签 + 彩色数值 + 彩色圆形箭头」。
+         颜色按国内习惯：增加红、减少绿。 */
       var pills = '';
       if (hasPrev) {
-        pills = '<span class="k-pill ' + dir + '">' + esc(kpiSigned(k, diff)) + '</span>' +
-          '<span class="k-pill ' + dir + '">' +
-          (k.yoy == null ? '—'
-            : (k.yoy < 0 ? '-' : '+') + Math.abs(k.yoy * 100).toFixed(1) + '%') +
-          '</span>';
+        var yoyTxt = k.yoy == null ? '—'
+          : (k.yoy < 0 ? '-' : '+') + Math.abs(k.yoy * 100).toFixed(1) + '%';
+        pills = kDelta('ΔPY', kpiSigned(k, diff), dir) +
+          kDelta('Δ%', yoyTxt, dir);
       }
       var sub = k.sub ? '<span class="k-sub">· ' + esc(k.sub) + '</span>' : '';
       var prev = hasPrev
@@ -1329,6 +1336,9 @@
     if (!S.data) return;
     renderKpis(); renderMonthly(); renderPareto(); renderCatDetails();
     renderExpenseDonut(); renderMethodDonut(); renderHeat();
+    /* Top 10 也依赖容器宽度：在别页隐藏时渲染只会拿到 fallback 480，
+       切回概览必须按真实宽度重画，否则 SVG 会被 width:100% 放大（字和图变大）。 */
+    if ((S.data.top || []).length) renderTop();
     updateVisualTools();
   }
   function loadAll() {
@@ -1712,7 +1722,14 @@
 
     // 财年 / 货币
     $('#fySel').addEventListener('change', function (e) {
-      S.fy = e.target.value; S.fc.page = 1; loadAll();
+      S.fy = e.target.value; S.fc.page = 1;
+      /* 日期范围是当前财年内的切片器：换财年清空，避免落在空区间 */
+      if (S.detail.from || S.detail.to) {
+        S.detail.from = ''; S.detail.to = '';
+        if ($('#dtFrom')) $('#dtFrom').value = '';
+        if ($('#dtTo')) $('#dtTo').value = '';
+      }
+      loadAll();
     });
     $('#curSeg').addEventListener('click', function (e) {
       var b = e.target.closest('button[data-cur]');
@@ -2840,7 +2857,9 @@
         geoSelected: S.geo.selected || [],
         geoQ: S.geo.q || '',
         expR: S.detail.expR || {},
-        expC: S.detail.expC || {}
+        expC: S.detail.expC || {},
+        dFrom: S.detail.from || '',
+        dTo: S.detail.to || ''
       }));
     } catch (e) { /* 隐私模式 / 配额满：存不了也不影响使用 */ }
   }
@@ -2871,6 +2890,8 @@
     if (v.fy) S.fy = v.fy;
     if (v.expR && typeof v.expR === 'object') S.detail.expR = v.expR;
     if (v.expC && typeof v.expC === 'object') S.detail.expC = v.expC;
+    if (typeof v.dFrom === 'string') S.detail.from = v.dFrom;
+    if (typeof v.dTo === 'string') S.detail.to = v.dTo;
   }
   /* 顶栏 / 图内的分段控件要跟着还原后的状态点亮（否则按钮和实际视图对不上） */
   function syncControls() {
@@ -3013,6 +3034,8 @@
   function dtParams(extra) {
     var p = qs(extra), d = S.detail;
     p.set('sort', d.sort); p.set('dir', d.dir);
+    if (d.from) p.set('dateFrom', d.from);
+    if (d.to) p.set('dateTo', d.to);
     Object.keys(d.q).forEach(function (k) { if (d.q[k]) p.set('q_' + k, d.q[k]); });
     Object.keys(d.f).forEach(function (k) {
       if (d.f[k] && d.f[k].length) p.set('f_' + k, JSON.stringify(d.f[k]));
@@ -3022,7 +3045,9 @@
     return p;
   }
   function loadDetail() {
-    if (S.detail.pending) return;   // 首帧早切与 loadAll 可能同时触发，去掉重复请求
+    /* 请求在飞时又来一次（连续改日期/筛选）：只记一个待办，等当前回来再补一次，
+       不能直接丢弃，否则最后一次改动不生效。 */
+    if (S.detail.pending) { S.detail.queued = true; return; }
     S.detail.pending = true;
     var seq = ++S.detail.seq;
     api('/api/board/detail', dtParams()).then(function (d) {
@@ -3033,6 +3058,7 @@
       toast('Failed to load detail: ' + e.message, 4000);
     }).then(function () {
       S.detail.pending = false;
+      if (S.detail.queued) { S.detail.queued = false; loadDetail(); }
     });
   }
   function renderDtHead() {
@@ -3078,6 +3104,14 @@
     hideDtTip();
     renderDtHead();
     S.detail.data = d;
+    /* 日期切片器回填 + 用数据整体范围限制可选区间 */
+    var dF = $('#dtFrom'), dT = $('#dtTo'), rg = (S.data && S.data.range) || {};
+    if (dF && dT) {
+      dF.value = S.detail.from || '';
+      dT.value = S.detail.to || '';
+      if (rg.from) { dF.min = rg.from; dT.min = rg.from; }
+      if (rg.to) { dF.max = rg.to; dT.max = rg.to; }
+    }
     var max = { amount: 0, paid: 0 }, reg = {}, co = {}, tree = [];
     (d.rows || []).forEach(function (r) {
       ['amount', 'paid'].forEach(function (k) {
@@ -3309,9 +3343,23 @@
       var f = e.target.closest('.dt-funnel');
       if (f) openDtPop(f.dataset.col, f);
     });
+    ['dtFrom', 'dtTo'].forEach(function (id) {
+      var el = $('#' + id);
+      if (!el) return;
+      el.addEventListener('change', function () {
+        S.detail.from = ($('#dtFrom').value || '').trim();
+        S.detail.to = ($('#dtTo').value || '').trim();
+        S.detail.page = 1;
+        saveView();
+        loadDetail();
+      });
+    });
     $('#dtReset').addEventListener('click', function () {
       var d = S.detail;
       d.q = {}; d.f = {}; d.min = {}; d.max = {}; d.page = 1;
+      d.from = ''; d.to = '';
+      if ($('#dtFrom')) $('#dtFrom').value = '';
+      if ($('#dtTo')) $('#dtTo').value = '';
       closeDtPop(); renderDtHead(); loadDetail();
     });
     pop.addEventListener('click', function (e) {

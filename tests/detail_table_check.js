@@ -329,6 +329,33 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
     chk('Clear filters 复原', metaNum(await page.evaluate(() =>
       document.getElementById('dtMeta').textContent)) === base.total);
 
+    console.log('=== 4b. 日期范围切片器 ===');
+    chk('Detail 有日期范围切片器', await page.evaluate(() =>
+      !!document.getElementById('dtFrom') && !!document.getElementById('dtTo')));
+    const expect = await page.evaluate(async () => {
+      const r = await fetch('/api/board/detail?dateFrom=2026-11-01&dateTo=2026-11-15');
+      return (await r.json()).total;
+    });
+    await page.evaluate(() => {
+      const f = document.getElementById('dtFrom'), t = document.getElementById('dtTo');
+      f.value = '2026-11-01'; f.dispatchEvent(new Event('change', { bubbles: true }));
+      t.value = '2026-11-15'; t.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await waitFor(page, n => Number(document.getElementById('dtMeta')
+      .textContent.split(' ')[0].replace(/,/g, '')) === n,
+      12000, 'date range', expect).catch(() => {});
+    const dateMeta = metaNum(await page.evaluate(() =>
+      document.getElementById('dtMeta').textContent));
+    chk('日期范围生效（行数=接口同区间）', dateMeta === expect && dateMeta < base.total,
+      { dateMeta, expect, all: base.total });
+    await page.click('#dtReset');
+    await waitFor(page, t => Number(document.getElementById('dtMeta')
+      .textContent.split(' ')[0].replace(/,/g, '')) === t,
+      8000, 'reset date', base.total).catch(() => {});
+    chk('Clear filters 同时清空日期', await page.evaluate(() =>
+      !document.getElementById('dtFrom').value && !document.getElementById('dtTo').value) &&
+      metaNum(await page.evaluate(() => document.getElementById('dtMeta').textContent)) === base.total);
+
     console.log('=== 5. 币种 ===');
     const rmbFirst = await page.evaluate(async () => {
       const r = await fetch('/api/board/detail?sort=region&dir=asc'); return (await r.json()).regionTotals[0].amount;
