@@ -69,20 +69,20 @@ function latestSnap() {
       return { map: r('.geo-map-pane'), yoy: r('.geo-yoy'), comp: r('.geo-comp-pane'),
                card: r('#pgGeo .geo-card') };
     });
-    chk('地图 / 同比表 / 公司筛选横向并排',
-      layout.map.y === layout.yoy.y && layout.yoy.y === layout.comp.y &&
-      layout.map.right <= layout.yoy.x && layout.yoy.right <= layout.comp.x, layout);
-    chk('三栏铺满卡片下方',
+    chk('公司筛选 / 地图 / 同比表横向并排',
+      layout.comp.y === layout.map.y && layout.map.y === layout.yoy.y &&
+      layout.comp.right <= layout.map.x && layout.map.right <= layout.yoy.x, layout);
+    chk('三栏等高且不铺满整屏',
       [layout.map, layout.yoy, layout.comp].every(b =>
-        Math.abs(b.bottom - layout.card.bottom) <= 12 && b.h > 400), layout);
+        Math.abs(b.h - 400) <= 2) && layout.card.h < 600, layout);
     const fit = await page.evaluate(() => {
       const w = document.querySelector('.geo-tbl-wrap').getBoundingClientRect();
       const last = document.querySelector('#geoTbl tbody tr:last-child').getBoundingClientRect();
       return { gap: Math.round(w.bottom - last.bottom), h: Math.round(w.height) };
     });
-    chk('同比表行高铺满、三栏纵向齐平', fit.gap < 40 && fit.h > 300, fit);
-    chk('地图占比最大、筛选栏最窄',
-      layout.map.w > layout.yoy.w && layout.yoy.w > layout.comp.w, layout);
+    chk('同比表固定行高、不拉伸', fit.h > 300 && fit.gap >= 0 && fit.gap < 80, fit);
+    chk('同比表最宽、筛选栏最窄',
+      layout.yoy.w > layout.map.w && layout.map.w > layout.comp.w, layout);
 
     console.log('=== 1c. 公司级气泡 / 英文简称 / 华南视角 ===');
     const gd = await page.evaluate(async () =>
@@ -108,6 +108,17 @@ function latestSnap() {
     if (!SNAP) {
       chk('默认聚焦华南', view.zoom >= 5.5 &&
         parseFloat(view.center.split(',')[1]) < 25, view);
+      const zr = await page.evaluate(async () => {
+        const el = document.getElementById('geoMap');
+        const r1 = +el.dataset.sampleRadius || 0;
+        window.__geoMap.setZoom(window.__geoMap.getZoom() + 2);
+        await new Promise(r => setTimeout(r, 600));
+        const r2 = +el.dataset.sampleRadius || 0;
+        window.__geoMap.setZoom(5.6);
+        await new Promise(r => setTimeout(r, 400));
+        return { r1, r2 };
+      });
+      chk('放大地图时气泡半径反向缩小', zr.r1 > 0 && zr.r2 > 0 && zr.r2 < zr.r1 * 0.4, zr);
     }
     const overflow = await page.evaluate(() => {
       const w = document.querySelector('.geo-tbl-wrap'),
@@ -125,29 +136,42 @@ function latestSnap() {
         const tds = [...tr.children];
         return {
           cat: tds[0].textContent.trim(),
-          amount: tds[1].querySelector('.z-amt .zv')?.textContent.trim(),
-          gray: !!tds[1].querySelector('.zb-gray'),
-          delta: tds[2].querySelector('.z-side .zv')?.textContent.trim(),
-          pct: tds[3].querySelector('.z-side .zv')?.textContent.trim(),
-          up: tds[2].querySelectorAll('.z-side.pos').length,
-          dn: tds[2].querySelectorAll('.z-side.neg').length,
-          dot: !!tds[3].querySelector('.zb-line')
+          py: tds[1].textContent.trim(),
+          amount: tds[2].querySelector('.z-amt .zv')?.textContent.trim(),
+          gray: !!tds[2].querySelector('.zb-gray'),
+          grayColor: tds[2].querySelector('.zb-gray')
+            ? getComputedStyle(tds[2].querySelector('.zb-gray')).backgroundColor : '',
+          delta: tds[3].querySelector('.z-side .zv')?.textContent.trim(),
+          pct: tds[4].querySelector('.z-side .zv')?.textContent.trim(),
+          up: tds[3].querySelectorAll('.z-side.pos').length,
+          dn: tds[3].querySelectorAll('.z-side.neg').length,
+          dot: !!tds[4].querySelector('.zb-line'),
+          dotColor: tds[4].querySelector('.zb-line')
+            ? getComputedStyle(tds[4].querySelector('.zb-line'), '::after').backgroundColor : ''
         };
       });
       return {
-        cols: document.querySelectorAll('#geoTbl thead th').length, rows,
+        cols: [...document.querySelectorAll('#geoTbl thead th')].map(e => e.textContent.trim()),
+        rows,
+        groups: document.querySelectorAll('#geoTbl tbody tr.z-group').length,
         dark: getComputedStyle(document.querySelector('.geo-tbl-wrap')).backgroundColor,
         zero: getComputedStyle(document.querySelector('.z-br'), '::after').width
       };
     });
-    chk('表头四列', tbl.cols === 4, tbl.cols);
+    chk('表头严格复刻：Category / PY / AC ↓ / ΔPY / ΔPY%',
+      tbl.cols.join('|') === 'Category|PY|AC ↓|ΔPY|ΔPY%', tbl.cols);
     chk('11 个类别', tbl.rows.length === 11, tbl.rows.length);
+    chk('PY 列是纯数字（右对齐）',
+      tbl.rows.filter(r => r.py).length >= 9 && tbl.rows.every(r => !r.py || /^\d+\.\d$/.test(r.py)),
+      tbl.rows.slice(0, 2).map(r => r.py));
     chk('每行金额/ΔPY/ΔPY% 都有值',
       tbl.rows.every(r => r.amount && r.delta && r.pct), tbl.rows.slice(0, 2));
     chk('表格沿用看板亮色主题', tbl.dark === 'rgb(255, 255, 255)', tbl.dark);
-    chk('金额列灰条 + ΔPY% 细线圆点',
-      tbl.rows.every(r => r.gray && r.dot), tbl.rows.slice(0, 2));
-    chk('ΔPY 中心零线', tbl.zero === '1px', tbl.zero);
+    chk('AC 深灰条 + ΔPY% 黑心圆点',
+      tbl.rows.every(r => r.gray && r.dot && r.grayColor === 'rgb(74, 74, 74)' &&
+        r.dotColor === 'rgb(17, 17, 17)'), tbl.rows.slice(0, 2));
+    chk('ΔPY 中心零线 2px', tbl.zero === '2px', tbl.zero);
+    chk('参考图分组横线（第 6 行前）', tbl.groups === 1, tbl.groups);
     chk('ΔPY 条形方向与符号一致', tbl.rows.every(r =>
       (r.delta.startsWith('-') ? r.dn === 1 && r.up === 0 : r.up === 1 && r.dn === 0)),
       tbl.rows.filter(r => r.dn !== 1).slice(0, 3));

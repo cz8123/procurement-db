@@ -202,3 +202,10 @@
 - **默认视角**：中心 `[113.5, 22.9]`（珠三角），zoom 5.6，不再一上来铺全中国；`#geoMap.dataset.zoom/center` 记录初始值便于回归断言。
 - **布局修复**：三栏原用 `flex:0 0 48%/37%/15%`，百分比合计 100% **再加 2×12px gap** 导致公司筛选栏右边界溢出画布 23px；改成 `flex:48 1 0 / 37 1 0 / 15 1 0`（≤1280 为 46/39/15），gap 自动从剩余空间扣。`.geo-comp-pane` 加 `overflow:hidden`、列表用 grid `13px minmax(0,1fr) auto` 防溢出；`.geo-tbl-wrap` 改 `overflow-x:hidden; overflow-y:auto`，横向滚动条消失。`fitGeoTbl()` 按容器高度摊 11 行行高（上限 120px），三栏纵向齐平。
 - **测试**：`geo_check` 在线 36/0、离线 35/0（离线无 Key 时跳过地图视角断言）；board 294、page_tabs 24、detail 30、snapshot 64、visual_tools 31、ui_focus 38、perf 11、grid_sum 14、colfilter 34 全绿。
+
+## 40 Geo 页 Zebra 1:1 复刻与三栏重排（11-25 深夜，替换 §38/§39 的表格方案）
+- **参考图逐像素核对**：把用户给的 Zebra 截图放大 4 倍分别看左右两段，确认视觉语言：表头 `Category | PY | AC ↓ | ΔPY | ΔPY%`；PY 右对齐纯数字；AC 左侧一条深色竖轴 + 深灰条（#4A4A4A）从左起、数值在条尾外侧；ΔPY 中心 2px 灰零线、正右绿条 #5FC228 / 负左红条 #FA2E2E、数值深色贴条尾；ΔPY% 同款零线 + 2px 细线 + 末端黑心圆点（外圈同色），接近 0 时只剩零线上的黑点；第 6 行前一条浅灰分组横线；无列竖线、无逐行边框、白底黑字。
+- **数值格式**：`zbNum()` / `zbSigned()` 统一按百万单位输出 1 位小数纯数字（不写 M / 币种），表头副标题加 `unit M`。原先 PY 直接写 raw 元（102852590.6）、AC 带 M，已统一。
+- **布局**：三栏顺序改为 **筛选 16% / 地图 31% / 同比 53%**（≤1280 为 17/31/52）；`.geo-body{height:400px; flex:0 0 auto}`、`#pgGeo{height:auto}`，不再竖向铺满屏幕。`fitGeoTbl()` 变空函数（行高固定 28px），resize 仍调用但无重算。
+- **气泡反向缩放**：`MultiCircle.radius` 是米制，屏幕上直径 ∝ radius × 2^zoom；把 radius 系数改成 `2^(-1.5×(zoom-5.6))` 后净效果每放大一级缩到约 0.7 倍（原来放大反而变大）。基准半径同步缩到 `(3000+sqrt*26000)` 米；`dataset.sampleRadius` + `window.__geoMap` 供回归测试验证缩放方向。
+- **测试**：`geo_check` 在线 39/0（新增 5 列表头、PY 格式、深灰条、黑心圆点、2px 零线、分组横线、反向缩放断言）、离线 37/0（无 Key 时跳过地图视角与缩放）；board 294、page_tabs 24、detail 30、snapshot 64、visual_tools 31、ui_focus 38、perf 11、grid_sum 14、colfilter 34 全绿。

@@ -2560,6 +2560,15 @@
     if (v == null || isNaN(v)) return '—';
     return (v < 0 ? '-' : (v > 0 ? '+' : '')) + geoNum(v, d);
   }
+  /* Zebra 参考图的数值只有纯数字（统一百万单位），不写 M / 币种 */
+  function zbNum(v) {
+    if (v == null || isNaN(v)) return '';
+    return nf(Math.abs(v) / S.rate / 1e6, 1);
+  }
+  function zbSigned(v) {
+    if (v == null || isNaN(v)) return '';
+    return (v < 0 ? '-' : (v > 0 ? '+' : '')) + zbNum(v);
+  }
   function renderGeo(d) {
     $('#geoSub').textContent = '· ' + d.fy + ' vs ' + (d.pyFy || '—') +
       ' · bubble = company city · FY in progress, so YoY looks low';
@@ -2583,29 +2592,34 @@
         esc(geoNum(r.v, 1)) + '</i></label>';
     }).join('') : '<div class="geo-comp-none">No matching company</div>';
   }
-  /* Zebra BI：金额灰条贴条尾写数值；ΔPY 以中心竖线为零线左右伸缩；
-     ΔPY% 用 1px 细线 + 末端圆点，数值贴在线尾。条宽百分比相对半列，留余量给文字。 */
+  /* Zebra BI 1:1：PY 右对齐数字 / AC 深灰条数值贴尾 / ΔPY 中心零线左右红绿条 /
+     ΔPY% 细线 + 黑心圆点。数值统一深色，不用彩色字。 */
   function zebraSide(kind, diff, ratio, txt) {
+    var zero = kind === 'pct' && Math.abs(parseFloat(txt)) < 0.5;
     var bar = kind === 'pct'
       ? '<i class="zb-line" style="width:' + ratio.toFixed(1) + '%"></i>'
       : '<i class="zb-bar" style="width:' + ratio.toFixed(1) + '%"></i>';
-    return '<div class="z-side ' + (diff >= 0 ? 'pos' : 'neg') + '">' + bar +
-      '<span class="zv">' + esc(txt) + '</span></div>';
+    return '<div class="z-side ' + (diff >= 0 ? 'pos' : 'neg') + (zero ? ' zero' : '') + '">' +
+      bar + '<span class="zv">' + esc(txt) + '</span></div>';
   }
   function zebra(v, pv, kind, max) {
+    if (kind === 'py') {
+      return '<td class="z-py">' + (pv ? esc(zbNum(pv)) : '') + '</td>';
+    }
     if (kind === 'amount') {
-      var w = Math.min(82, Math.abs(v) / (max || 1) * 82);
+      var w = Math.min(86, Math.abs(v) / (max || 1) * 86);
       return '<td><div class="z-amt"><i class="zb-gray" style="width:' +
-        w.toFixed(1) + '%"></i><span class="zv">' + esc(geoNum(v, 1)) +
+        w.toFixed(1) + '%"></i><span class="zv">' + esc(zbNum(v)) +
         '</span></div></td>';
     }
     var diff = v - pv;
     var val = kind === 'pct' ? (pv ? diff / pv : 0) : diff;
     var ratio = Math.min(85, Math.abs(val) / (max || 1) * 85);
     var txt = kind === 'pct'
-      ? (pv ? (diff >= 0 ? '+' : '-') + Math.abs(diff / pv * 100).toFixed(1) + '%' : '—')
-      : geoSigned(diff, 1);
-    return '<td><div class="z-br">' + zebraSide(kind, diff, ratio, txt) + '</div></td>';
+      ? (pv ? (diff >= 0 ? '+' : '-') + Math.abs(diff / pv * 100).toFixed(1) + '%' : '')
+      : zbSigned(diff);
+    return '<td><div class="z-br' + (kind === 'pct' ? ' z-pct' : '') + '">' +
+      zebraSide(kind, diff, ratio, txt) + '</div></td>';
   }
   function renderGeoTable(d) {
     var cats = (d.categories || []).slice().sort(function (a, b) { return b.v - a.v; });
@@ -2616,28 +2630,20 @@
       if (r.pv) maxP = Math.max(maxP, Math.abs((r.v - r.pv) / r.pv));
     });
     $('#geoYoyNote').textContent = (d.pyFy || 'PY') + ' → ' + d.fy +
-      ' · green = increase, red = decrease · FY in progress';
-    $('#geoTbl thead').innerHTML = '<tr><th>Category</th><th>Amount</th><th>ΔPY</th><th>ΔPY%</th></tr>';
-    $('#geoTbl tbody').innerHTML = cats.map(function (r) {
-      return '<tr><td title="' + esc(r.cat) + '">' + esc(r.cat) + '</td>' +
+      ' · unit M · green = increase, red = decrease · FY in progress';
+    $('#geoTbl thead').innerHTML = '<tr><th>Category</th><th>PY</th><th>AC ↓</th>' +
+      '<th>ΔPY</th><th>ΔPY%</th></tr>';
+    $('#geoTbl tbody').innerHTML = cats.map(function (r, i) {
+      return '<tr' + (i === 5 ? ' class="z-group"' : '') +
+        '><td title="' + esc(r.cat) + '">' + esc(r.cat) + '</td>' +
+        zebra(r.v, r.pv, 'py', 1) +
         zebra(r.v, r.pv, 'amount', maxV) +
         zebra(r.v, r.pv, 'delta', maxD) +
         zebra(r.v, r.pv, 'pct', maxP) + '</tr>';
     }).join('');
-    fitGeoTbl();
   }
-  /* 表格只有 11 行，按容器可用高度摊开行高，让三栏纵向长度一致、下方不留大片空白 */
-  function fitGeoTbl() {
-    var wrap = $('.geo-tbl-wrap'), tbl = $('#geoTbl');
-    if (!wrap || !tbl || !tbl.tHead || !tbl.tBodies[0]) return;
-    var n = tbl.tBodies[0].rows.length;
-    if (!n) return;
-    var headH = tbl.tHead.getBoundingClientRect().height;
-    var h = Math.max(20, Math.min(120, Math.floor((wrap.clientHeight - headH - 2) / n)));
-    Array.prototype.forEach.call(tbl.tBodies[0].rows, function (tr) {
-      Array.prototype.forEach.call(tr.cells, function (td) { td.style.height = h + 'px'; });
-    });
-  }
+  /* 表格按参考图固定行高，不再拉伸铺满容器 */
+  function fitGeoTbl() { /* 保留空函数：resize 监听仍调用，无需重算 */ }
   function ensureMapSDK(cb) {
     var key = window.TMAP_KEY || '';
     var msg = $('#geoMapMsg');
@@ -2673,6 +2679,7 @@
     /* 记录初始视角，便于回归断言默认落在华南 */
     $('#geoMap').dataset.zoom = String(GEO_ZOOM);
     $('#geoMap').dataset.center = GEO_CENTER.join(',');
+    window.__geoMap = S.geo.map;   /* 便于回归测试调整视角验证气泡随缩放变化 */
     S.geo.overlay = new window.TMap.MultiCircle({
       map: S.geo.map, styles: {}, geometries: []
     });
@@ -2684,8 +2691,8 @@
       else S.geo.selected.push(name);
       loadGeo();
     });
-    /* MultiCircle 的 radius 是米：地图缩放时气泡随地理尺度同步放大 / 缩小。
-       zoom 变化时按当前档位重算一次，保证视觉变化连贯。 */
+    /* 放大地图时把气泡按地理半径反向缩小，露出底图和各公司分布：
+       屏幕上直径 ∝ radius(m) × 2^zoom，这里 radius ∝ 2^(-1.5×zoom)，净效果每放大一级缩到 ~0.7。 */
     S.geo.map.on('zoom', function () {
       if (S.geo.data) drawGeoBubbles(S.geo.data);
     });
@@ -2697,8 +2704,9 @@
     var max = 0;
     bubbles.forEach(function (b) { max = Math.max(max, Math.abs(b.v)); });
     var zoom = S.geo.map.getZoom() || GEO_ZOOM;
-    /* 基准 zoom 5.6 下 3~28px；zoom 越高半径按地理尺度放大，随缩放同步变化 */
-    var scale = Math.pow(2, (zoom - GEO_ZOOM) * 0.5);
+    $('#geoMap').dataset.zoom = String(zoom);
+    /* 基准 zoom 5.6 下约 2~20px；zoom 越高半径越小（反比于缩放），避免盖住地图 */
+    var scale = Math.max(0.08, Math.min(2, Math.pow(2, -(zoom - GEO_ZOOM) * 1.5)));
     var styles = {}, geoms = {}, legend = {};
     bubbles.forEach(function (b) {
       var c = b.color || '#3B5E96';
@@ -2713,7 +2721,8 @@
         });
         legend[c] = b.region || '';
       }
-      var radius = (4000 + Math.sqrt(Math.abs(b.v) / (max || 1)) * 38000) * scale;
+      var radius = (3000 + Math.sqrt(Math.abs(b.v) / (max || 1)) * 26000) * scale;
+      $('#geoMap').dataset.sampleRadius = String(radius);
       (geoms[key] || (geoms[key] = [])).push({
         id: b.company, styleId: key,
         center: new window.TMap.LatLng(b.lat, b.lng), radius: radius

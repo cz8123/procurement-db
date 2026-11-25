@@ -306,6 +306,11 @@ window.TMAP_KEY = {{ tmap_key|default('', true)|tojson }};
       </div>
     </div>
     <div class="geo-body">
+      <div class="geo-comp-pane">
+        <div class="geo-comp-h"><span id="geoCompTitle">Company Search</span><span id="geoCompCount"></span></div>
+        <input id="geoSearch" class="mini-inp" type="search" placeholder="Search company">
+        <div class="geo-comp-list" id="geoCompList"></div>
+      </div>
       <div class="geo-map-pane">
         <div id="geoMap"></div>
         <div class="geo-map-msg" id="geoMapMsg" hidden></div>
@@ -316,11 +321,6 @@ window.TMAP_KEY = {{ tmap_key|default('', true)|tojson }};
         <div class="geo-tbl-wrap">
           <table class="geo-tbl" id="geoTbl"><thead></thead><tbody></tbody></table>
         </div>
-      </div>
-      <div class="geo-comp-pane">
-        <div class="geo-comp-h"><span id="geoCompTitle">Company Search</span><span id="geoCompCount"></span></div>
-        <input id="geoSearch" class="mini-inp" type="search" placeholder="Search company">
-        <div class="geo-comp-list" id="geoCompList"></div>
       </div>
     </div>
   </section>
