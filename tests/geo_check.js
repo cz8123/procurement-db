@@ -110,15 +110,18 @@ function latestSnap() {
         parseFloat(view.center.split(',')[1]) < 25, view);
       const zr = await page.evaluate(async () => {
         const el = document.getElementById('geoMap');
-        const r1 = +el.dataset.sampleRadius || 0;
+        const px1 = +el.dataset.samplePx || 0, m1 = +el.dataset.sampleRadius || 0;
         window.__geoMap.setZoom(window.__geoMap.getZoom() + 2);
         await new Promise(r => setTimeout(r, 600));
-        const r2 = +el.dataset.sampleRadius || 0;
+        const px2 = +el.dataset.samplePx || 0, m2 = +el.dataset.sampleRadius || 0;
         window.__geoMap.setZoom(5.6);
         await new Promise(r => setTimeout(r, 400));
-        return { r1, r2 };
+        return { px1, px2, m1, m2 };
       });
-      chk('放大地图时气泡半径反向缩小', zr.r1 > 0 && zr.r2 > 0 && zr.r2 < zr.r1 * 0.4, zr);
+      chk('放大时气泡屏幕尺寸近似恒定（仅轻微变小）',
+        zr.px1 > 0 && zr.px2 / zr.px1 > 0.7 && zr.px2 / zr.px1 < 0.95, zr);
+      chk('地理半径随缩放反向变化',
+        zr.m2 > 0 && zr.m1 / zr.m2 > 2, zr);
     }
     const overflow = await page.evaluate(() => {
       const w = document.querySelector('.geo-tbl-wrap'),

@@ -2691,8 +2691,8 @@
       else S.geo.selected.push(name);
       loadGeo();
     });
-    /* 放大地图时把气泡按地理半径反向缩小，露出底图和各公司分布：
-       屏幕上直径 ∝ radius(m) × 2^zoom，这里 radius ∝ 2^(-1.5×zoom)，净效果每放大一级缩到 ~0.7。 */
+    /* 气泡按屏幕像素定尺寸（参考图：各缩放级别下视觉大小基本一致、仅缓慢变小），
+       缩放时按当前米/像素重算地理半径。 */
     S.geo.map.on('zoom', function () {
       if (S.geo.data) drawGeoBubbles(S.geo.data);
     });
@@ -2705,8 +2705,9 @@
     bubbles.forEach(function (b) { max = Math.max(max, Math.abs(b.v)); });
     var zoom = S.geo.map.getZoom() || GEO_ZOOM;
     $('#geoMap').dataset.zoom = String(zoom);
-    /* 基准 zoom 5.6 下约 2~20px；zoom 越高半径越小（反比于缩放），避免盖住地图 */
-    var scale = Math.max(0.08, Math.min(2, Math.pow(2, -(zoom - GEO_ZOOM) * 1.5)));
+    /* 按参考图：气泡在屏幕上像素大小基本恒定（每放大一级只缩 8%），
+       所以先算目标像素半径，再按 Web Mercator 米/像素反算出地理半径。 */
+    var shrink = Math.pow(0.92, zoom - GEO_ZOOM);
     var styles = {}, geoms = {}, legend = {};
     bubbles.forEach(function (b) {
       var c = b.color || '#3B5E96';
@@ -2721,8 +2722,12 @@
         });
         legend[c] = b.region || '';
       }
-      var radius = (3000 + Math.sqrt(Math.abs(b.v) / (max || 1)) * 26000) * scale;
+      /* 屏幕半径 5~20px，再乘缩放衰减；mpp = 156543×cos(lat)/2^zoom */
+      var mpp = 156543.03392 * Math.cos(b.lat * Math.PI / 180) / Math.pow(2, zoom);
+      var pxR = (5 + Math.sqrt(Math.abs(b.v) / (max || 1)) * 15) * shrink;
+      var radius = pxR * mpp;
       $('#geoMap').dataset.sampleRadius = String(radius);
+      $('#geoMap').dataset.samplePx = String(pxR);
       (geoms[key] || (geoms[key] = [])).push({
         id: b.company, styleId: key,
         center: new window.TMap.LatLng(b.lat, b.lng), radius: radius
