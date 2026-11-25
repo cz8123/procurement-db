@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Procurement Data Dashboard</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='board/board.css') }}?v={{ v_css }}">
+<script>
+/* 刷新落在 Detail/Framework 时，首帧就别画 Overview（board.js 早切完成后移除 class） */
+(function () {
+  var h = (location.hash || '').replace(/^#\/?/, '');
+  if (h !== 'detail' && h !== 'framework') return;
+  var el = document.documentElement;
+  el.classList.add('boot-other');
+  setTimeout(function () { el.classList.remove('boot-other'); }, 3000);
+})();
+</script>
 </head>
 <body>
 

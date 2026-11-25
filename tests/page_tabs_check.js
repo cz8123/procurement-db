@@ -159,6 +159,40 @@ async function waitFor(page, fn, timeout, label) {
         g.controlsMiddle > w * 0.35 && g.controlsMiddle < w * 0.7, g);
     }
 
+    console.log('\n=== 7. 刷新首帧不闪回 Overview ===');
+    for (const hash of ['detail', 'framework']) {
+      const p = await browser.newPage();
+      p.on('pageerror', e => errs.push('PAGEERROR ' + hash + ' ' + e.message));
+      p.on('console', m => { if (m.type() === 'error') errs.push('CONSOLE ' + hash + ' ' + m.text().slice(0, 140)); });
+      await p.setViewport({ width: 1440, height: 900 });
+      await p.evaluateOnNewDocument((h) => {
+        window.__vis = [];
+        const t0 = Date.now();
+        function snap() {
+          const ov = document.getElementById('pgOverview');
+          const target = document.getElementById(h === 'detail' ? 'pgDetail' : 'pgFramework');
+          if (ov) window.__vis.push({
+            t: Date.now() - t0,
+            ov: getComputedStyle(ov).display !== 'none',
+            target: !!target && getComputedStyle(target).display !== 'none'
+          });
+          if (Date.now() - t0 < 5000) setTimeout(snap, 16);
+        }
+        document.addEventListener('DOMContentLoaded', snap);
+      }, hash);
+      await p.goto(BASE + '/dash?t=' + Date.now() + '#' + hash,
+        { waitUntil: 'networkidle0', timeout: 30000 });
+      await sleep(250);
+      const samples = await p.evaluate(() => window.__vis || []);
+      await p.close();
+      const flashes = samples.filter(s => s.ov);
+      chk(hash + ' 刷新全程未见 Overview', flashes.length === 0,
+        { samples: samples.length, flashes: flashes.slice(0, 4) });
+      chk(hash + ' 最终停在目标页',
+        samples.length > 0 && samples[samples.length - 1].target,
+        samples[samples.length - 1]);
+    }
+
     chk('全程无 JS 报错', errs.length === 0, errs);
     console.log('\n' + (fail ? 'FAILED ' + fail + ' / ' : 'ALL PASS ') + pass);
   } catch (e) {

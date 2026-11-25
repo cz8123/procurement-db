@@ -881,6 +881,8 @@ body.drawer-open{ overflow:hidden; }
 
 /* ---------------- 多页面容器（Overview / Detail / Framework） ---------------- */
 main[hidden], .page[hidden], .fbar[hidden], .kpis[hidden]{ display:none !important; }
+/* 首帧防闪：<head> 内联脚本按 URL hash 打标，board.js 早切完成后移除 */
+html.boot-other #pgOverview, html.boot-other #kpis, html.boot-other .fbar{ display:none !important; }
 .page{ padding:10px var(--pad) 32px; }
 /* Detail / Framework 表格页：KPI 与全局筛选已隐藏，固定区只剩 68px 顶栏；
    卡片与滚动容器撑满视口剩余高度，表格不再只占页面上半部。 */

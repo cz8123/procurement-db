@@ -1321,6 +1321,14 @@
   }
 
   /* ================================================ 加载 */
+  /* 概览区的全部可视化。隐藏状态下 chartW() 只能拿 fallback 宽度，
+     所以从 Detail/Framework 切回来时要重画一次（见 PAGES.overview.enter）。 */
+  function renderOverviewVisuals() {
+    if (!S.data) return;
+    renderKpis(); renderMonthly(); renderPareto(); renderCatDetails();
+    renderExpenseDonut(); renderMethodDonut(); renderHeat();
+    updateVisualTools();
+  }
   function loadAll() {
     var seq = ++S.seq;
     /* 这次刷新是不是图内点击（高亮）造成的：不是就把高亮清掉，
@@ -1338,8 +1346,10 @@
       S.data = d; S.rate = d.rate || 1;
       /* 下钻态且缓存已清：重新拉一次理由层，保证与当前筛选一致 */
       if (S.methodDrill) loadMethodDrill(S.methodDrill, function () { renderMethodDonut(); });
-      renderKpis(); renderMonthly(); renderPareto(); renderCatDetails();
-      renderExpenseDonut(); renderMethodDonut(); renderHeat();
+      renderOverviewVisuals();
+      /* 首帧落在 Detail/Framework 时概览是隐藏的：这里量到的宽度是 fallback，
+         回切到 Overview 时再按真实尺寸重画一次 */
+      if (S.page !== 'overview') S.overviewHiddenRender = true;
       loadTop();
       loadContracts();
       updateVisualTools();
@@ -2553,7 +2563,16 @@
 
   var PAGES = {
     overview:  { label: 'Overview',
-                 enter: function () { $('#pgOverview').hidden = false; showChrome(true); },
+                 enter: function () {
+                   $('#pgOverview').hidden = false; showChrome(true);
+                   if (S.overviewHiddenRender) {
+                     S.overviewHiddenRender = false;
+                     /* 双 rAF：等 hidden 取消后的布局真正生效再量宽重画 */
+                     requestAnimationFrame(function () {
+                       requestAnimationFrame(renderOverviewVisuals);
+                     });
+                   }
+                 },
                  leave: function () { $('#pgOverview').hidden = true; } },
     detail:    { label: 'Detail',    enter: enterDetail,   leave: leaveDetail },
     framework: { label: 'Framework', enter: enterFramework, leave: leaveFramework }
@@ -2679,6 +2698,8 @@
     return p;
   }
   function loadDetail() {
+    if (S.detail.pending) return;   // 首帧早切与 loadAll 可能同时触发，去掉重复请求
+    S.detail.pending = true;
     var seq = ++S.detail.seq;
     api('/api/board/detail', dtParams()).then(function (d) {
       if (seq !== S.detail.seq) return;
@@ -2686,6 +2707,8 @@
       renderDetail(d);
     }).catch(function (e) {
       toast('Failed to load detail: ' + e.message, 4000);
+    }).then(function () {
+      S.detail.pending = false;
     });
   }
   function renderDtHead() {
@@ -3006,6 +3029,18 @@
     bind();
     bindDetail();
     bindSpec();
+    /* 首帧就落在 hash 指定的页：旧逻辑要等 data 回来才切，刷新时会先闪一下 Overview。
+       这里只切可见性与页签，加载仍由下面的 loadAll / enterDetail 负责。 */
+    var bootPage = pageFromHash();
+    if (bootPage && bootPage !== S.page) {
+      S.page = bootPage;
+      renderTabs();
+      var bootEnter = PAGES[bootPage];
+      if (bootEnter && bootEnter.enter) bootEnter.enter();
+      $('#pgOverview').hidden = true;
+      /* 交给 hidden 属性接管，撤掉 <head> 的首帧防闪标记 */
+      document.documentElement.classList.remove('boot-other');
+    }
     /* options 与 data 互不依赖：data 不带 fy 时后端取最新财年（与 options.latestFy
        同一个口径），所以两个请求可以并行发，首屏少一个 300ms 的往返。 */
     Promise.all([
