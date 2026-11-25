@@ -61,7 +61,24 @@ function latestSnap() {
     chk('顶部 KPI 卡已移除', head.noKpi, head);
     chk('默认指标 prpo', head.metric === 'prpo', head.metric);
 
-    console.log('=== 2. Category 同比表（Zebra BI 1:1）===');
+    console.log('=== 1b. 三栏横向布局 ===');
+    const layout = await page.evaluate(() => {
+      const r = s => { const b = document.querySelector(s).getBoundingClientRect();
+        return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width),
+                 h: Math.round(b.height), right: Math.round(b.right), bottom: Math.round(b.bottom) }; };
+      return { map: r('.geo-map-pane'), yoy: r('.geo-yoy'), comp: r('.geo-comp-pane'),
+               card: r('#pgGeo .geo-card') };
+    });
+    chk('地图 / 同比表 / 公司筛选横向并排',
+      layout.map.y === layout.yoy.y && layout.yoy.y === layout.comp.y &&
+      layout.map.right <= layout.yoy.x && layout.yoy.right <= layout.comp.x, layout);
+    chk('三栏铺满卡片下方',
+      [layout.map, layout.yoy, layout.comp].every(b =>
+        Math.abs(b.bottom - layout.card.bottom) <= 12 && b.h > 400), layout);
+    chk('地图占比最大、筛选栏最窄',
+      layout.map.w > layout.yoy.w && layout.yoy.w > layout.comp.w, layout);
+
+    console.log('=== 2. Category 同比表（Zebra 视觉 + 亮色主题）===');
     const tbl = await page.evaluate(() => {
       const rows = [...document.querySelectorAll('#geoTbl tbody tr')].map(tr => {
         const tds = [...tr.children];
@@ -86,7 +103,7 @@ function latestSnap() {
     chk('11 个类别', tbl.rows.length === 11, tbl.rows.length);
     chk('每行金额/ΔPY/ΔPY% 都有值',
       tbl.rows.every(r => r.amount && r.delta && r.pct), tbl.rows.slice(0, 2));
-    chk('深色矩阵背景', tbl.dark === 'rgb(13, 27, 42)', tbl.dark);
+    chk('表格沿用看板亮色主题', tbl.dark === 'rgb(255, 255, 255)', tbl.dark);
     chk('金额列灰条 + ΔPY% 细线圆点',
       tbl.rows.every(r => r.gray && r.dot), tbl.rows.slice(0, 2));
     chk('ΔPY 中心零线', tbl.zero === '1px', tbl.zero);
