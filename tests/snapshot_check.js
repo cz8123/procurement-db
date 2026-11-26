@@ -325,13 +325,23 @@ async function waitFor(pg, fn, timeout, label) {
                     ellipsis: getComputedStyle(td).textOverflow,
                     hasTipBox: !!document.querySelector('#dtTip') } : null;
     });
-    chk('离线 Detail 11 列，类目后是子类别、理由紧跟方法、Note 之后是 Date',
-      dtOff.length === 11 && dtOff[3].indexOf('Sub-Category') === 0 &&
-      dtOff[6].indexOf('Single Source Reason') === 0 &&
-      dtOff[7].indexOf('Note') === 0 && dtOff[8].indexOf('Date') === 0, dtOff);
+    chk('离线 Detail 12 列，公司后是 City、类目后是子类别、理由紧跟方法、Note 之后是 Date',
+      dtOff.length === 12 && dtOff[2].indexOf('City') === 0 &&
+      dtOff[4].indexOf('Sub-Category') === 0 &&
+      dtOff[7].indexOf('Single Source Reason') === 0 &&
+      dtOff[8].indexOf('Note') === 0 && dtOff[9].indexOf('Date') === 0, dtOff);
     chk('离线说明也是单行 + 省略号 + data-tip（悬停浮窗同构）',
       !!noteOff && noteOff.ellipsis === 'ellipsis' && noteOff.hasTipBox &&
       noteOff.text.length > 0 && noteOff.tip.length > 0, noteOff);
+    const offCity = await page.evaluate(() => {
+      const co = document.querySelector('#dtTbl tr.dt-company');
+      const cells = co ? [...co.children].map(t => t.textContent.trim()) : [];
+      const child = document.querySelector('#dtTbl tr.dt-child');
+      const cc = child ? [...child.children].map(t => t.textContent.trim()) : [];
+      return { co: cells.slice(0, 4), child: cc.slice(0, 5),
+               ok: !!cells[2] && cells[2] !== '—' && !!cc[2] && cc[2] === cells[2] };
+    });
+    chk('离线 City：公司分组行与明细行城市一致（第 3 格）', offCity.ok, offCity);
 
     console.log('=== 5c. 离线：理由收在 Method 下拉的第二段（同 Region→Company） ===');
     await page.click('.pg-tab[data-page=overview]');

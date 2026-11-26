@@ -35,7 +35,7 @@ OUT_DIR = os.path.join(APP_DIR, "exports")
 
 # 行级数据列（顺序即 JSON 数组里的顺序）
 ROW_COLS = [
-    "no", "date", "fy", "company", "region", "brand", "dept", "category", "sub",
+    "no", "date", "fy", "company", "region", "city", "brand", "dept", "category", "sub",
     "expense", "method", "note", "supplier", "amount", "days", "budget", "level",
     "poPaid", "month", "exc", "ssr",
     # 明细表「Single Source Reason」列：豁免理由 / 单一来源理由合并（两者互斥），
@@ -51,6 +51,7 @@ NOTE_LIMIT = 3000
 
 ROW_SQL = """
 SELECT dash_po."No.",dash_po."Date",dash_po."FY",dash_po."Company_cn",dash_po."Region_cn",
+       dash_po."City_cn",
        dash_po."Brand",dash_po."Department",dash_po."Category",dash_po."Sub-Category",
        dash_po."Expense Type",dash_po."Procurement Method",dash_po."Note",
        dash_po."Supplier_cn",dash_po."Total Price",dash_po."Time Taken",
@@ -86,13 +87,13 @@ def build_rows(con):
     data, dicts = [], {}
     cols = ROW_COLS
     for row in con.execute(ROW_SQL):
-        (no, date, fy, company, region, brand, dept, category, sub,
+        (no, date, fy, company, region, city, brand, dept, category, sub,
          expense, method, note, supplier, amount, days, budget, level, po_paid,
          exc, ssr, reason) = row
         note = (note or "").strip()
         if sub:
             sub = submap.get(sub, sub)
-        vals = [no, date, fy, company, region, brand, dept, category, sub,
+        vals = [no, date, fy, company, region, city, brand, dept, category, sub,
                 expense, method, note[:NOTE_LIMIT] or None,
                 supplier, amount, days, budget, level, po_paid,
                 cal.get(date), exc, ssr, reason]

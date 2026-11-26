@@ -369,3 +369,9 @@
 - **修复 3（可发现性）**：`.fdrop .spec-btn` 从 `opacity:0; pointer-events:none`（仅 hover 才出现）改为常驻 `opacity:.55; pointer-events:auto`，尺寸 13→15px，hover/展开时加深。原来完全隐形，用户不易察觉那里有个按钮。
 - **测试**：`board_check` 339/0（新增 5y 段 5 条：所有 ? 带 data-spec、右上角圆 ? 弹出且 display:flex、Method 小 ? 弹出「筛选 · 采购方式」、全量 sweep 逐个 `.click()` 断言每个都弹且标题非空、全程 0 条 missing definition 警告；`page.on('console')` 增加 specWarns 收集）；`snapshot_check` 72/0（新增 5d 段 4 条离线断言）。`page_tabs` 27、`detail` 48、`visual_tools` 31、`ui_focus` 41、`grid_sum` 14、`colfilter` 34、`perf` 11、`geo` 45 全绿。
 - **离线**：`board.js` 改了，已重跑 `board_export.py` 覆盖 `exports/采购看板_单文件_20261126.html`（12.42 MB）；发给同事仍用这一份。
+
+## 58 Detail 加 City 列（11-26）
+- **取数**：直接用 `dash_po."City_cn"`（26 个取值、0 空值，公司→城市 **1:1**，无多城市公司），**不 JOIN `fct_company_location`**。`DETAIL_TEXT`/`DETAIL_EXPR` 加 `city`，位置在 `company` 之后；`columns` 自动含 city（第 3 位）。`companyTotals` 用 `MAX(city) city` 带出，公司分组行也能显示城市（默认折叠态就看得见）。
+- **前端**：`DT_COLS` 插 City 在第 3 位（12 列）；列宽重排 sub 9.8→8.3、supplier 12.4→10.9、reason 10.9→9.4、note 10.5→9.0 腾出 city 6.0，合计仍 100%。四级树分组行 colspan 同步：区域 8→9（含 company/city/category/…/date 共 9 列），公司行 +1 个 city `<td>` 后 gmeta 仍 colspan 7（category…date），类目行 +1 个空 `<td>` 占 city 位、gmeta 仍 colspan 6。`.dt-tbl min-width` 1470→1560（12 列临界）；1920 视口下 scrollWidth=clientWidth=1791 无横滚。
+- **离线**：`board_export.py` 的 `ROW_COLS`/`ROW_SQL`/`build_rows` 加 `city`（在 region 后）；`snapshot.js` 的 `DETAIL_KEYS`/排序 `field`/行输出/`cmap` 初值/`ct` 输出都加 city。重跑导出 → 单文件 12.54 MB。
+- **测试**：`detail_table_check` 49/0（12 列断言插 City，列号全后移 1：金额合计 tfoot 9/10→10/11、公司小计 nth-child 4→5、子类别 4→5、说明 idx 7→8、明细金额 10→11、币种表头 10→11；新增 cityApi 断言公司→城市 1:1 + companyTotals 带城市 + columns 位置）；`snapshot_check` 73/0（离线 12 列断言 + 公司分组行与明细行城市一致）；其余 board 339、page_tabs 27、visual 31、ui_focus 41、grid_sum 14、colfilter 34、perf 11、geo 45 全绿。

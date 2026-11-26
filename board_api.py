@@ -1037,7 +1037,7 @@ def contracts_csv():
 # Detail 页大表格：区域 / 公司 / 类别 / 供应商 / 采购方法 / 说明 / PRPO金额 / PO Paid
 # 每列都可搜索（LIKE）、筛选（多选取值 / 数值区间）、排序；三级树 + 全集合计，不分页。
 DETAIL_TEXT = {
-    "region": "Region", "company": "Company", "category": "Category",
+    "region": "Region", "company": "Company", "city": "City", "category": "Category",
     "sub": "Sub-Category",
     "supplier": "Supplier", "method": "Method",
     # 豁免理由 / 单一来源理由 两列互斥（FY2627 同时非空 0 条），合并成一列
@@ -1050,6 +1050,9 @@ DETAIL_SEARCH_ONLY = DETAIL_LONG | {"date"}
 DETAIL_EXPR = {
     "region": 'p."Region_cn"',
     "company": 'p."Company_cn"',
+    # 城市在 dash_po 上就是行级字段（26 个取值、0 空值，且公司→城市 1:1），
+    # 不用再 JOIN fct_company_location；公司分组行用 MAX 带出同一个城市
+    "city": 'p."City_cn"',
     "category": 'p."Category"',
     # 采购子类别：走 dim_agg 聚合（244 原始值 → 144 聚合名），与筛选口径同一表达式
     "sub": SUB_EXPR,
@@ -1171,9 +1174,10 @@ def detail():
             'GROUP BY 1 ORDER BY 3 DESC'
             % (DETAIL_EXPR["region"], DETAIL_EXPR["amount"], DETAIL_EXPR["paid"], base), params)]
         ct = [dict(r) for r in c.execute(
-            'SELECT %s region, %s company, COUNT(*) n, SUM(%s) amount, SUM(%s) paid %s '
-            'GROUP BY 1, 2 ORDER BY 1, 3 DESC'
-            % (DETAIL_EXPR["region"], DETAIL_EXPR["company"],
+            'SELECT %s region, %s company, MAX(%s) city, COUNT(*) n, '
+            'SUM(%s) amount, SUM(%s) paid %s '
+            'GROUP BY 1, 2 ORDER BY 1, 5 DESC'
+            % (DETAIL_EXPR["region"], DETAIL_EXPR["company"], DETAIL_EXPR["city"],
                DETAIL_EXPR["amount"], DETAIL_EXPR["paid"], base), params)]
         # 第四级（类目）小计：Region → Company → Category → 明细
         gt = [dict(r) for r in c.execute(
@@ -1187,6 +1191,8 @@ def detail():
                 r["region"] = r["region"] or ""
                 if "company" in r:
                     r["company"] = r["company"] or ""
+                if "city" in r:
+                    r["city"] = r["city"] or ""
                 if "category" in r:
                     r["category"] = r["category"] or ""
                 for k in ("amount", "paid"):

@@ -3384,20 +3384,22 @@
        · Clear filters 一次清掉所有列条件 */
   /* 列宽按实测内容定（1600 视口 ≈1472px 表宽）：
        短列只要放下表头 + 漏斗 + 一个分组行，余量全给 Supplier / Note；
-       Company / Category 再压一档（分组行仍放得下），多出来的宽度都给说明；
+       Company / Category / City 再压一档（分组行仍放得下），多出来的宽度都给说明；
        金额两列要容得下表头「PRPO Amount (RMB)」，否则表头被省略号截掉。 */
   var DT_COLS = [
     { k: 'region',   t: 'Region',              w: '5.8%' },
     { k: 'company',  t: 'Company',             w: '7.4%' },
+    /* 城市：dash_po.City_cn，公司→城市 1:1，公司分组行也带出来 */
+    { k: 'city',     t: 'City',                w: '6.0%' },
     { k: 'category', t: 'Category',            w: '6.6%' },
     /* 子类别：dim_agg 聚合名，紧跟在类别之后 */
-    { k: 'sub',      t: 'Sub-Category',        w: '9.8%' },
-    { k: 'supplier', t: 'Supplier',            w: '12.4%' },
+    { k: 'sub',      t: 'Sub-Category',        w: '8.3%' },
+    { k: 'supplier', t: 'Supplier',            w: '10.9%' },
     { k: 'method',   t: 'Procurement Method',  w: '10.9%' },
     /* 豁免单一来源的理由 / 单一来源采购理由 不会同时出现，合并成一列 */
-    { k: 'reason',   t: 'Single Source Reason', w: '10.9%' },
+    { k: 'reason',   t: 'Single Source Reason', w: '9.4%' },
     /* 说明：一行显示 + 省略号（全文在悬停浮窗里），夹在理由与日期之间 */
-    { k: 'note',     t: 'Note',                w: '10.5%', long: 1 },
+    { k: 'note',     t: 'Note',                w: '9.0%', long: 1 },
     /* 申请日期（ISO 文本）：只给搜索，不给取值勾选 */
     { k: 'date',     t: 'Date',                w: '6.4%', qonly: 1 },
     { k: 'amount',   t: 'PRPO Amount',         w: '11.0%', num: 1 },
@@ -3583,7 +3585,7 @@
         '<td data-tip="' + esc(rk) + '"><button type="button" class="dt-toggle" data-toggle-region="' + esc(rk) +
         '" title="' + (rOpen ? 'Collapse' : 'Expand') + ' ' + esc(rk) + '">' +
         (rOpen ? '−' : '+') + '</button>' + esc(rk || '(blank)') + '</td>' +
-        '<td colspan="8" class="dt-gmeta">region subtotal · ' +
+        '<td colspan="9" class="dt-gmeta">region subtotal · ' +
         nf(rg.n, 0) + ' orders</td>' +
         numCell(rg.amount, 'amount') + numCell(rg.paid, 'paid') + '</tr>');
       if (!rOpen) return;
@@ -3594,6 +3596,7 @@
           '<td class="dt-tree">└</td><td data-tip="' + esc(ckName) + '"><button type="button" class="dt-toggle" data-toggle-company="' +
           esc(key) + '" title="' + (cOpen ? 'Collapse' : 'Expand') + ' ' + esc(ckName) + '">' +
           (cOpen ? '−' : '+') + '</button>' + esc(ckName || '(blank)') + '</td>' +
+          '<td data-tip="' + esc(cg.city || '') + '">' + esc(cg.city || '—') + '</td>' +
           '<td colspan="7" class="dt-gmeta">company subtotal · ' +
           nf(cg.n, 0) + ' orders</td>' +
           numCell(cg.amount, 'amount') + numCell(cg.paid, 'paid') + '</tr>');
@@ -3605,7 +3608,7 @@
           var gOpen = !!S.detail.expG[gkey];
           body.push('<tr class="dt-catgroup" data-region="' + esc(rk) + '" data-company="' + esc(ckName) +
             '" data-category="' + esc(gkName) + '">' +
-            '<td class="dt-tree"></td><td class="dt-tree">└</td>' +
+            '<td class="dt-tree"></td><td class="dt-tree">└</td><td class="dt-tree"></td>' +
             '<td data-tip="' + esc(gkName) + '"><button type="button" class="dt-toggle" data-toggle-category="' +
             esc(gkey) + '" title="' + (gOpen ? 'Collapse' : 'Expand') + ' ' + esc(gkName) + '">' +
             (gOpen ? '−' : '+') + '</button>' + esc(gkName || '(blank)') + '</td>' +
