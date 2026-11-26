@@ -146,18 +146,22 @@ async function waitFor(page, fn, timeout, label) {
                  overflow: hd.scrollWidth > hd.clientWidth + 1,
                  cut: [...document.querySelectorAll('.pg-tab-top')]
                    .filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent),
-                 tabsRight: Math.round(right('#pgTabs')),
-                 edgeGap: Math.round(innerWidth - 15 - right('#pgTabs')), // 15px 为滚动条
+                 tabsLeft: Math.round(left('#pgTabs')),
+                 titleRight: Math.round(right('.hd-l')),
+                 hdRight: Math.round(right('.hd')),
+                 expRight: Math.round(right('#btnExport')),
+                 edgeGap: Math.round(innerWidth - 15 - right('#btnExport')), // 15px 为滚动条
                  pad: pad,
-                 controlsBeforeTabs: right('.hd-r') <= left('#pgTabs') + 1,
-                 controlsMiddle: Math.round((left('.hd-r') + right('.hd-r')) / 2) };
+                 tabsAfterTitle: left('#pgTabs') >= right('.hd-l') - 1,
+                 expInHd: !!document.querySelector('.hd #btnExport') };
       });
       console.log('    ' + w + ' ' + JSON.stringify(g));
       chk(w + 'px 顶栏仍 68px 且无溢出/截断',
         g.h === 68 && !g.overflow && g.cut.length === 0, g);
-      chk(w + 'px 页签贴最右、控件在中间', g.controlsBeforeTabs &&
-        Math.abs(g.edgeGap - g.pad) <= 2 &&
-        g.controlsMiddle > w * 0.35 && g.controlsMiddle < w * 0.7, g);
+      /* 版式（11-26）：标题 → 页签 → 右侧控件；Export View 钉在整页右上角 */
+      chk(w + 'px 页签紧跟标题（不贴右端）', g.tabsAfterTitle && g.tabsLeft < g.hdRight * 0.75, g);
+      chk(w + 'px Export View 贴页面右上角', g.expInHd &&
+        Math.abs(g.edgeGap - g.pad) <= 2, g);
     }
 
     console.log('\n=== 6b. 切回概览时 Top10 不被放大 ===');

@@ -35,6 +35,11 @@ window.__FY_DEFAULT = {{ default_fy|default('', true)|tojson }};
       <p class="hd-sub" id="hdSub">Procurement spend analysis · Loading…</p>
     </div>
   </div>
+  <!-- 页签：多页面切换入口（Power BI 式视觉对象页头），后续新页面只需在
+       board.js 的 PAGES 里注册 label/sub/render，不用改这里。
+       顺序：标题 → 页签 → 右侧控制区，保证 Export View 钉在整页右上角 -->
+  <nav class="pg-tabs" id="pgTabs" aria-label="Dashboard pages"></nav>
+
   <div class="hd-r">
     <label class="sel">
       <span>Fiscal Year</span>
@@ -44,28 +49,23 @@ window.__FY_DEFAULT = {{ default_fy|default('', true)|tojson }};
       <button data-cur="RM">RM</button>
       <button data-cur="RMB" class="on">RMB</button>
     </div>
+    <button class="btn" id="btnExport" title="Export purchase requisition detail for the current fiscal year and filters">Export View</button>
   </div>
-
-  <!-- 页签：多页面切换入口（Power BI 式视觉对象页头），后续新页面只需在
-       board.js 的 PAGES 里注册 label/sub/render，不用改这里 -->
-  <nav class="pg-tabs" id="pgTabs" aria-label="Dashboard pages"></nav>
 </header>
 
 <!-- KPI -->
 <section class="kpis" id="kpis"></section>
 
-<!-- 筛选 -->
+<!-- 筛选：上排切片器 + 右侧操作，下排已选条件（chips） -->
 <section class="fbar">
-  <div class="fbar-in" id="fbar"></div>
-  <div class="fbar-r">
-    <button class="spec-btn" data-spec="global" title="How the whole dashboard is calculated">?</button>
-    <!-- 已选筛选：放在筛选条右侧（Reset 左边），不再单独占一行 -->
-    <div class="chips" id="chips"></div>
-    <div class="fbar-acts">
-      <button class="btn" id="btnExport" title="Export purchase requisition detail for the current fiscal year and filters">Export View</button>
+  <div class="fbar-top">
+    <div class="fbar-in" id="fbar"></div>
+    <div class="fbar-r">
+      <button class="spec-btn" data-spec="global" title="How the whole dashboard is calculated">?</button>
       <button class="btn ghost" id="btnReset">Reset Filters</button>
     </div>
   </div>
+  <div class="chips" id="chips"></div>
 </section>
 
 </div><!-- /.sticky-head -->

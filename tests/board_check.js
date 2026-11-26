@@ -716,17 +716,20 @@ async function waitFor(pg, fn, timeout, label) {
         return { x: Math.round(b.x), y: Math.round(b.y), r: Math.round(b.right),
                  b: Math.round(b.bottom), w: Math.round(b.width), h: Math.round(b.height) };
       };
-      const ex = r('#btnExport'), rs = r('#btnReset');
+      const ex = r('#btnExport'), rs = r('#btnReset'), hd = r('.hd');
       const dw = [...document.querySelectorAll('.fdrop')].map(e =>
         Math.round(e.getBoundingClientRect().width));
-      return { ex, rs, dw, inFbar: !!document.querySelector('.fbar-acts #btnExport'),
-               hdHasBtn: !!document.querySelector('.hd #btnExport') };
+      return { ex, rs, hd, dw,
+               inHd: !!document.querySelector('.hd #btnExport'),
+               inFbar: !!document.querySelector('.fbar #btnExport'),
+               /* 顶栏里位置最靠右的元素就是它（= 整页右上角） */
+               rightMost: Math.max.apply(null, [...document.querySelectorAll('.hd *')]
+                 .map(e => e.getBoundingClientRect().right)) };
     });
-    chk('Export View 在筛选条右侧操作组内（不再占顶栏）',
-      acts.inFbar && !acts.hdHasBtn, acts);
-    chk('Export View 在 Reset Filters 正上方且同宽右对齐',
-      acts.ex.b < acts.rs.y && Math.abs(acts.ex.r - acts.rs.r) <= 1 &&
-      Math.abs(acts.ex.w - acts.rs.w) <= 1, acts);
+    chk('Export View 在顶栏（不在筛选条内）', acts.inHd && !acts.inFbar, acts);
+    chk('Export View 位于整页右上角（顶栏最右 + 垂直居中于顶栏）',
+      Math.abs(acts.ex.r - acts.rightMost) <= 1 && acts.ex.b <= acts.hd.b &&
+      Math.abs((acts.ex.y + acts.ex.h / 2) - (acts.hd.y + acts.hd.h / 2)) <= 5, acts);
     chk('6 个切片器等宽', acts.dw.length === 6 &&
       Math.max.apply(null, acts.dw) - Math.min.apply(null, acts.dw) <= 1, acts.dw);
 

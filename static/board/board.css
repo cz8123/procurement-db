@@ -116,14 +116,14 @@ h1,h2,h3,p{ margin:0; }
    高度 50px、下沿与顶栏下沿齐平；切页只换 class，不改变顶栏高度。 */
 .pg-tabs{
   display:flex; align-items:stretch; gap:3px; height:40px;
-  margin-left:auto; flex:0 1 auto; min-width:0;
+  margin-left:14px; flex:0 1 auto; min-width:0;
   /* 顶栏上下各有 9px 内边距；页签高 40px，下移 19px 后下沿与顶栏下沿（= KPI 顶边）齐平。
      relative 偏移不占布局高度，顶栏仍是 68px。 */
   position:relative; top:14px;
 }
 .pg-tab{
   width:clamp(104px,7.4vw,150px); height:40px; padding:0; border:0;
-  background:transparent; cursor:pointer; flex:0 0 auto;
+  background:transparent; cursor:pointer; flex:0 1 auto; min-width:0;
   color:#2A3542; font-family:var(--font-semi);
 }
 .pg-tab-top{
@@ -138,6 +138,12 @@ h1,h2,h3,p{ margin:0; }
 .pg-tab:focus-visible{ outline:2px solid #FF6B12; outline-offset:-2px; }
 
 .hd-r{ display:flex; align-items:center; gap:8px; flex:none; margin-left:auto; }
+/* 右上角主操作：白底藏青字，与深色顶栏强对比 */
+.hd-r .btn{
+  background:#fff; color:var(--navy); border:1px solid #fff; border-radius:5px;
+  padding:5px 13px; font-size:12.5px; font-weight:700; line-height:1.2;
+}
+.hd-r .btn:hover{ background:#DCE4EF; border-color:#DCE4EF; }
 
 .sel{ display:flex; align-items:center; gap:6px; font-size:12px; color:rgba(255,255,255,.9); }
 .sel select{
@@ -236,32 +242,28 @@ h1,h2,h3,p{ margin:0; }
 }
 .kpi .k-sub{ color:#8A8A8A; margin-left:3px; }
 
-/* ---------------- 筛选条（切片器组，白卡） ---------------- */
+/* ---------------- 筛选条（切片器组，白卡） ----------------
+   上排：紧凑切片器 + 右侧 Reset；下排：已选条件 chips（没有筛选时整行不占位） */
 .fbar{
-  display:flex; align-items:flex-end; gap:12px;
-  margin:8px var(--pad) 6px; padding:9px 12px 10px;
+  display:flex; flex-direction:column; gap:5px;
+  margin:6px var(--pad) 6px; padding:6px 11px 7px;
   background:var(--card); border:1px solid var(--line); border-radius:var(--r);
   box-shadow:var(--shadow);
 }
+.fbar-top{ display:flex; align-items:center; gap:10px; }
 /* 用 grid 而不是 flex-wrap：窄屏换行时最后一个切片器不会被拉成整行宽 */
 .fbar-in{
-  display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-  gap:10px; flex:1; min-width:0;
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr));
+  gap:8px; flex:1; min-width:0;
 }
-.fbar-r{ flex:none; display:flex; align-items:center; gap:10px; }
-/* 右侧操作组：Export View 在上、Reset Filters 在下（同一组，右边缘对齐） */
-.fbar-acts{
-  display:flex; flex-direction:column; align-items:stretch; gap:6px; flex:0 0 auto;
-}
+.fbar-r{ flex:none; display:flex; align-items:center; gap:8px; }
 /* 白色筛选条里不能用顶栏那套「白底白边」按钮：这里给实心主按钮 + 描边次按钮 */
-.fbar-acts .btn{
-  min-width:112px; justify-content:center; padding:4px 12px;
-  border-radius:6px; font-size:12px;
-  background:var(--navy); color:#fff; border:1px solid var(--navy);
+.fbar-r .btn{
+  min-width:104px; justify-content:center; padding:4px 12px;
+  border-radius:6px; font-size:12px; line-height:1.3;
 }
-.fbar-acts .btn:hover{ background:#173F63; border-color:#173F63; }
-.fbar-acts .btn.ghost{ background:#fff; color:var(--navy); border-color:#C8CFDA; }
-.fbar-acts .btn.ghost:hover{ background:#F1F5FA; border-color:#9FB0C4; }
+.fbar-r .btn.ghost{ background:#fff; color:var(--navy); border-color:#C8CFDA; }
+.fbar-r .btn.ghost:hover{ background:#F1F5FA; border-color:#9FB0C4; }
 /* 整页口径说明：小圆形问号，跟新样式统一 */
 .fbar-r > .spec-btn{
   width:20px; height:20px; border-radius:50%; font-size:10px;
@@ -269,14 +271,14 @@ h1,h2,h3,p{ margin:0; }
 }
 .fbar-r > .spec-btn:hover{ background:var(--navy); border-color:var(--navy); color:#fff; }
 
-/* 切片器：等宽卡片式（名称一行 + 取值一行），品牌描边、悬停浮起 */
+/* 切片器：等宽紧凑卡片（名称一行 + 取值一行），品牌描边、悬停浮起 */
 .fdrop{ position:relative; display:flex; align-items:stretch; min-width:0; }
 .fdrop .fd-row{ position:relative; display:flex; align-items:stretch; width:100%; }
 .fdrop .fd-btn{
   display:flex; flex-direction:column; align-items:flex-start; justify-content:center;
-  gap:1px; width:100%; min-height:46px;
-  background:#fff; border:1px solid #D8DEE7; border-radius:8px;
-  padding:5px 30px 6px 11px; cursor:pointer; color:var(--ink); text-align:left;
+  gap:0; width:100%; min-height:32px;
+  background:#fff; border:1px solid #D8DEE7; border-radius:7px;
+  padding:2px 22px 3px 9px; cursor:pointer; color:var(--ink); text-align:left;
   transition:border-color .12s ease, box-shadow .12s ease, background .12s ease;
 }
 .fdrop .fd-btn:hover{ border-color:#A6B7CB; box-shadow:0 1px 3px rgba(16,28,48,.10); }
@@ -285,16 +287,16 @@ h1,h2,h3,p{ margin:0; }
   box-shadow:0 0 0 2px rgba(30,77,120,.13);
 }
 .fdrop .fd-name{
-  font-size:10.5px; font-weight:600; color:#7A8698; letter-spacing:.2px; line-height:1.35;
+  font-size:9.5px; font-weight:600; color:#7A8698; letter-spacing:.2px; line-height:1.25;
 }
 .fdrop .fd-val{
-  width:100%; color:#1E2F4B; font-weight:700; font-size:13px; line-height:1.35;
+  width:100%; color:#1E2F4B; font-weight:700; font-size:12.5px; line-height:1.28;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 /* 下拉箭头：CSS 折角（比 ▾ 字形更细腻，且垂直居中） */
 .fdrop .fd-caret{
-  position:absolute; right:12px; top:50%; width:6px; height:6px;
-  margin-top:-5px; border-right:1.5px solid #7D8797; border-bottom:1.5px solid #7D8797;
+  position:absolute; right:10px; top:50%; width:5px; height:5px;
+  margin-top:-4px; border-right:1.5px solid #7D8797; border-bottom:1.5px solid #7D8797;
   transform:rotate(45deg); transition:transform .15s ease, border-color .12s ease;
   pointer-events:none;
 }
@@ -338,23 +340,19 @@ h1,h2,h3,p{ margin:0; }
 .fpop-b input{ accent-color:var(--blue); margin:0; }
 .fpop-b .cnt{ margin-left:auto; color:var(--faint); font-size:11.5px; font-variant-numeric:tabular-nums; }
 
-/* 已选筛选 chips：**放在筛选条右侧**（Reset 左边）
-   · 不占额外行 → 钻取时不会把整页往下顶
-   · 不换行、横向滚动，且限宽 → 再多个也不会把左边下拉挤到换行
+/* 已选筛选 chips：**排在切片器下方整行**
+   · 通栏、可换行（切片器那行不再被 chips 挤占宽度）
    · :empty 时直接不显示（没有筛选就没有任何留白） */
 .chips{
-  display:flex; flex-wrap:nowrap; align-items:center; gap:5px;
-  max-width:min(38vw,380px); min-width:0;
-  overflow-x:auto; overflow-y:hidden;
-  scrollbar-width:none; -ms-overflow-style:none;
-  padding:1px 0;
+  display:flex; flex-wrap:wrap; align-items:center; gap:4px 5px;
+  width:100%; min-width:0;
+  padding:0;
 }
 .chips:empty{ display:none; }
-.chips::-webkit-scrollbar{ display:none; }
 .chip{
   display:inline-flex; align-items:center; gap:4px; flex:0 0 auto;
   background:#E8EDF4; color:var(--navy); border:1px solid #CBD8E6;
-  border-radius:0; padding:1px 4px 1px 6px; font-size:11.5px; line-height:1.55;
+  border-radius:0; padding:0 3px 0 6px; font-size:11px; line-height:1.6;
 }
 .chip b{ font-weight:600; color:var(--ink-2); margin-right:2px; }
 .chip button{
@@ -817,6 +815,23 @@ body.drawer-open{ overflow:hidden; }
   .hd-sub{ font-size:10.5px; }
   .hd-logo{ height:28px; }
 }
+/* 标题 → 页签 → 右上控件三段在 1180 以下开始挤：先收窄页签、隐掉 FY 文字标签 */
+@media (max-width:1180px){
+  .hd{ gap:10px; }
+  .pg-tabs{ margin-left:10px; }
+  .pg-tab{ width:88px; }
+  .pg-tab-top{ font-size:11.5px; padding:0 5px; }
+  .sel > span{ display:none; }
+  .hd-r{ gap:6px; }
+  .hd-r .btn{ padding:5px 10px; font-size:12px; }
+  .hd h1{ font-size:16px; }
+}
+/* 1080 以下：宁可去掉副标题，也不让页签互相压字 */
+@media (max-width:1080px){
+  .hd-sub{ display:none; }
+  .hd h1{ font-size:15px; }
+  .hd-l{ gap:10px; }
+}
 @media (max-width:1280px){
   :root{ --pad:24px; }
   .hd h1{ font-size:15.5px; }
@@ -835,7 +850,8 @@ body.drawer-open{ overflow:hidden; }
   .hd h1{ font-size:16px; }
   .kpis{ grid-template-columns:repeat(2,1fr); }
   .mini-inp{ width:130px; }
-  .fbar{ flex-wrap:wrap; }
+  .fbar-top{ flex-wrap:wrap; }
+  .fbar-r{ width:100%; justify-content:flex-end; }
 }
 
 /* ---------------- 取值计算逻辑说明（spec-pop） ---------------- */
@@ -1062,6 +1078,23 @@ html.boot-other #pgOverview, html.boot-other #kpis, html.boot-other .fbar{ displ
 .dt-pop .dt-none{ padding:10px; font-size:11px; color:var(--note); text-align:center; }
 .dt-pop .dt-acts{ display:flex; justify-content:flex-end; gap:6px; }
 .dt-pop .btn{ font-size:11.5px; padding:3px 10px; }
+/* 标题 → 页签 → 右上控件三段在 1180 以下开始挤：先收窄页签、隐掉 FY 文字标签 */
+@media (max-width:1180px){
+  .hd{ gap:10px; }
+  .pg-tabs{ margin-left:10px; }
+  .pg-tab{ width:88px; }
+  .pg-tab-top{ font-size:11.5px; padding:0 5px; }
+  .sel > span{ display:none; }
+  .hd-r{ gap:6px; }
+  .hd-r .btn{ padding:5px 10px; font-size:12px; }
+  .hd h1{ font-size:16px; }
+}
+/* 1080 以下：宁可去掉副标题，也不让页签互相压字 */
+@media (max-width:1080px){
+  .hd-sub{ display:none; }
+  .hd h1{ font-size:15px; }
+  .hd-l{ gap:10px; }
+}
 @media (max-width:1280px){
   .dt-wrap{ max-height:none; }
 }
@@ -1152,6 +1185,23 @@ html.boot-other #pgOverview, html.boot-other #kpis, html.boot-other .fbar{ displ
 .z-side.neg .zb-line::after{ left:-5px; box-shadow:0 0 0 2.5px #FA2E2E; }
 .z-side.zero .zb-line{ width:0 !important; }
 .z-side.zero .zb-line::after{ right:auto; left:-4.5px; }
+/* 标题 → 页签 → 右上控件三段在 1180 以下开始挤：先收窄页签、隐掉 FY 文字标签 */
+@media (max-width:1180px){
+  .hd{ gap:10px; }
+  .pg-tabs{ margin-left:10px; }
+  .pg-tab{ width:88px; }
+  .pg-tab-top{ font-size:11.5px; padding:0 5px; }
+  .sel > span{ display:none; }
+  .hd-r{ gap:6px; }
+  .hd-r .btn{ padding:5px 10px; font-size:12px; }
+  .hd h1{ font-size:16px; }
+}
+/* 1080 以下：宁可去掉副标题，也不让页签互相压字 */
+@media (max-width:1080px){
+  .hd-sub{ display:none; }
+  .hd h1{ font-size:15px; }
+  .hd-l{ gap:10px; }
+}
 @media (max-width:1280px){
   .geo-body{ gap:8px; height:380px; }
   .geo-comp-pane{ flex:16 1 0; }
