@@ -3392,16 +3392,18 @@
     { k: 'region',   t: 'Region',              w: '5.8%' },
     /* 城市：dash_po.City_cn，区域的下级、公司的上级（五级树第二层） */
     { k: 'city',     t: 'City',                w: '6.0%' },
-    { k: 'company',  t: 'Company',             w: '7.4%' },
-    { k: 'category', t: 'Category',            w: '6.6%' },
+    { k: 'company',  t: 'Company',             w: '7.0%' },
+    { k: 'category', t: 'Category',            w: '6.3%' },
     /* 子类别：dim_agg 聚合名，紧跟在类别之后 */
-    { k: 'sub',      t: 'Sub-Category',        w: '8.3%' },
-    { k: 'supplier', t: 'Supplier',            w: '10.9%' },
-    { k: 'method',   t: 'Procurement Method',  w: '10.9%' },
+    { k: 'sub',      t: 'Sub-Category',        w: '7.9%' },
+    { k: 'supplier', t: 'Supplier',            w: '10.4%' },
+    { k: 'method',   t: 'Procurement Method',  w: '10.4%' },
     /* 豁免单一来源的理由 / 单一来源采购理由 不会同时出现，合并成一列 */
-    { k: 'reason',   t: 'Single Source Reason', w: '9.4%' },
-    /* 说明：一行显示 + 省略号（全文在悬停浮窗里），夹在理由与日期之间 */
-    { k: 'note',     t: 'Note',                w: '9.0%', long: 1 },
+    { k: 'reason',   t: 'Single Source Reason', w: '8.4%' },
+    /* 财政年度：行级 dash_po.FY，跨财年日期范围时逐行显示自己的 FY */
+    { k: 'fy',       t: 'Fiscal Year',          w: '5.0%' },
+    /* 说明：一行显示 + 省略号（全文在悬停浮窗里），夹在财年与日期之间 */
+    { k: 'note',     t: 'Note',                w: '7.1%', long: 1 },
     /* 申请日期（ISO 文本）：只给搜索，不给取值勾选 */
     { k: 'date',     t: 'Date',                w: '6.4%', qonly: 1 },
     { k: 'amount',   t: 'PRPO Amount',         w: '11.0%', num: 1 },
@@ -3608,7 +3610,7 @@
         '<td data-tip="' + esc(rk) + '"><button type="button" class="dt-toggle" data-toggle-region="' + esc(rk) +
         '" title="' + (rOpen ? 'Collapse' : 'Expand') + ' ' + esc(rk) + '">' +
         (rOpen ? '−' : '+') + '</button>' + esc(rk || '(blank)') + '</td>' +
-        '<td colspan="9" class="dt-gmeta">region subtotal · ' +
+        '<td colspan="10" class="dt-gmeta">region subtotal · ' +
         nf(rg.n, 0) + ' orders</td>' +
         numCell(rg.amount, 'amount') + numCell(rg.paid, 'paid') + '</tr>');
       if (!rOpen) return;
@@ -3619,7 +3621,7 @@
           '<td class="dt-tree">└</td><td data-tip="' + esc(ykName) + '"><button type="button" class="dt-toggle" data-toggle-city="' +
           esc(ykey) + '" title="' + (yOpen ? 'Collapse' : 'Expand') + ' ' + esc(ykName) + '">' +
           (yOpen ? '−' : '+') + '</button>' + esc(ykName || '(blank)') + '</td>' +
-          '<td colspan="8" class="dt-gmeta">city subtotal · ' +
+          '<td colspan="9" class="dt-gmeta">city subtotal · ' +
           nf(yg.n, 0) + ' orders</td>' +
           numCell(yg.amount, 'amount') + numCell(yg.paid, 'paid') + '</tr>');
         if (!yOpen) return;
@@ -3633,7 +3635,7 @@
             '<td data-tip="' + esc(ckName) + '"><button type="button" class="dt-toggle" data-toggle-company="' +
             esc(key) + '" title="' + (cOpen ? 'Collapse' : 'Expand') + ' ' + esc(ckName) + '">' +
             (cOpen ? '−' : '+') + '</button>' + esc(ckName || '(blank)') + '</td>' +
-            '<td colspan="7" class="dt-gmeta">company subtotal · ' +
+            '<td colspan="8" class="dt-gmeta">company subtotal · ' +
             nf(cg.n, 0) + ' orders</td>' +
             numCell(cg.amount, 'amount') + numCell(cg.paid, 'paid') + '</tr>');
           if (!cOpen) return;
@@ -3648,7 +3650,7 @@
               '<td data-tip="' + esc(gkName) + '"><button type="button" class="dt-toggle" data-toggle-category="' +
               esc(gkey) + '" title="' + (gOpen ? 'Collapse' : 'Expand') + ' ' + esc(gkName) + '">' +
               (gOpen ? '−' : '+') + '</button>' + esc(gkName || '(blank)') + '</td>' +
-              '<td colspan="6" class="dt-gmeta">category subtotal · ' +
+              '<td colspan="7" class="dt-gmeta">category subtotal · ' +
               nf(gg.n, 0) + ' orders</td>' +
               numCell(gg.amount, 'amount') + numCell(gg.paid, 'paid') + '</tr>');
             if (!gOpen) return;

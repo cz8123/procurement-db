@@ -327,11 +327,12 @@ async function waitFor(pg, fn, timeout, label) {
                     ellipsis: getComputedStyle(td).textOverflow,
                     hasTipBox: !!document.querySelector('#dtTip') } : null;
     });
-    chk('离线 Detail 12 列，区域后是 City、城市后是公司、类目后是子类别',
-      dtOff.length === 12 && dtOff[1].indexOf('City') === 0 &&
+    chk('离线 Detail 13 列，区域后是 City、理由后是 Fiscal Year、财年后是 Note',
+      dtOff.length === 13 && dtOff[1].indexOf('City') === 0 &&
       dtOff[4].indexOf('Sub-Category') === 0 &&
       dtOff[7].indexOf('Single Source Reason') === 0 &&
-      dtOff[8].indexOf('Note') === 0 && dtOff[9].indexOf('Date') === 0, dtOff);
+      dtOff[8].indexOf('Fiscal Year') === 0 &&
+      dtOff[9].indexOf('Note') === 0 && dtOff[10].indexOf('Date') === 0, dtOff);
     chk('离线说明也是单行 + 省略号 + data-tip（悬停浮窗同构）',
       !!noteOff && noteOff.ellipsis === 'ellipsis' && noteOff.hasTipBox &&
       noteOff.text.length > 0 && noteOff.tip.length > 0, noteOff);
@@ -344,6 +345,12 @@ async function waitFor(pg, fn, timeout, label) {
                ok: !!cells[1] && cells[1] !== '—' && !!cc[1] && cc[1] === cells[1].replace(/^[+−]\s*/, '') };
     });
     chk('离线 City：城市分组行与明细行城市一致（第 2 格）', offCity.ok, offCity);
+    const offFy = await page.evaluate(() => {
+      const tr = document.querySelector('#dtTbl tr.dt-child');
+      const cell = tr ? tr.children[8] : null;
+      return { v: cell ? cell.textContent.trim() : '', n: document.querySelectorAll('#dtTbl tr.dt-child').length };
+    });
+    chk('离线明细行 Fiscal Year 列有 FY 值（第 9 格）', /^FY\d{4}$/.test(offFy.v), offFy);
 
     console.log('=== 5c. 离线：理由收在 Method 下拉的第二段（同 Region→Company） ===');
     await page.click('.pg-tab[data-page=overview]');

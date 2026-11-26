@@ -382,3 +382,10 @@
 - **前端**：新增 `dtCyKey(region,city)` 与展开态 `expY`（存/读 `sessionStorage` 同步加）；树 map 多一层 `g.cys[city].cos[company].cats[category]`；各层按金额降序。`dtSetAll` 的 keys 加 `Y`，全展开仍只到类目层（区域+城市+公司+类目几百行），明细按需展开。新增 `data-toggle-city` 点击处理。CSS 加 `.dt-city` 分组行（底色介于区域/公司之间）。**各级名称必须落在本名列**：区域 x=57 / 城市 x=161 / 公司 x=268 / 类目 x=401（DOM 实测），靠 group 行 `colspan` 递减 9/8/7/6 对齐，截图缩放会造成「类目落在 Company 列」的错觉 —— 以 DOM 坐标为准。
 - **离线**：`snapshot.js` 的 `DETAIL_KEYS` 把 city 移到 company 前；`detailResp` 新增 `ymap`/`yt`（cityTotals），companyTotals/categoryTotals 带 city。重导单文件 12.54 MB。
 - **测试**：`detail_table_check` 52/0（1b 段改五级树：默认全折叠→展开区域出城市行→展开城市出公司行→展开公司出类目行→展开类目出明细，逐级断言小计金额与降序；Expand all 断言加 cities 且 rows=区域+城市+公司+类目）；`snapshot_check` 73/0（离线树多展开一层 + 城市分组行与明细行城市一致）；其余 board 339、page_tabs 27、visual 31、ui_focus 41、grid_sum 14、colfilter 34、perf 11、geo 45 全绿。
+
+## 60 Detail 加 Fiscal Year 列（11-26）
+- **取数**：行级 `p."FY"`（dash_po 自带 FY2425/FY2526/FY2627），与日期表 FiscalYearName 一致。**跨财年日期范围**切片器下同一张表会出现多个财年，每行显示自己的 FY；放进 `DETAIL_TEXT` 自动获得排序 + 取值筛选（只有 3 个值，`/detail/values?col=fy` 可直接勾选）。位置在 **Single Source Reason 之后、Note 之前**，使后端 `columns`（`list(DETAIL_TEXT)+note/date/amount/paid`）与前端 `DT_COLS` 顺序严格一致。
+- **前端**：13 列，列宽重排（company 7.4→7.0、category 6.6→6.3、sub 8.3→7.9、supplier/method 10.9→10.4、reason 9.4→8.4、note 9.0→7.1，腾出 FY 5.0，合计仍 100%）。五级树各级 gmeta colspan 各 +1：区域 9→10、城市 8→9、公司 7→8、类目 6→7。`.dt-tbl min-width` 1560→1650。DOM 实测 FY 表头与明细单元格同 x=1171，无横滚。
+- **离线**：`board_export.py` 的 ROW_COLS/ROW_SQL 早已含 `fy`，无需改；`snapshot.js` 的 `DETAIL_KEYS`、行输出、排序 `field` 加 `fy`（放在 reason 后）。重导单文件 12.54 MB。
+- **测试**：`detail_table_check` 53/0（13 列断言、funnel 13、FY 值/取值筛选/columns 位置、列号后移：tfoot 10/11→11/12、说明 idx 8→9、明细金额 11→12、币种表头 11→12）；`snapshot_check` 74/0（13 列 + 离线 FY 值第 9 格）；其余 board 339、page_tabs 27、visual 31、ui_focus 41、grid_sum 14、colfilter 34、perf 11、geo 45（geo 首跑偶发地图 zoom 未就绪，单跑 45/0）全绿。
+- **坑**：改 gmeta colspan 时 Edit 的 old_string 若只匹配到 `subtotal · '` 会把后面的 `' +` 一起吃掉，导致 `missing ) after argument list` 首屏全白。**改完 JS 必须 `node --check static/board/board.js`**，别只靠浏览器测。

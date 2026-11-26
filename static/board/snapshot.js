@@ -589,7 +589,7 @@
      与在线接口同口径：财年 + 全局筛选 + 每列搜索/取值/区间，三级树全量行 + 全集合计。
      离线已内嵌 46k 行（ROW_COLS 里有 region/company/category/supplier/method/
      amount/poPaid），所以这里只是本地复算，不需要额外数据。 */
-  var DETAIL_KEYS = ['region', 'city', 'company', 'category', 'sub', 'supplier', 'method', 'reason', 'note', 'date'];
+  var DETAIL_KEYS = ['region', 'city', 'company', 'category', 'sub', 'supplier', 'method', 'reason', 'fy', 'note', 'date'];
 
   function detailPass(r, sp, fy, f, skip) {
     if (r.fy !== fy) return false;
@@ -632,7 +632,7 @@
     var sa = 0, sp_ = 0;
     list.forEach(function (r) { sa += r.amount || 0; sp_ += r.poPaid || 0; });
     var field = { region: 'region', company: 'company', city: 'city', category: 'category',
-                  sub: 'sub', supplier: 'supplier', method: 'method', note: 'note',
+                  sub: 'sub', supplier: 'supplier', method: 'method', fy: 'fy', note: 'note',
                   date: 'date', amount: 'amount', paid: 'poPaid' };
     var sk = field[sp.get('sort') || 'amount'] || 'date';
     var dir = sp.get('dir') === 'asc' ? 1 : -1;
@@ -646,8 +646,8 @@
       return {
         region: r.region || '', city: r.city || '', company: r.company || '',
         category: r.category || '', sub: r.sub || '',
-        supplier: r.supplier || '', method: r.method || '', note: r.note || '',
-        date: r.date || '',
+        supplier: r.supplier || '', method: r.method || '', fy: r.fy || '',
+        note: r.note || '', date: r.date || '',
         amount: r2((r.amount || 0) / rate), paid: r2((r.poPaid || 0) / rate)
       };
     });

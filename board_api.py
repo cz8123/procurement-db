@@ -1042,6 +1042,9 @@ DETAIL_TEXT = {
     "supplier": "Supplier", "method": "Method",
     # 豁免理由 / 单一来源理由 两列互斥（FY2627 同时非空 0 条），合并成一列
     "reason": "Single Source Reason",
+    # 财政年度：行级字段 dash_po.FY（FY2425/FY2526/FY2627），跨财年日期范围时
+    # 同一张表会同时出现多个财年，所以每行带出自己的 FY 并支持按财年筛选
+    "fy": "Fiscal Year",
 }
 # 长文本列：只给「搜索」，不给取值勾选（说明有 4 万多种，勾选没意义）
 DETAIL_LONG = {"note"}
@@ -1062,6 +1065,8 @@ DETAIL_EXPR = {
     # 优先取 dim_agg 的聚合值，聚合表里没有该原始值就回落原文
     "reason": ('COALESCE(mx."豁免单一来源的理由", f."豁免单一来源的理由", '
                'ms."单一来源采购理由", f."单一来源采购理由")'),
+    # 财政年度：dash_po 上已有的行级字段，与日期表 FiscalYearName 一致
+    "fy": 'p."FY"',
     # fct_prpo.说明 → dash_po."Note"（PRPO 的申请说明）
     "note": 'p."Note"',
     # 申请日期：dash_po."Date" 已是 ISO 文本，直接显示/排序，不参与金额换算

@@ -1025,9 +1025,9 @@ html.boot-other #pgOverview, html.boot-other #kpis, html.boot-other .fbar{ displ
 .xsep{ width:1px; height:9px; background:#C8D2DF; }
 #catCard > .xbar{ margin:2px 12px 2px; }
 .dt-wrap{ position:relative; flex:1 1 auto; min-height:0; margin:2px 12px 0; overflow:auto; }
-/* 12 列（多出 City + Sub-Category）在 1600 以下放不满：按实测临界给一个最小宽度，
+/* 13 列（多出 Fiscal Year + City + Sub-Category）在 1700 以下放不满：按实测临界给一个最小宽度，
    窄屏横向滚动，宁可滚也不要表头被省略号吃掉 */
-.dt-tbl{ width:100%; min-width:1560px; border-collapse:separate; border-spacing:0; table-layout:fixed; font-size:12px; }
+.dt-tbl{ width:100%; min-width:1650px; border-collapse:separate; border-spacing:0; table-layout:fixed; font-size:12px; }
 .dt-tbl thead th{
   position:sticky; top:0; z-index:3; height:34px; padding:0 2px 0 8px;
   background:var(--hdr-bg); color:#122745; border:0;

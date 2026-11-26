@@ -55,10 +55,10 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       width: Math.round(th.getBoundingClientRect().width)
     })));
     console.log('    ' + JSON.stringify(head.map(h => [h.text, h.width])));
-    chk('十二列且名称正确（区域后跟城市，城市后跟公司，类目后紧跟子类别）',
-      head.length === 12 &&
+    chk('十三列且名称正确（区域后跟城市，理由后跟财政年度，财年后跟说明）',
+      head.length === 13 &&
       ['Region', 'City', 'Company', 'Category', 'Sub-Category', 'Supplier', 'Procurement Method',
-       'Single Source Reason', 'Note', 'Date', 'PRPO Amount (RMB)', 'PO Paid (RMB)']
+       'Single Source Reason', 'Fiscal Year', 'Note', 'Date', 'PRPO Amount (RMB)', 'PO Paid (RMB)']
         .every((t, i) => head[i].text.indexOf(t) === 0), head);
     /* 日期列：ISO 文本（此刻表格默认全折叠，直接查 API 更干净） */
     const dCol = await page.evaluate(async () => {
@@ -82,11 +82,25 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
     chk('City 列有值、公司→城市 1:1、companyTotals 带城市、cityTotals 齐全、columns 顺序',
       cityApi.n > 5 && cityApi.blank === 0 && cityApi.coCity &&
       cityApi.columns === 1 && cityApi.cityTotals > 5, cityApi);
+    /* Fiscal Year 列：行级 dash_po.FY，可按财年取值筛选（跨财年日期范围时逐行显示） */
+    const fyApi = await page.evaluate(async () => {
+      const j = await (await fetch('/api/board/detail?sort=amount&dir=desc')).json();
+      const vs = await (await fetch('/api/board/detail/values?col=fy')).json();
+      return { vals: [...new Set(j.rows.map(r => r.fy))].sort(),
+               blank: j.rows.filter(r => !r.fy).length,
+               opts: vs.map(v => v.v).sort(),
+               colIdx: j.columns.indexOf('fy') };
+    });
+    chk('Fiscal Year 列有 FY 值、可取值筛选、columns 位置在 reason 之后',
+      fyApi.vals.length > 0 && fyApi.blank === 0 &&
+      fyApi.vals.every(v => /^FY\d{4}$/.test(v)) &&
+      JSON.stringify(fyApi.vals) === JSON.stringify(fyApi.opts) &&
+      fyApi.colIdx === 8, fyApi);
     chk('每个表头都有排序与筛选入口', head.every(h => h.sort && h.funnel), head);
     /* 11-26：筛选入口从一枚淡到看不见的 ▾ 字形换成 18px 描边方块 + 矢量漏斗 */
     chk('筛选入口是 18px 描边按钮 + 矢量漏斗图标', await page.evaluate(() => {
       const a = [...document.querySelectorAll('#dtTbl thead .dt-funnel')];
-      return a.length === 12 && a.every(b => {
+      return a.length === 13 && a.every(b => {
         const r = b.getBoundingClientRect();
         return !!b.querySelector('svg') && Math.round(r.width) === 18 &&
           Math.round(r.height) === 18 && b.textContent.trim() === '';
@@ -100,8 +114,8 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
     console.log('    ' + JSON.stringify(shown) + ' api total=' + base.total);
     chk('行数与 API 一致', metaNum(shown.meta) === base.total, shown);
     chk('合计 = 筛选全集（不是当前页）',
-      Math.abs(num(shown.footCells[10]) - base.sums.amount) < 0.05 &&
-      Math.abs(num(shown.footCells[11]) - base.sums.paid) < 0.05,
+      Math.abs(num(shown.footCells[11]) - base.sums.amount) < 0.05 &&
+      Math.abs(num(shown.footCells[12]) - base.sums.paid) < 0.05,
       { foot: shown.footCells, sums: base.sums });
 
     console.log('=== 1b. 五级树默认全折叠 ===');
@@ -289,7 +303,7 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       };
     });
     console.log('    ' + JSON.stringify(noteCell));
-    chk('明细行有说明列（加 City 后第 9 列，理由与日期之间）', !!noteCell && noteCell.idx === 8, noteCell);
+    chk('明细行有说明列（加 City + Fiscal Year 后第 10 列，财年与日期之间）', !!noteCell && noteCell.idx === 9, noteCell);
     chk('说明单行 + 省略号（不会被长文本撑开）', !!noteCell &&
       noteCell.ellipsis === 'ellipsis' && noteCell.nowrap === 'nowrap', noteCell);
     chk('data-tip 给全文（长于可见文字）', !!noteCell &&
@@ -476,7 +490,7 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
     await page.click('#dtTbl tr.dt-catgroup .dt-toggle');
     await waitFor(page, () => document.querySelectorAll('#dtTbl tr.dt-child').length > 0, 8000, 'range rows');
     chk('筛选后明细金额均 ≥ 下限', await page.evaluate(() =>
-      [...document.querySelectorAll('#dtTbl tr.dt-child td:nth-child(11)')]
+      [...document.querySelectorAll('#dtTbl tr.dt-child td:nth-child(12)')]
         .every(e => Number(String(e.textContent).replace(/[^\d.-]/g, '')) >= 1000000)));
     await page.click('#dtReset');
     await waitFor(page, t => Number(document.getElementById('dtMeta').textContent.split(' ')[0].replace(/,/g, '')) === t,
@@ -582,7 +596,7 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       const r = await fetch('/api/board/detail?sort=region&dir=asc'); return (await r.json()).regionTotals[0].amount;
     });
     await page.click('#curSeg button[data-cur="RM"]');
-    await waitFor(page, () => document.querySelector('#dtTbl thead th:nth-child(11)').textContent.indexOf('(RM)') >= 0,
+    await waitFor(page, () => document.querySelector('#dtTbl thead th:nth-child(12)').textContent.indexOf('(RM)') >= 0,
       8000, 'currency RM');
     const rmFirst = await page.evaluate(async () => {
       const r = await fetch('/api/board/detail?sort=region&dir=asc&cur=RM'); return (await r.json()).regionTotals[0].amount;
