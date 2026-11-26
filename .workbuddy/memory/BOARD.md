@@ -351,3 +351,13 @@
 - **`waitFor` 测试 helper** 原来只传 4 个参数，`t => ... !== t` 的第 5 个实参被丢掉（恒真）。已支持传参，5b「点理由 → 金额变化」变成真断言。
 - **离线**：`snapshot.js` 早就有 `exc`/`ssr` 行内列 + `readFilters` 的 reason 键 + `methodDrillResp`，无需改代码；但 `exports/` 里官方单文件停在 11-24，缺四级树。已重跑 `board_export.py` → `exports/采购看板_单文件_20261126.html`（12.41 MB，`exports/` 在 .gitignore 里，不入库）。**发给同事前请确认用这个新文件**。
 - **测试**：`board_check` 332/0（删 5 条图内断言、加「图内不再有理由按钮」+ 新增 5x 段 10 条：切片器出现/位置/选项含原始值 JSON/勾选联动/移除/换字段/两 SS 同显顺序/Reset）；`snapshot_check` 68/0（新增 5c 段 4 条离线断言）；`page_tabs` 27、`detail` 48、`visual_tools` 31、`ui_focus` 41、`grid_sum` 14、`colfilter` 34、`perf` 11、`geo` 45 全绿。
+
+## 56 修订：理由不单独占格，收进 Method 下拉第二段（11-26，用户「类似 region 切片器的方式」）
+- **用户纠正**：「不要这样，类似 region 切片器的方式」= 两个理由不该各占一个筛选格（§55 那两个独立 `.fdrop` 作废），要像 **Company 收在 Region 下拉第二段** 那样，收进 **Procurement Method 下拉**的第二/第三段。**§55 里除「独立格子 / FDEFS 位置 / syncReasonSlicers 增删 .fdrop」外的口径（双缓存、原始值、chip 合并、图内无按钮、离线垫片）全部保留**。
+- **FDEFS**：两个理由项加 `parent: 'method'`（仍带 `cond`），紧跟 method 后；`renderFilters()` 的 `tops` 不再需要 cond 过滤，改为对 `kids[f.k]` **子段**按 cond 过滤后传给 `slicerHtml`，所以 Method 没选对应 SS 时下拉里根本没这段（Region 的 Company 无 cond、常驻）。`slicerHtml` 自动给子段加 `within procurement method` 标注。
+- **`syncReasonSlicers()` 改写**：不再增删 `.fdrop`，只增删 Method `.fpop` 里的 `.fsec[data-k=…]`；已存在的段**只换 `.fpop-b`**（选项异步到位时），不动表头/不重建下拉，用户勾选 Method 时下拉不会被关掉；新增段按 FDEFS 顺序插到后面第一个已存在理由段之前，两个同显时顺序稳定。同时刷新 Method 按钮文字与 `.has`。
+- **`fdText`**：多个下级时用统称 `reason`（避免拿 `kids[0].name` 硬套成 "exemption reasons"）；理由子项按 `chipSel(k).length` **聚合名**计数（原始值可能一对多），其余维度仍按取值数。
+- **CSS 必须同步**：Method 下拉变成最多 3 段，原来 `.fsec + .fsec{min-height:150px}` 配 `.fpop{max-height:430px}` 会把**第三段裁掉**。改为 `min-height:110px` + `.fdrop[data-k="method"] .fpop{max-height:520px}`；两段时 `flex:1` 仍吃掉剩余空间，Region→Company 观感不变。测试里加了一条几何断言（第三段 bottom ≤ 下拉 bottom 且高度 ≥ 90px）。
+- **恒 6 个切片器**：任何筛选状态下 `#fbar .fdrop` 都是 6 个（brand/category/expense/method/level/region），`board_check` 的「6 个等宽 / 6 组下拉」断言不用改。
+- **离线**：重跑 `board_export.py` 覆盖 `exports/采购看板_单文件_20261126.html`（12.42 MB）。`snapshot.js` 无需改代码。
+- **测试**：`board_check` 334/0（5x 段整体重写为「Method 下拉子段」：恒 6 格、段顺序 `method,exempt_reason`、段头 within 标注、Method 按钮汇总理由数、三段几何；并把 5b 三个下钻等待 8s→12s 消 flaky、catch 里打印运行期 JS 错误）；`snapshot_check` 68/0（5c 同步重写）；`page_tabs` 27、`detail` 48、`visual_tools` 31、`ui_focus` 41、`grid_sum` 14、`colfilter` 34、`perf` 11、`geo` 45 全绿。

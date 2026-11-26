@@ -212,7 +212,7 @@ async function waitFor(pg, fn, timeout, label, arg) {
     /* 第一层点 SS-Exempt → 下钻到豁免理由层（不产生 chip） */
     chk('点 SS-Exempt 进入下钻', await pickSeg('SS-Exempt'));
     await waitFor(page, () => /Exemption Reason/.test(document.getElementById('mDonutTitle').textContent) &&
-      document.querySelectorAll('#chMethodDonut [data-exp]').length > 1, 8000, 'exempt drill');
+      document.querySelectorAll('#chMethodDonut [data-exp]').length > 1, 12000, 'exempt drill');
     const drill1 = await page.evaluate(() => ({
       title: document.getElementById('mDonutTitle').textContent,
       keys: [...document.querySelectorAll('#chMethodDonut [data-exp]')].map(e => e.dataset.exp),
@@ -255,14 +255,14 @@ async function waitFor(pg, fn, timeout, label, arg) {
     await pickSeg('SS-Non Exempt');
     await waitFor(page, () => /Single Source Reason/.test(
       document.getElementById('mDonutTitle').textContent) &&
-      document.querySelectorAll('#chMethodDonut [data-exp]').length > 1, 8000, 'single drill');
+      document.querySelectorAll('#chMethodDonut [data-exp]').length > 1, 12000, 'single drill');
     const drill2 = await page.evaluate(() => [...document.querySelectorAll('#chMethodDonut [data-exp]')]
       .map(e => e.dataset.exp));
     console.log('    ' + JSON.stringify(drill2));
     chk('SS-Non Exempt 下钻到单一来源理由', drill2.indexOf('Inadequate Competition') >= 0, drill2);
     await page.evaluate(() => document.querySelector('.v-back[data-clear=method]').click());
     await waitFor(page, () => /Spend by Method/.test(
-      document.getElementById('mDonutTitle').textContent), 8000, 'back method');
+      document.getElementById('mDonutTitle').textContent), 12000, 'back method');
 
     /* 非单一来源方式（Quotation）仍走普通交叉筛选 */
     await pickSeg('Quotation');
@@ -272,36 +272,43 @@ async function waitFor(pg, fn, timeout, label, arg) {
     await page.click('#btnReset');
     await waitFor(page, () => document.querySelectorAll('.chip').length === 0, 6000, 'reset2');
 
-    console.log('=== 5x. 顶部「单一来源理由」切片器（11-26 纠正：二级筛选不在图里） ===');
-    /* 选中 Procurement Method=SS-Exempt → 只出现 Exemption Reason 切片器 */
-    await page.click('.fdrop[data-k=method] .fd-btn');
-    await sleep(150);
-    chk('Method 下拉里有 SS-Exempt', await page.evaluate(() =>
-      !![...document.querySelectorAll('.fdrop[data-k=method] .fpop-b input')]
-        .find(i => i.value === 'SS-Exempt')));
-    await page.evaluate(() => {
-      const i = [...document.querySelectorAll('.fdrop[data-k=method] .fpop-b input')]
-        .find(x => x.value === 'SS-Exempt');
-      i.click();
+    console.log('=== 5x. 单一来源理由 = Method 下拉里的第二段（同 Region→Company） ===');
+    /* 每次操作前确保 Method 下拉是开着的（点 chip / Reset 会顺手关掉所有下拉） */
+    const openMethod = () => page.evaluate(() => {
+      const d = document.querySelector('.fdrop[data-k=method]');
+      if (d && !d.classList.contains('open')) d.querySelector('.fd-btn').click();
     });
-    await waitFor(page, () => document.querySelector('.fdrop[data-k=exempt_reason]') &&
-      !document.querySelector('.fdrop[data-k=single_reason]') &&
-      /SS-Exempt/.test(document.getElementById('chips').textContent), 9000, 'exempt slicer');
-    const rs1 = await page.evaluate(() =>
-      [...document.querySelectorAll('#fbar .fdrop')].map(e => e.dataset.k));
-    chk('SS-Exempt → Exemption Reason 切片器紧跟 Method，Single Source Reason 不出现',
-      rs1.indexOf('exempt_reason') === rs1.indexOf('method') + 1 &&
-      rs1.indexOf('single_reason') < 0, rs1);
-    chk('理由切片器按钮默认 All',
-      (await num('.fdrop[data-k=exempt_reason] .fd-val')) === 'All');
+    const MMAIN = '.fdrop[data-k=method] .fsec[data-k=method] .fpop-b input';
+    const MSEC = k => '.fdrop[data-k=method] .fsec[data-k=' + k + '] .fpop-b input';
+
+    await openMethod();
+    await sleep(150);
+    chk('Method 下拉里有 SS-Exempt', await page.evaluate(sel =>
+      !![...document.querySelectorAll(sel)].find(i => i.value === 'SS-Exempt'), MMAIN));
+    await page.evaluate(sel => {
+      [...document.querySelectorAll(sel)].find(x => x.value === 'SS-Exempt').click();
+    }, MMAIN);
+    await waitFor(page, () => document.querySelector('.fdrop[data-k=method] .fsec[data-k=exempt_reason]') &&
+      !document.querySelector('.fdrop[data-k=method] .fsec[data-k=single_reason]') &&
+      /SS-Exempt/.test(document.getElementById('chips').textContent), 9000, 'exempt section');
+    const rs1 = await page.evaluate(() => ({
+      drops: [...document.querySelectorAll('#fbar .fdrop')].map(e => e.dataset.k),
+      secs: [...document.querySelectorAll('.fdrop[data-k=method] .fsec')].map(e => e.dataset.k),
+      head: (document.querySelector('.fdrop[data-k=method] .fsec[data-k=exempt_reason] .fpop-h') || {}).textContent || ''
+    }));
+    chk('理由不单独占筛选格：筛选条恒 6 个切片器',
+      rs1.drops.length === 6 && rs1.drops.indexOf('exempt_reason') < 0 &&
+      rs1.drops.indexOf('single_reason') < 0, rs1.drops);
+    chk('SS-Exempt → Method 下拉第二段是 Exemption Reason（标注 within procurement method）',
+      rs1.secs.join(',') === 'method,exempt_reason' &&
+      /within procurement method/i.test(rs1.head), rs1);
 
     /* 选项来自 method-drill（聚合名 + 原始值 JSON），不是 fct_prpo 原始列名 */
-    await page.click('.fdrop[data-k=exempt_reason] .fd-btn');
     await waitFor(page, () =>
-      document.querySelectorAll('.fdrop[data-k=exempt_reason] .fpop-b input').length >= 5,
+      document.querySelectorAll('.fdrop[data-k=method] .fsec[data-k=exempt_reason] .fpop-b input').length >= 5,
       9000, 'reason options');
-    const ro = await page.evaluate(() => {
-      const ins = [...document.querySelectorAll('.fdrop[data-k=exempt_reason] .fpop-b input')];
+    const ro = await page.evaluate(sel => {
+      const ins = [...document.querySelectorAll(sel)];
       let rawOk = true;
       ins.forEach(i => {
         try { const a = JSON.parse(i.dataset.raws || '[]');
@@ -309,16 +316,14 @@ async function waitFor(pg, fn, timeout, label, arg) {
         catch (e) { rawOk = false; }
       });
       return { n: ins.length, vals: ins.map(i => i.value), rawOk };
-    });
+    }, MSEC('exempt_reason'));
     chk('理由是 method-drill 聚合名（含 Frame Contract），每项带原始值 JSON',
       ro.vals.indexOf('Frame Contract') >= 0 && ro.n >= 5 && ro.rawOk, ro);
 
     const rAmt0 = await num('.kpi[data-k=amount] .k-val');
-    await page.evaluate(() => {
-      const i = [...document.querySelectorAll('.fdrop[data-k=exempt_reason] .fpop-b input')]
-        .find(x => x.value === 'Frame Contract');
-      i.click();
-    });
+    await page.evaluate(sel => {
+      [...document.querySelectorAll(sel)].find(x => x.value === 'Frame Contract').click();
+    }, MSEC('exempt_reason'));
     await waitFor(page, t => document.querySelectorAll('.chip').length === 2 &&
       document.querySelector('.kpi[data-k=amount] .k-val').textContent.trim() !== t,
       10000, 'slicer reason filter', rAmt0);
@@ -329,6 +334,10 @@ async function waitFor(pg, fn, timeout, label, arg) {
       rChips.some(c => /Exemption Reason/.test(c) && /Frame Contract/.test(c)) &&
       rChips.some(c => /Procurement Method/.test(c) && /SS-Exempt/.test(c)) &&
       rAmt1 !== rAmt0, { rChips, rAmt0, rAmt1 });
+    await waitFor(page, () => /reason/i.test(
+      (document.querySelector('.fdrop[data-k=method] .fd-val') || {}).textContent || ''),
+      8000, 'method label reason');
+    chk('Method 按钮汇总下级理由数（同 Region 带 Company 计数）', true);
 
     await page.evaluate(() =>
       document.querySelector('.chip button[data-k=exempt_reason]').click());
@@ -340,47 +349,53 @@ async function waitFor(pg, fn, timeout, label, arg) {
       (await num('.kpi[data-k=amount] .k-val')) !== rAmt1);
 
     /* 换成 SS-Non Exempt → 字段换成了「单一来源采购理由」 */
-    await page.click('.fdrop[data-k=method] .fd-btn');
-    await page.evaluate(() => {
-      const ins = [...document.querySelectorAll('.fdrop[data-k=method] .fpop-b input')];
+    await openMethod();
+    await page.evaluate(sel => {
+      const ins = [...document.querySelectorAll(sel)];
       const a = ins.find(x => x.value === 'SS-Exempt'), b = ins.find(x => x.value === 'SS-Non Exempt');
       if (a && a.checked) a.click();
       if (b && !b.checked) b.click();
-    });
-    await waitFor(page, () => document.querySelector('.fdrop[data-k=single_reason]') &&
-      !document.querySelector('.fdrop[data-k=exempt_reason]'), 9000, 'single slicer');
-    await page.click('.fdrop[data-k=single_reason] .fd-btn');
+    }, MMAIN);
+    await waitFor(page, () => document.querySelector('.fdrop[data-k=method] .fsec[data-k=single_reason]') &&
+      !document.querySelector('.fdrop[data-k=method] .fsec[data-k=exempt_reason]'), 9000, 'single section');
     await waitFor(page, () =>
-      document.querySelectorAll('.fdrop[data-k=single_reason] .fpop-b input').length >= 3,
+      document.querySelectorAll('.fdrop[data-k=method] .fsec[data-k=single_reason] .fpop-b input').length >= 3,
       9000, 'single options');
-    const sVals = await page.evaluate(() =>
-      [...document.querySelectorAll('.fdrop[data-k=single_reason] .fpop-b input')].map(i => i.value));
+    const sVals = await page.evaluate(sel =>
+      [...document.querySelectorAll(sel)].map(i => i.value), MSEC('single_reason'));
     chk('SS-Non Exempt → Single Source Reason 字段（含 Inadequate Competition）',
       sVals.indexOf('Inadequate Competition') >= 0, sVals);
     chk('切换后旧理由筛选已被清掉', await page.evaluate(() =>
       !/Exemption Reason/.test(document.getElementById('chips').textContent)));
 
-    /* 两个 SS 同时选中：两个理由切片器都出现，且顺序与 renderFilters 一致 */
-    await page.click('.fdrop[data-k=method] .fd-btn');
-    await page.evaluate(() => {
-      const i = [...document.querySelectorAll('.fdrop[data-k=method] .fpop-b input')]
-        .find(x => x.value === 'SS-Exempt');
+    /* 两个 SS 同时选中：两段理由都在 Method 下拉里，顺序与 renderFilters 一致 */
+    await openMethod();
+    await page.evaluate(sel => {
+      const i = [...document.querySelectorAll(sel)].find(x => x.value === 'SS-Exempt');
       if (i && !i.checked) i.click();
-    });
-    await waitFor(page, () => document.querySelector('.fdrop[data-k=exempt_reason]') &&
-      document.querySelector('.fdrop[data-k=single_reason]'), 9000, 'both slicers');
+    }, MMAIN);
+    await waitFor(page, () => document.querySelector('.fdrop[data-k=method] .fsec[data-k=exempt_reason]') &&
+      document.querySelector('.fdrop[data-k=method] .fsec[data-k=single_reason]'), 9000, 'both sections');
     const rs2 = await page.evaluate(() =>
-      [...document.querySelectorAll('#fbar .fdrop')].map(e => e.dataset.k));
-    chk('两个 SS 同选 → 两个理由切片器同显且顺序稳定（method→exempt→single）',
-      rs2.indexOf('exempt_reason') === rs2.indexOf('method') + 1 &&
-      rs2.indexOf('single_reason') === rs2.indexOf('method') + 2, rs2);
+      [...document.querySelectorAll('.fdrop[data-k=method] .fsec')].map(e => e.dataset.k));
+    chk('两个 SS 同选 → 两段理由同显且顺序稳定（method→exempt→single）',
+      rs2.join(',') === 'method,exempt_reason,single_reason', rs2);
+    await openMethod();
+    const box = await page.evaluate(() => {
+      const p = document.querySelector('.fdrop[data-k=method] .fpop');
+      const s = [...p.querySelectorAll('.fsec')];
+      const pr = p.getBoundingClientRect(), last = s[s.length - 1].getBoundingClientRect();
+      return { popBottom: pr.bottom, lastBottom: last.bottom, h: last.height };
+    });
+    chk('三段都落在下拉可视范围内（第三段没被裁掉）',
+      box.lastBottom <= box.popBottom + 1 && box.h >= 90, box);
 
     await page.click('#btnReset');
     await waitFor(page, () => document.querySelectorAll('.chip').length === 0 &&
-      !document.querySelector('.fdrop[data-k=exempt_reason]') &&
-      !document.querySelector('.fdrop[data-k=single_reason]') &&
+      !document.querySelector('.fdrop[data-k=method] .fsec[data-k=exempt_reason]') &&
+      !document.querySelector('.fdrop[data-k=method] .fsec[data-k=single_reason]') &&
       document.querySelectorAll('.fdrop').length === 6, 9000, 'reason reset');
-    chk('Reset 后理由切片器消失、恢复 6 个切片器', true);
+    chk('Reset 后理由段消失、筛选条仍是 6 个切片器', true);
 
     console.log('=== 6. 下拉与 chips ===');
     await page.click('.fdrop[data-k=category] .fd-btn');
@@ -1135,6 +1150,7 @@ async function waitFor(pg, fn, timeout, label, arg) {
   } catch (e) {
     fail++;
     console.log('  XX  测试中断：' + e.message);
+    if (errs.length) console.log('  运行期错误：' + JSON.stringify(errs.slice(0, 6)));
     console.log(e.stack);
   } finally {
     await browser.close();

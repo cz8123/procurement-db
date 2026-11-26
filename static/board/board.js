@@ -21,12 +21,11 @@
     { k: 'category', name: 'Category' },
     { k: 'expense', name: 'Expense Type' },
     { k: 'method', name: 'Procurement Method' },
-    /* 两个单一来源理由切片器：只在 Procurement Method 选中对应 SS 时才出现
-       （SS-Exempt → 豁免单一来源的理由；SS-Non Exempt → 单一来源采购理由）。
-       位置紧跟 Method —— renderFilters 与 syncReasonSlicers 两条路径必须同序，
-       否则从下拉选中/点图进入时理由切片器会在筛选条里跳位。 */
-    { k: 'exempt_reason', name: 'Exemption Reason', cond: 'SS-Exempt' },
-    { k: 'single_reason', name: 'Single Source Reason', cond: 'SS-Non Exempt' },
+    /* 两个单一来源理由跟 Company 一样是「下级」：不单独占筛选格，
+       收在 Procurement Method 下拉的第二/第三段（用户 11-26 明确：类似 region 切片器的方式）。
+       只在 Method 选中对应 SS 时才出现，两个字段互斥。 */
+    { k: 'exempt_reason', name: 'Exemption Reason', parent: 'method', cond: 'SS-Exempt' },
+    { k: 'single_reason', name: 'Single Source Reason', parent: 'method', cond: 'SS-Non Exempt' },
     { k: 'level', name: 'Supplier Category' },
     { k: 'region', name: 'Region' },
     /* Company 是 Region 的下级：不再单独占一格，收在 Region 下拉的第二段 */
@@ -351,8 +350,13 @@
     var txt = sel.length === 0 ? 'All' : (sel.length === 1 ? sel[0] : sel.length + ' selected');
     var kids = FDEFS.filter(function (x) { return x.parent === f.k; });
     if (kids.length) {
-      var n = kids.reduce(function (a, x) { return a + (S.sel[x.k] || []).length; }, 0);
-      if (n) txt += ' · ' + n + ' ' + kids[0].name.toLowerCase() + (n > 1 ? 's' : '');
+      /* 理由子项按「聚合名」计数（原始值可能一对多），其余按取值数 */
+      var n = kids.reduce(function (a, x) {
+        return a + (isReason(x.k) ? chipSel(x.k).length : (S.sel[x.k] || []).length);
+      }, 0);
+      /* 多个下级（Method 下挂两个理由）用统称，别拿第一个的名字硬套 */
+      var nm = kids.length === 1 ? kids[0].name.toLowerCase() : 'reason';
+      if (n) txt += ' · ' + n + ' ' + nm + (n > 1 ? 's' : '');
     }
     return txt;
   }
@@ -414,41 +418,42 @@
       return Array.isArray(a) ? a : [];
     } catch (e) { return []; }
   }
-  /** 理由切片器的出现 / 消失 / 内容，只动这两格，不重建整条筛选条
-      （重建会把用户正开着的下拉关掉） */
+  /** 理由不是独立切片器，而是 Method 下拉里的第二段（同 Region → Company）。
+      只增删/刷新这两个 .fsec，不重建 .fpop —— 用户可能正开着 Method 下拉在勾选。 */
   function syncReasonSlicers() {
-    var bar = $('#fbar');
-    if (!bar) return;
+    var drop = $('#fbar .fdrop[data-k="method"]');
+    if (!drop) return;
+    var pop = drop.querySelector('.fpop');
+    if (!pop) return;
     Object.keys(REASON_KEYS).forEach(function (k) {
-      var drop = bar.querySelector('.fdrop[data-k="' + k + '"]');
-      var vis = reasonVisible(k);
-      if (!vis) {
-        if (drop) drop.parentNode.removeChild(drop);
+      var sec = pop.querySelector('.fsec[data-k="' + k + '"]');
+      if (!reasonVisible(k)) {
+        if (sec) sec.parentNode.removeChild(sec);
         if ((S.sel[k] || []).length) delete S.sel[k];
         return;
       }
-      var f = { k: k, name: REASON_KEYS[k].name };
-      if (!drop) {
+      if (!sec) {
         var host = document.createElement('div');
-        host.innerHTML = slicerHtml(f);
+        host.innerHTML = fsec({ k: k, name: REASON_KEYS[k].name },
+                              'within procurement method');
         var node = host.firstChild;
-        /* 按 FDEFS 顺序插到「后面第一个已存在的切片器」之前，
-           与 renderFilters() 重建整条时的位置完全一致（两个理由同显时也不会反序） */
+        /* 按 FDEFS 顺序插到后面第一个已存在的理由段之前，两个同显时顺序稳定 */
         var idx = FDEFS.map(function (x) { return x.k; }).indexOf(k), anchor = null;
         for (var j = idx + 1; j < FDEFS.length && !anchor; j++) {
-          if (FDEFS[j].parent) continue;
-          anchor = bar.querySelector('.fdrop[data-k="' + FDEFS[j].k + '"]');
+          if (FDEFS[j].parent !== 'method') continue;
+          anchor = pop.querySelector('.fsec[data-k="' + FDEFS[j].k + '"]');
         }
-        if (anchor) bar.insertBefore(node, anchor);
-        else bar.appendChild(node);
+        if (anchor) pop.insertBefore(node, anchor);
+        else pop.appendChild(node);
       } else {
-        var v = drop.querySelector('.fd-val');
-        if (v) v.textContent = fdText(f);
-        var pop = drop.querySelector('.fpop');
-        if (pop) pop.innerHTML = fsec(f);
-        drop.classList.toggle('has', (S.sel[k] || []).length > 0);
+        /* 选项异步到位后只换列表，不动表头/勾选焦点 */
+        var body = sec.querySelector('.fpop-b');
+        if (body) body.innerHTML = optBody(k);
       }
     });
+    var val = drop.querySelector('.fd-val');
+    if (val) val.textContent = fdText({ k: 'method', name: 'Procurement Method' });
+    drop.classList.toggle('has', hasAny('method'));
     renderChips();
   }
   /** 选项来自 method-drill（已排除 method / 理由自身的筛选，等于"其他筛选下的可选值"） */
@@ -487,10 +492,13 @@
       if (f.parent) (kids[f.parent] = kids[f.parent] || []).push(f);
       else tops.push(f);
     });
-    bar.innerHTML = tops.filter(function (f) {
-      return !f.cond || (S.sel.method || []).indexOf(f.cond) >= 0;
-    }).map(function (f) {
-      return slicerHtml(f, kids[f.k]);
+    bar.innerHTML = tops.map(function (f) {
+      /* 理由子段按 cond 过滤：Method 没选对应 SS 时，下拉里不该出现这一段
+         （Region 的 Company 没有 cond，始终在下拉里） */
+      var sub = (kids[f.k] || []).filter(function (c) {
+        return !c.cond || (S.sel.method || []).indexOf(c.cond) >= 0;
+      });
+      return slicerHtml(f, sub);
     }).join('');
     renderChips();
   }
