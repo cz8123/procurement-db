@@ -1075,7 +1075,13 @@ html.boot-other #pgOverview, html.boot-other #kpis, html.boot-other .fbar{ displ
   font-size:12px; line-height:14px; text-align:center; cursor:pointer; vertical-align:middle;
 }
 .dt-toggle:hover{ background:#D9E5F4; }
-/* 公司分组行：二级树，浅一档底色；公司名在 Company 列 */
+/* 城市分组行：二级树（Region→City），底色介于区域与公司之间；城市名在 City 列 */
+.dt-tbl tr.dt-city td{ background:#ECF2F9; font-weight:600; color:#173A60; }
+.dt-tbl tr.dt-city td:first-child{ background:#E7EEF7; }
+.dt-tbl tr.dt-city .dt-gmeta{ color:#66758A; font-size:10.5px; font-weight:600; }
+.dt-tbl tr.dt-city .dt-toggle{ width:15px; height:15px; line-height:13px; font-size:11px; }
+.dt-tbl tr.dt-city td.dt-tree{ text-align:center; color:#9AA6B5; padding-left:8px; }
+/* 公司分组行：三级树，浅一档底色；公司名在 Company 列 */
 .dt-tbl tr.dt-company td{ background:#F2F6FB; font-weight:600; color:#173A60; }
 .dt-tbl tr.dt-company td:first-child{ background:#EDF2F8; }
 .dt-tbl tr.dt-company .dt-gmeta{ color:#66758A; font-size:10.5px; font-weight:600; }

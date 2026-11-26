@@ -314,6 +314,8 @@ async function waitFor(pg, fn, timeout, label) {
     const dtOff = await page.evaluate(() =>
       [...document.querySelectorAll('#dtTbl thead th')].map(t => t.textContent.trim()));
     await page.evaluate(() => document.querySelector('#dtTbl tr.dt-group .dt-toggle').click());
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tr.dt-city').length > 0, 8000, 'offline city');
+    await page.evaluate(() => document.querySelector('#dtTbl tr.dt-city .dt-toggle').click());
     await waitFor(page, () => document.querySelectorAll('#dtTbl tr.dt-company').length > 0, 8000, 'offline company');
     await page.evaluate(() => document.querySelector('#dtTbl tr.dt-company .dt-toggle').click());
     await waitFor(page, () => document.querySelectorAll('#dtTbl tr.dt-catgroup').length > 0, 8000, 'offline cat');
@@ -325,8 +327,8 @@ async function waitFor(pg, fn, timeout, label) {
                     ellipsis: getComputedStyle(td).textOverflow,
                     hasTipBox: !!document.querySelector('#dtTip') } : null;
     });
-    chk('离线 Detail 12 列，公司后是 City、类目后是子类别、理由紧跟方法、Note 之后是 Date',
-      dtOff.length === 12 && dtOff[2].indexOf('City') === 0 &&
+    chk('离线 Detail 12 列，区域后是 City、城市后是公司、类目后是子类别',
+      dtOff.length === 12 && dtOff[1].indexOf('City') === 0 &&
       dtOff[4].indexOf('Sub-Category') === 0 &&
       dtOff[7].indexOf('Single Source Reason') === 0 &&
       dtOff[8].indexOf('Note') === 0 && dtOff[9].indexOf('Date') === 0, dtOff);
@@ -334,14 +336,14 @@ async function waitFor(pg, fn, timeout, label) {
       !!noteOff && noteOff.ellipsis === 'ellipsis' && noteOff.hasTipBox &&
       noteOff.text.length > 0 && noteOff.tip.length > 0, noteOff);
     const offCity = await page.evaluate(() => {
-      const co = document.querySelector('#dtTbl tr.dt-company');
-      const cells = co ? [...co.children].map(t => t.textContent.trim()) : [];
+      const cityRow = document.querySelector('#dtTbl tr.dt-city');
+      const cells = cityRow ? [...cityRow.children].map(t => t.textContent.trim()) : [];
       const child = document.querySelector('#dtTbl tr.dt-child');
       const cc = child ? [...child.children].map(t => t.textContent.trim()) : [];
-      return { co: cells.slice(0, 4), child: cc.slice(0, 5),
-               ok: !!cells[2] && cells[2] !== '—' && !!cc[2] && cc[2] === cells[2] };
+      return { city: cells.slice(0, 3), child: cc.slice(0, 5),
+               ok: !!cells[1] && cells[1] !== '—' && !!cc[1] && cc[1] === cells[1].replace(/^[+−]\s*/, '') };
     });
-    chk('离线 City：公司分组行与明细行城市一致（第 3 格）', offCity.ok, offCity);
+    chk('离线 City：城市分组行与明细行城市一致（第 2 格）', offCity.ok, offCity);
 
     console.log('=== 5c. 离线：理由收在 Method 下拉的第二段（同 Region→Company） ===');
     await page.click('.pg-tab[data-page=overview]');

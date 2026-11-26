@@ -55,9 +55,9 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       width: Math.round(th.getBoundingClientRect().width)
     })));
     console.log('    ' + JSON.stringify(head.map(h => [h.text, h.width])));
-    chk('十二列且名称正确（公司后跟城市，类目后紧跟子类别，理由/说明/日期在方法与本单金额之间）',
+    chk('十二列且名称正确（区域后跟城市，城市后跟公司，类目后紧跟子类别）',
       head.length === 12 &&
-      ['Region', 'Company', 'City', 'Category', 'Sub-Category', 'Supplier', 'Procurement Method',
+      ['Region', 'City', 'Company', 'Category', 'Sub-Category', 'Supplier', 'Procurement Method',
        'Single Source Reason', 'Note', 'Date', 'PRPO Amount (RMB)', 'PO Paid (RMB)']
         .every((t, i) => head[i].text.indexOf(t) === 0), head);
     /* 日期列：ISO 文本（此刻表格默认全折叠，直接查 API 更干净） */
@@ -76,10 +76,12 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       return { n: new Set(j.rows.map(r => r.city)).size,
                blank: j.rows.filter(r => !r.city).length,
                coCity: j.companyTotals.every(r => !!r.city && byCo[r.company] === r.city),
-               columns: j.columns.indexOf('city') };
+               columns: j.columns.indexOf('city'),
+               cityTotals: (j.cityTotals || []).length };
     });
-    chk('City 列有值、公司→城市 1:1、companyTotals 带城市、columns 含 city',
-      cityApi.n > 5 && cityApi.blank === 0 && cityApi.coCity && cityApi.columns === 2, cityApi);
+    chk('City 列有值、公司→城市 1:1、companyTotals 带城市、cityTotals 齐全、columns 顺序',
+      cityApi.n > 5 && cityApi.blank === 0 && cityApi.coCity &&
+      cityApi.columns === 1 && cityApi.cityTotals > 5, cityApi);
     chk('每个表头都有排序与筛选入口', head.every(h => h.sort && h.funnel), head);
     /* 11-26：筛选入口从一枚淡到看不见的 ▾ 字形换成 18px 描边方块 + 矢量漏斗 */
     chk('筛选入口是 18px 描边按钮 + 矢量漏斗图标', await page.evaluate(() => {
@@ -102,9 +104,10 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       Math.abs(num(shown.footCells[11]) - base.sums.paid) < 0.05,
       { foot: shown.footCells, sums: base.sums });
 
-    console.log('=== 1b. 三级树默认全折叠 ===');
+    console.log('=== 1b. 五级树默认全折叠 ===');
     const grp = await page.evaluate(() => ({
       regions: document.querySelectorAll('#dtTbl tbody tr.dt-group').length,
+      cities: document.querySelectorAll('#dtTbl tbody tr.dt-city').length,
       companies: document.querySelectorAll('#dtTbl tbody tr.dt-company').length,
       children: document.querySelectorAll('#dtTbl tbody tr.dt-child').length,
       glyph: document.querySelector('#dtTbl .dt-toggle').textContent.trim(),
@@ -113,31 +116,54 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
     console.log('    ' + JSON.stringify(grp));
     chk('区域行数 = API regionTotals 且默认 + 号全折叠',
       grp.regions === base.regionTotals.length && grp.glyph === '+' &&
-      grp.companies === 0 && grp.children === 0 && /¥/.test(grp.subTotal), grp);
+      grp.cities === 0 && grp.companies === 0 && grp.children === 0 && /¥/.test(grp.subTotal), grp);
     const dtRegions = await page.evaluate(() => [...document.querySelectorAll('#dtTbl tr.dt-group')]
       .map(e => e.dataset.region));
     const expectRegions = base.regionTotals.slice().sort((a, b) => b.amount - a.amount).map(r => r.region);
     chk('区域按采购额降序（大的在上）', JSON.stringify(dtRegions) === JSON.stringify(expectRegions),
       { actual: dtRegions, expect: expectRegions });
 
-    /* 找一个有多个公司的小区域展开，避免渲染上千行 */
+    /* 找一个有多个城市的小区域展开，避免渲染上千行 */
     const target = base.regionTotals.slice().sort((a, b) => a.n - b.n)[0].region;
-    const coCount = base.companyTotals.filter(r => r.region === target).length;
+    const cyCount = base.cityTotals.filter(r => r.region === target).length;
     await page.evaluate(r => document.querySelector('#dtTbl tr.dt-group[data-region="' +
       CSS.escape(r) + '"] .dt-toggle').click(), target);
-    await waitFor(page, r => document.querySelectorAll('#dtTbl tbody tr.dt-company').length > 0,
+    await waitFor(page, r => document.querySelectorAll('#dtTbl tbody tr.dt-city').length > 0,
       8000, 'expand region', target);
     await page.evaluate(r => window.__targetRegion = r, target);
     const lvl2 = await page.evaluate(() => ({
       glyph: document.querySelector('#dtTbl tr.dt-group[data-region="' + CSS.escape(window.__targetRegion) +
         '"] .dt-toggle').textContent.trim(),
+      cities: document.querySelectorAll('#dtTbl tbody tr.dt-city').length,
+      companies: document.querySelectorAll('#dtTbl tbody tr.dt-company').length,
+      children: document.querySelectorAll('#dtTbl tbody tr.dt-child').length,
+      subTotal: document.querySelector('#dtTbl tr.dt-city td:nth-child(4)').textContent.trim()
+    }));
+    console.log('    ' + JSON.stringify(lvl2) + ' expect cities=' + cyCount);
+    chk('展开区域后出现城市行（城市仍折叠）', lvl2.glyph === '−' &&
+      lvl2.cities === cyCount && lvl2.companies === 0 && lvl2.children === 0 && /¥/.test(lvl2.subTotal), lvl2);
+    const dtCities = await page.evaluate(() => [...document.querySelectorAll('#dtTbl tr.dt-city')]
+      .map(e => e.dataset.city));
+    const expCities = base.cityTotals.filter(r => r.region === target)
+      .sort((a, b) => b.amount - a.amount).map(r => r.city);
+    chk('城市按采购额降序（大的在上）', JSON.stringify(dtCities) === JSON.stringify(expCities),
+      { actual: dtCities, expect: expCities });
+
+    /* 展开一个城市 → 公司行 */
+    const cyTarget = await page.evaluate(() => document.querySelector('#dtTbl tr.dt-city').dataset.city);
+    const coCount = base.companyTotals.filter(r => r.region === target && r.city === cyTarget).length;
+    await page.click('#dtTbl tr.dt-city .dt-toggle');
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-company').length > 0,
+      8000, 'expand city');
+    const lvl2b = await page.evaluate(() => ({
+      glyph: document.querySelector('#dtTbl tr.dt-city .dt-toggle').textContent.trim(),
       companies: document.querySelectorAll('#dtTbl tbody tr.dt-company').length,
       children: document.querySelectorAll('#dtTbl tbody tr.dt-child').length,
       subTotal: document.querySelector('#dtTbl tr.dt-company td:nth-child(5)').textContent.trim()
     }));
-    console.log('    ' + JSON.stringify(lvl2) + ' expect companies=' + coCount);
-    chk('展开区域后出现公司行（公司仍折叠）', lvl2.glyph === '−' &&
-      lvl2.companies === coCount && lvl2.children === 0 && /¥/.test(lvl2.subTotal), lvl2);
+    console.log('    ' + JSON.stringify(lvl2b) + ' expect companies=' + coCount);
+    chk('展开城市后出现公司行（公司仍折叠）', lvl2b.glyph === '−' &&
+      lvl2b.companies === coCount && lvl2b.children === 0 && /¥/.test(lvl2b.subTotal), lvl2b);
 
     const coKey = await page.evaluate(() => document.querySelector('#dtTbl tr.dt-company .dt-toggle').dataset.toggleCompany);
     const coRow = base.companyTotals.find(r => (r.region || '') + '\u0001' + (r.company || '') === coKey);
@@ -177,11 +203,15 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
     await sleep(200);
     chk('再点公司 + 收起类目行', await page.evaluate(() =>
       document.querySelectorAll('#dtTbl tbody tr.dt-catgroup').length === 0));
+    await page.click('#dtTbl tr.dt-city .dt-toggle');
+    await sleep(200);
+    chk('再点城市 + 收起公司行', await page.evaluate(() =>
+      document.querySelectorAll('#dtTbl tbody tr.dt-company').length === 0));
     await page.evaluate(r => document.querySelector('#dtTbl tr.dt-group[data-region="' +
       CSS.escape(r) + '"] .dt-toggle').click(), target);
     await sleep(200);
-    chk('再点区域 + 收起公司行', await page.evaluate(() =>
-      document.querySelectorAll('#dtTbl tbody tr.dt-company').length === 0));
+    chk('再点区域 + 收起城市行', await page.evaluate(() =>
+      document.querySelectorAll('#dtTbl tbody tr.dt-city').length === 0));
 
     console.log('=== 1b2. 表头工具条：展开全部 / 收起全部 ===');
     const xb = await page.evaluate(() => {
@@ -200,6 +230,7 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       10000, 'expand all');
     const allOn = await page.evaluate(() => ({
       regions: document.querySelectorAll('#dtTbl tbody tr.dt-group').length,
+      cities: document.querySelectorAll('#dtTbl tbody tr.dt-city').length,
       companies: document.querySelectorAll('#dtTbl tbody tr.dt-company').length,
       cats: document.querySelectorAll('#dtTbl tbody tr.dt-catgroup').length,
       children: document.querySelectorAll('#dtTbl tbody tr.dt-child').length,
@@ -208,11 +239,11 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
     }));
     console.log('    ' + JSON.stringify(allOn));
     /* 11-26 修：一次性铺 5,892 行明细会卡死主线程，Expand all 只到类目层 */
-    chk('Expand all 展开到类目层（区域/公司/类目全开，明细行不展开）',
-      allOn.companies > 0 && allOn.cats > 0 && allOn.children === 0 &&
-      allOn.rows === allOn.regions + allOn.companies + allOn.cats &&
+    chk('Expand all 展开到类目层（区域/城市/公司/类目全开，明细行不展开）',
+      allOn.cities > 0 && allOn.companies > 0 && allOn.cats > 0 && allOn.children === 0 &&
+      allOn.rows === allOn.regions + allOn.cities + allOn.companies + allOn.cats &&
       allOn.rows < 800 &&
-      /* 只剩类目行的 +（明细未展开），区域/公司层已经没有 + 了 */
+      /* 只剩类目行的 +（明细未展开），区域/城市/公司层已经没有 + 了 */
       allOn.plus === allOn.cats, allOn);
     const tExpand = await page.evaluate(() => new Promise(res => {
       document.querySelectorAll('#dtXbar .xbtn')[1].click();
@@ -234,8 +265,11 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
     /* 重新展开一个区域 + 一个公司，拿到明细行 */
     await page.evaluate(r => document.querySelector('#dtTbl tr.dt-group[data-region="' +
       CSS.escape(r) + '"] .dt-toggle').click(), target);
-    await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-company').length > 0,
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-city').length > 0,
       8000, 're-expand region');
+    await page.click('#dtTbl tr.dt-city .dt-toggle');
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-company').length > 0,
+      8000, 're-expand city');
     await page.click('#dtTbl tr.dt-company .dt-toggle');
     await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-catgroup').length > 0,
       8000, 're-expand company');
@@ -318,12 +352,17 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
     await page.click('#dtReset');
     await waitFor(page, t => Number(document.getElementById('dtMeta').textContent
       .split(' ')[0].replace(/,/g, '')) === t, 12000, 'note reset', base.total);
-    /* 收起 1c 里手工展开的公司/区域，恢复默认全折叠（后面要断言这一点） */
+    /* 收起 1c 里手工展开的公司/城市/区域，恢复默认全折叠（后面要断言这一点） */
     await page.evaluate(() => {
       const c = document.querySelector('#dtTbl tr.dt-company .dt-toggle');
       if (c) c.click();
     });
-    await sleep(200);
+    await sleep(150);
+    await page.evaluate(() => {
+      const y = document.querySelector('#dtTbl tr.dt-city .dt-toggle');
+      if (y) y.click();
+    });
+    await sleep(150);
     await page.evaluate(r => {
       const g = document.querySelector('#dtTbl tr.dt-group[data-region="' +
         CSS.escape(r) + '"] .dt-toggle');
@@ -429,9 +468,11 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
     const small = rr.slice().sort((a, b) => a.n - b.n)[0].region;
     await page.evaluate(v => document.querySelector('#dtTbl tr.dt-group[data-region="' + CSS.escape(v) +
       '"] .dt-toggle').click(), small);
-    await sleep(200);
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-city').length > 0, 8000, 'range city');
+    await page.click('#dtTbl tr.dt-city .dt-toggle');
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-company').length > 0, 8000, 'range company');
     await page.click('#dtTbl tr.dt-company .dt-toggle');
-    await waitFor(page, () => document.querySelectorAll('#dtTbl tr.dt-catgroup').length > 0, 8000, 'range cats');
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-catgroup').length > 0, 8000, 'range cats');
     await page.click('#dtTbl tr.dt-catgroup .dt-toggle');
     await waitFor(page, () => document.querySelectorAll('#dtTbl tr.dt-child').length > 0, 8000, 'range rows');
     chk('筛选后明细金额均 ≥ 下限', await page.evaluate(() =>

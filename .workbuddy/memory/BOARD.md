@@ -375,3 +375,10 @@
 - **前端**：`DT_COLS` 插 City 在第 3 位（12 列）；列宽重排 sub 9.8→8.3、supplier 12.4→10.9、reason 10.9→9.4、note 10.5→9.0 腾出 city 6.0，合计仍 100%。四级树分组行 colspan 同步：区域 8→9（含 company/city/category/…/date 共 9 列），公司行 +1 个 city `<td>` 后 gmeta 仍 colspan 7（category…date），类目行 +1 个空 `<td>` 占 city 位、gmeta 仍 colspan 6。`.dt-tbl min-width` 1470→1560（12 列临界）；1920 视口下 scrollWidth=clientWidth=1791 无横滚。
 - **离线**：`board_export.py` 的 `ROW_COLS`/`ROW_SQL`/`build_rows` 加 `city`（在 region 后）；`snapshot.js` 的 `DETAIL_KEYS`/排序 `field`/行输出/`cmap` 初值/`ct` 输出都加 city。重跑导出 → 单文件 12.54 MB。
 - **测试**：`detail_table_check` 49/0（12 列断言插 City，列号全后移 1：金额合计 tfoot 9/10→10/11、公司小计 nth-child 4→5、子类别 4→5、说明 idx 7→8、明细金额 10→11、币种表头 10→11；新增 cityApi 断言公司→城市 1:1 + companyTotals 带城市 + columns 位置）；`snapshot_check` 73/0（离线 12 列断言 + 公司分组行与明细行城市一致）；其余 board 339、page_tabs 27、visual 31、ui_focus 41、grid_sum 14、colfilter 34、perf 11、geo 45 全绿。
+
+## 59 修订：City 移到 Company 前 + 升为可展开树层（11-26，用户「city要在company前面，要有展开」）
+- **§58 作废部分**：City 不再是 Company 后面的普通列，改到 **Company 前面**（列序 Region → City → Company → Category → Sub-Category → …）；也不再只在公司行显示城市名，而是**升为独立树层**。
+- **树从四级升五级**：Region → **City** → Company → Category → 明细。后端新增 `cityTotals`（`GROUP BY region, city`）；`companyTotals` 改 `GROUP BY region, city, company`（带 city）；`categoryTotals` 改 `GROUP BY region, city, company, category`（带 city）。返回体加 `cityTotals`。
+- **前端**：新增 `dtCyKey(region,city)` 与展开态 `expY`（存/读 `sessionStorage` 同步加）；树 map 多一层 `g.cys[city].cos[company].cats[category]`；各层按金额降序。`dtSetAll` 的 keys 加 `Y`，全展开仍只到类目层（区域+城市+公司+类目几百行），明细按需展开。新增 `data-toggle-city` 点击处理。CSS 加 `.dt-city` 分组行（底色介于区域/公司之间）。**各级名称必须落在本名列**：区域 x=57 / 城市 x=161 / 公司 x=268 / 类目 x=401（DOM 实测），靠 group 行 `colspan` 递减 9/8/7/6 对齐，截图缩放会造成「类目落在 Company 列」的错觉 —— 以 DOM 坐标为准。
+- **离线**：`snapshot.js` 的 `DETAIL_KEYS` 把 city 移到 company 前；`detailResp` 新增 `ymap`/`yt`（cityTotals），companyTotals/categoryTotals 带 city。重导单文件 12.54 MB。
+- **测试**：`detail_table_check` 52/0（1b 段改五级树：默认全折叠→展开区域出城市行→展开城市出公司行→展开公司出类目行→展开类目出明细，逐级断言小计金额与降序；Expand all 断言加 cities 且 rows=区域+城市+公司+类目）；`snapshot_check` 73/0（离线树多展开一层 + 城市分组行与明细行城市一致）；其余 board 339、page_tabs 27、visual 31、ui_focus 41、grid_sum 14、colfilter 34、perf 11、geo 45 全绿。

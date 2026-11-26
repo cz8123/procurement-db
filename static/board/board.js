@@ -76,7 +76,7 @@
     geo: { metric: 'prpo', data: null, selected: [], q: '',
            loaded: false, stale: true, seq: 0, map: null, overlay: null },
     detail: { sort: 'region', dir: 'asc',
-              q: {}, f: {}, min: {}, max: {}, expR: {}, expC: {}, expG: {},
+              q: {}, f: {}, min: {}, max: {}, expR: {}, expY: {}, expC: {}, expG: {},
               from: '', to: '',
               loaded: false, stale: true, seq: 0, pop: null, tmp: null },
     seq: 0, rowSeq: 0, drawerSeq: 0
@@ -3236,6 +3236,7 @@
         geoSelected: S.geo.selected || [],
         geoQ: S.geo.q || '',
         expR: S.detail.expR || {},
+        expY: S.detail.expY || {},
         expC: S.detail.expC || {},
         expG: S.detail.expG || {},
         dFrom: S.detail.from || '',
@@ -3269,6 +3270,7 @@
     if (v.cur === 'RM' || v.cur === 'RMB') S.cur = v.cur;
     if (typeof v.fy === 'string') S.fy = v.fy;
     if (v.expR && typeof v.expR === 'object') S.detail.expR = v.expR;
+    if (v.expY && typeof v.expY === 'object') S.detail.expY = v.expY;
     if (v.expC && typeof v.expC === 'object') S.detail.expC = v.expC;
     if (v.expG && typeof v.expG === 'object') S.detail.expG = v.expG;
     if (typeof v.dFrom === 'string') S.detail.from = v.dFrom;
@@ -3388,9 +3390,9 @@
        金额两列要容得下表头「PRPO Amount (RMB)」，否则表头被省略号截掉。 */
   var DT_COLS = [
     { k: 'region',   t: 'Region',              w: '5.8%' },
-    { k: 'company',  t: 'Company',             w: '7.4%' },
-    /* 城市：dash_po.City_cn，公司→城市 1:1，公司分组行也带出来 */
+    /* 城市：dash_po.City_cn，区域的下级、公司的上级（五级树第二层） */
     { k: 'city',     t: 'City',                w: '6.0%' },
+    { k: 'company',  t: 'Company',             w: '7.4%' },
     { k: 'category', t: 'Category',            w: '6.6%' },
     /* 子类别：dim_agg 聚合名，紧跟在类别之后 */
     { k: 'sub',      t: 'Sub-Category',        w: '8.3%' },
@@ -3465,6 +3467,9 @@
         '</div></th>';
     }).join('') + '</tr>';
   }
+  /* 五级树键：区域 → 城市 → 公司 → 类目 → 明细。公司→城市 1:1，
+     所以公司键仍用 region+company；城市键单独用 region+city。 */
+  function dtCyKey(region, city) { return (region || '') + '\u0001' + (city || ''); }
   function dtCoKey(region, company) { return (region || '') + '\u0001' + (company || ''); }
   function dtCaKey(region, company, category) {
     return dtCoKey(region, company) + '\u0001' + (category || '');
@@ -3507,7 +3512,7 @@
       if (rg.from) { dF.min = rg.from; dT.min = rg.from; }
       if (rg.to) { dF.max = rg.to; dT.max = rg.to; }
     }
-    var max = { amount: 0, paid: 0 }, reg = {}, co = {}, ca = {}, tree = [];
+    var max = { amount: 0, paid: 0 }, reg = {}, cy = {}, co = {}, ca = {}, tree = [];
     (d.rows || []).forEach(function (r) {
       ['amount', 'paid'].forEach(function (k) {
         if (r[k] > max[k]) max[k] = r[k];
@@ -3515,33 +3520,40 @@
     });
     /* 分组小计：后端按筛选全集算；老快照没带就按全集兜底 */
     (d.regionTotals || []).forEach(function (r) { reg[r.region || ''] = r; });
-    (d.companyTotals || []).forEach(function (r) { co[dtCoKey(r.region, r.company)] = r; });
+    (d.cityTotals || []).forEach(function (r) { cy[dtCyKey(r.region, r.city)] = r; });
+    (d.companyTotals || []).forEach(function (r) {
+      co[dtCoKey(r.region, r.company)] = r;
+    });
     (d.categoryTotals || []).forEach(function (r) {
       ca[dtCaKey(r.region, r.company, r.category)] = r;
     });
-    if (!(d.regionTotals || []).length || !(d.companyTotals || []).length ||
-        !(d.categoryTotals || []).length) {
+    if (!(d.regionTotals || []).length || !(d.cityTotals || []).length ||
+        !(d.companyTotals || []).length || !(d.categoryTotals || []).length) {
       (d.rows || []).forEach(function (r) {
-        var rk = r.region || '', ck = dtCoKey(rk, r.company);
+        var rk = r.region || '', yk = dtCyKey(rk, r.city), ck = dtCoKey(rk, r.company);
         var g = reg[rk] || (reg[rk] = { region: rk, n: 0, amount: 0, paid: 0 });
-        var h = co[ck] || (co[ck] = { region: rk, company: r.company || '', n: 0, amount: 0, paid: 0 });
+        var y = cy[yk] || (cy[yk] = { region: rk, city: r.city || '', n: 0, amount: 0, paid: 0 });
+        var h = co[ck] || (co[ck] = { region: rk, city: r.city || '',
+                                     company: r.company || '', n: 0, amount: 0, paid: 0 });
         var gk = dtCaKey(rk, r.company, r.category);
-        var q = ca[gk] || (ca[gk] = { region: rk, company: r.company || '',
+        var q = ca[gk] || (ca[gk] = { region: rk, city: r.city || '', company: r.company || '',
                                       category: r.category || '', n: 0, amount: 0, paid: 0 });
-        [g, h, q].forEach(function (o) {
+        [g, y, h, q].forEach(function (o) {
           o.n++; o.amount += r.amount || 0; o.paid += r.paid || 0;
         });
       });
     }
-    /* 建 区域 → 公司 → 类目 三层树；各层按采购额降序（小计来自筛选全集），
+    /* 建 区域 → 城市 → 公司 → 类目 四层树；各层按采购额降序（小计来自筛选全集），
        明细行在组内保持后端排序。 */
     var rmap = {};
     (d.rows || []).forEach(function (r) {
-      var rk = r.region || '', ck = r.company || '', gk = r.category || '';
+      var rk = r.region || '', yk = r.city || '', ck = r.company || '', gk = r.category || '';
       var g = rmap[rk];
-      if (!g) { g = rmap[rk] = { region: rk, cos: {}, order: [] }; }
-      var h = g.cos[ck];
-      if (!h) { h = g.cos[ck] = { company: ck, cats: {}, order: [] }; g.order.push(ck); }
+      if (!g) { g = rmap[rk] = { region: rk, cys: {}, order: [] }; }
+      var y = g.cys[yk];
+      if (!y) { y = g.cys[yk] = { city: yk, cos: {}, order: [] }; g.order.push(yk); }
+      var h = y.cos[ck];
+      if (!h) { h = y.cos[ck] = { company: ck, cats: {}, order: [] }; y.order.push(ck); }
       var q = h.cats[gk];
       if (!q) { q = h.cats[gk] = { category: gk, rows: [] }; h.order.push(gk); }
       q.rows.push(r);
@@ -3552,23 +3564,34 @@
     });
     tree.forEach(function (g) {
       g.order.sort(function (x, y) {
-        var cx = co[dtCoKey(g.region, x)], cy = co[dtCoKey(g.region, y)];
-        return (cy ? cy.amount : 0) - (cx ? cx.amount : 0);
+        var cx = cy[dtCyKey(g.region, x)], cyy = cy[dtCyKey(g.region, y)];
+        return (cyy ? cyy.amount : 0) - (cx ? cx.amount : 0);
       });
-      g.order.forEach(function (cn) {
-        g.cos[cn].order.sort(function (x, y) {
-          var cx = ca[dtCaKey(g.region, cn, x)], cy = ca[dtCaKey(g.region, cn, y)];
-          return (cy ? cy.amount : 0) - (cx ? cx.amount : 0);
+      g.order.forEach(function (yn) {
+        g.cys[yn].order.sort(function (x, y) {
+          var cx = co[dtCoKey(g.region, x)], cy2 = co[dtCoKey(g.region, y)];
+          return (cy2 ? cy2.amount : 0) - (cx ? cx.amount : 0);
+        });
+        g.cys[yn].order.forEach(function (cn) {
+          g.cys[yn].cos[cn].order.sort(function (x, y) {
+            var cx = ca[dtCaKey(g.region, cn, x)], cy3 = ca[dtCaKey(g.region, cn, y)];
+            return (cy3 ? cy3.amount : 0) - (cx ? cx.amount : 0);
+          });
         });
       });
     });
-    /* 三层可展开键的全集：表头那枚「展开全部 / 收起全部」据此判断当前是否全开 */
-    var keys = { R: [], C: [], G: [] };
+    /* 四层可展开键的全集：表头那枚「展开全部 / 收起全部」据此判断当前是否全开 */
+    var keys = { R: [], Y: [], C: [], G: [] };
     tree.forEach(function (g) {
       keys.R.push(g.region);
-      g.order.forEach(function (cn) {
-        keys.C.push(dtCoKey(g.region, cn));
-        g.cos[cn].order.forEach(function (gk) { keys.G.push(dtCaKey(g.region, cn, gk)); });
+      g.order.forEach(function (yn) {
+        keys.Y.push(dtCyKey(g.region, yn));
+        g.cys[yn].order.forEach(function (cn) {
+          keys.C.push(dtCoKey(g.region, cn));
+          g.cys[yn].cos[cn].order.forEach(function (gk) {
+            keys.G.push(dtCaKey(g.region, cn, gk));
+          });
+        });
       });
     });
     S.detail.keys = keys;
@@ -3589,47 +3612,61 @@
         nf(rg.n, 0) + ' orders</td>' +
         numCell(rg.amount, 'amount') + numCell(rg.paid, 'paid') + '</tr>');
       if (!rOpen) return;
-      g.order.forEach(function (ckName) {
-        var key = dtCoKey(rk, ckName), cg = co[key] || { n: 0, amount: 0, paid: 0 };
-        var cOpen = !!S.detail.expC[key];
-        body.push('<tr class="dt-company" data-region="' + esc(rk) + '" data-company="' + esc(ckName) + '">' +
-          '<td class="dt-tree">└</td><td data-tip="' + esc(ckName) + '"><button type="button" class="dt-toggle" data-toggle-company="' +
-          esc(key) + '" title="' + (cOpen ? 'Collapse' : 'Expand') + ' ' + esc(ckName) + '">' +
-          (cOpen ? '−' : '+') + '</button>' + esc(ckName || '(blank)') + '</td>' +
-          '<td data-tip="' + esc(cg.city || '') + '">' + esc(cg.city || '—') + '</td>' +
-          '<td colspan="7" class="dt-gmeta">company subtotal · ' +
-          nf(cg.n, 0) + ' orders</td>' +
-          numCell(cg.amount, 'amount') + numCell(cg.paid, 'paid') + '</tr>');
-        if (!cOpen) return;
-        var ch = g.cos[ckName];
-        ch.order.forEach(function (gkName) {
-          var gkey = dtCaKey(rk, ckName, gkName);
-          var gg = ca[gkey] || { n: 0, amount: 0, paid: 0 };
-          var gOpen = !!S.detail.expG[gkey];
-          body.push('<tr class="dt-catgroup" data-region="' + esc(rk) + '" data-company="' + esc(ckName) +
-            '" data-category="' + esc(gkName) + '">' +
-            '<td class="dt-tree"></td><td class="dt-tree">└</td><td class="dt-tree"></td>' +
-            '<td data-tip="' + esc(gkName) + '"><button type="button" class="dt-toggle" data-toggle-category="' +
-            esc(gkey) + '" title="' + (gOpen ? 'Collapse' : 'Expand') + ' ' + esc(gkName) + '">' +
-            (gOpen ? '−' : '+') + '</button>' + esc(gkName || '(blank)') + '</td>' +
-            '<td colspan="6" class="dt-gmeta">category subtotal · ' +
-            nf(gg.n, 0) + ' orders</td>' +
-            numCell(gg.amount, 'amount') + numCell(gg.paid, 'paid') + '</tr>');
-          if (!gOpen) return;
-          ch.cats[gkName].rows.forEach(function (r) {
-            body.push('<tr class="dt-child">' + DT_COLS.map(function (c, i) {
-              var v = r[c.k];
-              if (c.num) return numCell(v, c.k);
-              if (i === 0) return '<td class="dt-tree"></td>';
-              var tip = v == null ? '' : String(v);
-              /* 文本列把原值放进 data-tip，悬停时由浮窗给全文（说明保留换行、
-                 供应商给中英文全称，宽度不够时不再靠浏览器原生 title） */
-              if (c.long) {
-                return '<td class="dt-note" data-tip="' + esc(tip) + '">' + esc(v || '—') + '</td>';
-              }
-              var disp = c.k === 'supplier' ? supEn(v) : (v || '—');
-              return '<td data-tip="' + esc(tip) + '">' + esc(disp) + '</td>';
-            }).join('') + '</tr>');
+      g.order.forEach(function (ykName) {
+        var ykey = dtCyKey(rk, ykName), yg = cy[ykey] || { n: 0, amount: 0, paid: 0 };
+        var yOpen = !!S.detail.expY[ykey];
+        body.push('<tr class="dt-city" data-region="' + esc(rk) + '" data-city="' + esc(ykName) + '">' +
+          '<td class="dt-tree">└</td><td data-tip="' + esc(ykName) + '"><button type="button" class="dt-toggle" data-toggle-city="' +
+          esc(ykey) + '" title="' + (yOpen ? 'Collapse' : 'Expand') + ' ' + esc(ykName) + '">' +
+          (yOpen ? '−' : '+') + '</button>' + esc(ykName || '(blank)') + '</td>' +
+          '<td colspan="8" class="dt-gmeta">city subtotal · ' +
+          nf(yg.n, 0) + ' orders</td>' +
+          numCell(yg.amount, 'amount') + numCell(yg.paid, 'paid') + '</tr>');
+        if (!yOpen) return;
+        var chCity = g.cys[ykName];
+        chCity.order.forEach(function (ckName) {
+          var key = dtCoKey(rk, ckName), cg = co[key] || { n: 0, amount: 0, paid: 0 };
+          var cOpen = !!S.detail.expC[key];
+          body.push('<tr class="dt-company" data-region="' + esc(rk) + '" data-city="' + esc(ykName) +
+            '" data-company="' + esc(ckName) + '">' +
+            '<td class="dt-tree"></td><td class="dt-tree">└</td>' +
+            '<td data-tip="' + esc(ckName) + '"><button type="button" class="dt-toggle" data-toggle-company="' +
+            esc(key) + '" title="' + (cOpen ? 'Collapse' : 'Expand') + ' ' + esc(ckName) + '">' +
+            (cOpen ? '−' : '+') + '</button>' + esc(ckName || '(blank)') + '</td>' +
+            '<td colspan="7" class="dt-gmeta">company subtotal · ' +
+            nf(cg.n, 0) + ' orders</td>' +
+            numCell(cg.amount, 'amount') + numCell(cg.paid, 'paid') + '</tr>');
+          if (!cOpen) return;
+          var ch = chCity.cos[ckName];
+          ch.order.forEach(function (gkName) {
+            var gkey = dtCaKey(rk, ckName, gkName);
+            var gg = ca[gkey] || { n: 0, amount: 0, paid: 0 };
+            var gOpen = !!S.detail.expG[gkey];
+            body.push('<tr class="dt-catgroup" data-region="' + esc(rk) + '" data-city="' + esc(ykName) +
+              '" data-company="' + esc(ckName) + '" data-category="' + esc(gkName) + '">' +
+              '<td class="dt-tree"></td><td class="dt-tree"></td><td class="dt-tree">└</td>' +
+              '<td data-tip="' + esc(gkName) + '"><button type="button" class="dt-toggle" data-toggle-category="' +
+              esc(gkey) + '" title="' + (gOpen ? 'Collapse' : 'Expand') + ' ' + esc(gkName) + '">' +
+              (gOpen ? '−' : '+') + '</button>' + esc(gkName || '(blank)') + '</td>' +
+              '<td colspan="6" class="dt-gmeta">category subtotal · ' +
+              nf(gg.n, 0) + ' orders</td>' +
+              numCell(gg.amount, 'amount') + numCell(gg.paid, 'paid') + '</tr>');
+            if (!gOpen) return;
+            ch.cats[gkName].rows.forEach(function (r) {
+              body.push('<tr class="dt-child">' + DT_COLS.map(function (c, i) {
+                var v = r[c.k];
+                if (c.num) return numCell(v, c.k);
+                if (i === 0) return '<td class="dt-tree"></td>';
+                var tip = v == null ? '' : String(v);
+                /* 文本列把原值放进 data-tip，悬停时由浮窗给全文（说明保留换行、
+                   供应商给中英文全称，宽度不够时不再靠浏览器原生 title） */
+                if (c.long) {
+                  return '<td class="dt-note" data-tip="' + esc(tip) + '">' + esc(v || '—') + '</td>';
+                }
+                var disp = c.k === 'supplier' ? supEn(v) : (v || '—');
+                return '<td data-tip="' + esc(tip) + '">' + esc(disp) + '</td>';
+              }).join('') + '</tr>');
+            });
           });
         });
       });
@@ -3745,15 +3782,16 @@
     delete d.q[key]; delete d.f[key]; delete d.min[key]; delete d.max[key];
     d.page = 1; closeDtPop(); renderDtHead(); loadDetail();
   }
-  /** 明细树「全展开 / 全收起」：三层键的全集来自 renderDetail 落下的 S.detail.keys */
-  /* 全展开只展到「类目」这一层：区域 + 公司 + 类目 = 几百行，瞬间完成。
-     再往下一层是全量明细（FY2627 有 5,892 行 × 11 列），一次性铺进 DOM 会卡死
+  /** 明细树「全展开 / 全收起」：四层键的全集来自 renderDetail 落下的 S.detail.keys */
+  /* 全展开只展到「类目」这一层：区域 + 城市 + 公司 + 类目 = 几百行，瞬间完成。
+     再往下一层是全量明细（FY2627 有 5,892 行 × 12 列），一次性铺进 DOM 会卡死
      主线程，所以明细行由各类目自己的 + 按需展开。 */
   function dtSetAll(open) {
-    var k = S.detail.keys || { R: [], C: [], G: [] };
-    S.detail.expR = {}; S.detail.expC = {}; S.detail.expG = {};
+    var k = S.detail.keys || { R: [], Y: [], C: [], G: [] };
+    S.detail.expR = {}; S.detail.expY = {}; S.detail.expC = {}; S.detail.expG = {};
     if (open) {
       k.R.forEach(function (v) { S.detail.expR[v] = true; });
+      k.Y.forEach(function (v) { S.detail.expY[v] = true; });
       k.C.forEach(function (v) { S.detail.expC[v] = true; });
     }
     if (S.detail.data) renderDetail(S.detail.data);
@@ -3787,6 +3825,14 @@
     /* 表格横竖滚动、页面滚动都会让浮窗位置失效，直接收起 */
     document.addEventListener('scroll', hideDtTip, true);
     tbl.addEventListener('click', function (e) {
+      var y = e.target.closest('[data-toggle-city]');
+      if (y) {
+        var ykey = y.dataset.toggleCity;
+        S.detail.expY[ykey] = !S.detail.expY[ykey];
+        if (S.detail.data) renderDetail(S.detail.data);
+        saveView();
+        return;
+      }
       var c = e.target.closest('[data-toggle-company]');
       if (c) {
         var key = c.dataset.toggleCompany;
