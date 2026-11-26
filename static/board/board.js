@@ -21,11 +21,27 @@
     { k: 'category', name: 'Category' },
     { k: 'expense', name: 'Expense Type' },
     { k: 'method', name: 'Procurement Method' },
+    /* 两个单一来源理由切片器：只在 Procurement Method 选中对应 SS 时才出现
+       （SS-Exempt → 豁免单一来源的理由；SS-Non Exempt → 单一来源采购理由）。
+       位置紧跟 Method —— renderFilters 与 syncReasonSlicers 两条路径必须同序，
+       否则从下拉选中/点图进入时理由切片器会在筛选条里跳位。 */
+    { k: 'exempt_reason', name: 'Exemption Reason', cond: 'SS-Exempt' },
+    { k: 'single_reason', name: 'Single Source Reason', cond: 'SS-Non Exempt' },
     { k: 'level', name: 'Supplier Category' },
     { k: 'region', name: 'Region' },
     /* Company 是 Region 的下级：不再单独占一格，收在 Region 下拉的第二段 */
     { k: 'company', name: 'Company', parent: 'region' }
   ];
+  var REASON_KEYS = {
+    exempt_reason: { name: 'Exemption Reason', method: 'SS-Exempt' },
+    single_reason: { name: 'Single Source Reason', method: 'SS-Non Exempt' }
+  };
+  function isReason(k) { return Object.prototype.hasOwnProperty.call(REASON_KEYS, k); }
+  /** 该理由切片器当前是否该出现：顶部 Procurement Method 里选了这个 SS */
+  function reasonVisible(k) {
+    return !!REASON_KEYS[k] && (S.sel.method || []).indexOf(REASON_KEYS[k].method) >= 0;
+  }
+  function reasonOpts(k) { return (S.reasonOpts && S.reasonOpts[k]) || []; }
   /* 抽屉 = 按公司聚合（用户要求）：一行一家公司，不列 PRPO 单号、不逐单展开 */
   var AG_COLS = [
     { k: 'company', t: 'Company', w: 230 },
@@ -53,6 +69,7 @@
     hl: null,                 // {src, key, vals, base}：当前高亮的来源视觉对象 + 点击前数据
     hlFresh: false,
     drill: {},                // 下钻数据缓存 {method: {rows,...}}（筛选变化时清空）
+    reasonOpts: {},           // 两个理由切片器的选项（method-drill 的 rows，含原始值）
     // 框架协议统计（独立数据源 vw_fa_analysis，不吃 PRPO 全局筛选）
     fc: { page: 1, size: 50, sort: 'start', dir: 'desc',
           q: '', sup: '', type: '', df: '', dt: '', status: '' },
@@ -329,6 +346,7 @@
   }
   /** 按钮上的取值文字；Region 有下级 Company 时附上公司计数 */
   function fdText(f) {
+    if (isReason(f.k)) return reasonText(f.k);
     var sel = S.sel[f.k] || [];
     var txt = sel.length === 0 ? 'All' : (sel.length === 1 ? sel[0] : sel.length + ' selected');
     var kids = FDEFS.filter(function (x) { return x.parent === f.k; });
@@ -338,7 +356,41 @@
     }
     return txt;
   }
+  /** 理由切片器按钮上的文字：S.sel 里存原始值，展示用聚合名 */
+  function reasonText(k) {
+    var sel = S.sel[k] || [];
+    if (!sel.length) return 'All';
+    var names = reasonOpts(k).filter(function (o) {
+      return o.raws.some(function (r) { return sel.indexOf(r) >= 0; });
+    }).map(function (o) { return o.v; });
+    if (!names.length) return sel.length + ' selected';
+    return names.length === 1 ? names[0] : names.length + ' selected';
+  }
+  /** chips 的展示单位：普通键一个值一项；理由键按聚合名合并（多个原始值 = 一个 chip） */
+  function chipSel(k) {
+    var sel = S.sel[k] || [];
+    if (!isReason(k)) return sel.map(function (v) { return { label: v, vals: [v] }; });
+    var out = [], used = {};
+    reasonOpts(k).forEach(function (o) {
+      var hit = o.raws.filter(function (r) { return sel.indexOf(r) >= 0; });
+      if (!hit.length) return;
+      out.push({ label: o.v, vals: hit });
+      hit.forEach(function (r) { used[r] = 1; });
+    });
+    sel.forEach(function (v) { if (!used[v]) out.push({ label: v, vals: [v] }); });
+    return out;
+  }
   function optBody(k) {
+    if (isReason(k)) {
+      var ro = reasonOpts(k), rs = S.sel[k] || [];
+      if (!ro.length) return '<div class="fempty">Loading…</div>';
+      return ro.map(function (o) {
+        var on = o.raws.some(function (r) { return rs.indexOf(r) >= 0; });
+        return '<label><input type="checkbox" value="' + esc(o.v) + '" data-raws="' +
+          esc(JSON.stringify(o.raws)) + '"' + (on ? ' checked' : '') + '><span>' + esc(o.v) +
+          '</span><span class="cnt">' + nf(o.n, 0) + '</span></label>';
+      }).join('');
+    }
     var opts = S.options[k] || [], sel = S.sel[k] || [];
     var body = opts.map(function (o) {
       return '<label><input type="checkbox" value="' + esc(o.v) + '"' +
@@ -356,26 +408,89 @@
       '<div class="fpop-b">' + optBody(f.k) + '</div></div>';
   }
 
+  function parseRaws(inp) {
+    try {
+      var a = JSON.parse(inp.dataset.raws || '[]');
+      return Array.isArray(a) ? a : [];
+    } catch (e) { return []; }
+  }
+  /** 理由切片器的出现 / 消失 / 内容，只动这两格，不重建整条筛选条
+      （重建会把用户正开着的下拉关掉） */
+  function syncReasonSlicers() {
+    var bar = $('#fbar');
+    if (!bar) return;
+    Object.keys(REASON_KEYS).forEach(function (k) {
+      var drop = bar.querySelector('.fdrop[data-k="' + k + '"]');
+      var vis = reasonVisible(k);
+      if (!vis) {
+        if (drop) drop.parentNode.removeChild(drop);
+        if ((S.sel[k] || []).length) delete S.sel[k];
+        return;
+      }
+      var f = { k: k, name: REASON_KEYS[k].name };
+      if (!drop) {
+        var host = document.createElement('div');
+        host.innerHTML = slicerHtml(f);
+        var node = host.firstChild;
+        /* 按 FDEFS 顺序插到「后面第一个已存在的切片器」之前，
+           与 renderFilters() 重建整条时的位置完全一致（两个理由同显时也不会反序） */
+        var idx = FDEFS.map(function (x) { return x.k; }).indexOf(k), anchor = null;
+        for (var j = idx + 1; j < FDEFS.length && !anchor; j++) {
+          if (FDEFS[j].parent) continue;
+          anchor = bar.querySelector('.fdrop[data-k="' + FDEFS[j].k + '"]');
+        }
+        if (anchor) bar.insertBefore(node, anchor);
+        else bar.appendChild(node);
+      } else {
+        var v = drop.querySelector('.fd-val');
+        if (v) v.textContent = fdText(f);
+        var pop = drop.querySelector('.fpop');
+        if (pop) pop.innerHTML = fsec(f);
+        drop.classList.toggle('has', (S.sel[k] || []).length > 0);
+      }
+    });
+    renderChips();
+  }
+  /** 选项来自 method-drill（已排除 method / 理由自身的筛选，等于"其他筛选下的可选值"） */
+  function loadReasonOpts() {
+    Object.keys(REASON_KEYS).forEach(function (k) {
+      if (!reasonVisible(k) || S.reasonOpts[k]) return;
+      loadMethodDrill(REASON_KEYS[k].method, function (d) {
+        S.reasonOpts[k] = ((d && d.rows) || []).map(function (r) {
+          return { v: r.k || 'Unassigned', n: r.n || 0,
+                   raws: (r.raws && r.raws.length) ? r.raws : [r.k || ''] };
+        });
+        syncReasonSlicers();
+      }, true);
+    });
+  }
+
+  function slicerHtml(f, sub) {
+    sub = sub || [];
+    return '<div class="fdrop' + (hasAny(f.k) ? ' has' : '') +
+      '" data-k="' + f.k + '">' +
+      '<div class="fd-row">' +
+      '<button type="button" class="fd-btn"><span class="fd-name">' + f.name + '</span>' +
+      '<span class="fd-val">' + esc(fdText(f)) + '</span>' +
+      '<span class="fd-caret" aria-hidden="true"></span></button>' +
+      '<button class="spec-btn fdrop-spec" data-spec="filter_' + f.k + '" ' +
+      'title="Where ' + esc(f.name) + ' values come from">?</button>' +
+      '</div>' +
+      '<div class="fpop">' + fsec(f) +
+      sub.map(function (c) { return fsec(c, 'within ' + f.name.toLowerCase()); }).join('') +
+      '</div></div>';
+  }
+
   function renderFilters() {
     var bar = $('#fbar'), tops = [], kids = {};
     FDEFS.forEach(function (f) {
       if (f.parent) (kids[f.parent] = kids[f.parent] || []).push(f);
       else tops.push(f);
     });
-    bar.innerHTML = tops.map(function (f) {
-      var sub = kids[f.k] || [];
-      return '<div class="fdrop' + (hasAny(f.k) ? ' has' : '') +
-        '" data-k="' + f.k + '">' +
-        '<div class="fd-row">' +
-        '<button type="button" class="fd-btn"><span class="fd-name">' + f.name + '</span>' +
-        '<span class="fd-val">' + esc(fdText(f)) + '</span>' +
-        '<span class="fd-caret" aria-hidden="true"></span></button>' +
-        '<button class="spec-btn fdrop-spec" data-spec="filter_' + f.k + '" ' +
-        'title="Where ' + esc(f.name) + ' values come from">?</button>' +
-        '</div>' +
-        '<div class="fpop">' + fsec(f) +
-        sub.map(function (c) { return fsec(c, 'within ' + f.name.toLowerCase()); }).join('') +
-        '</div></div>';
+    bar.innerHTML = tops.filter(function (f) {
+      return !f.cond || (S.sel.method || []).indexOf(f.cond) >= 0;
+    }).map(function (f) {
+      return slicerHtml(f, kids[f.k]);
     }).join('');
     renderChips();
   }
@@ -499,13 +614,14 @@
   function renderChips() {
     var box = $('#chips'), out = [];
     FDEFS.forEach(function (f) {
-      (S.sel[f.k] || []).forEach(function (v) {
-        out.push('<span class="chip"><b>' + f.name + '</b>' + esc(v) +
-          '<button data-k="' + f.k + '" data-v="' + esc(v) + '" title="Remove">×</button></span>');
+      chipSel(f.k).forEach(function (c) {
+        out.push('<span class="chip"><b>' + f.name + '</b>' + esc(c.label) +
+          '<button data-k="' + f.k + '" data-v="' + esc(c.label) + '" title="Remove">×</button></span>');
       });
     });
-    /* 单一来源理由不在 FDEFS（不占筛选下拉），但下钻后要能看见并移除 */
+    /* 不在 FDEFS 里的筛选（如 Sub-category）也要能看见并移除 */
     Object.keys(EXTRA_CHIP_LABEL).forEach(function (k) {
+      if (FDEFS.some(function (f) { return f.k === k; })) return;
       (S.sel[k] || []).forEach(function (v) {
         out.push('<span class="chip"><b>' + EXTRA_CHIP_LABEL[k] + '</b>' + esc(v) +
           '<button data-k="' + k + '" data-v="' + esc(v) + '" title="Remove">×</button></span>');
@@ -1000,105 +1116,43 @@
   }
   /* 采购方式环形：默认第一层（方式）；点 SS-Exempt / SS-Non Exempt 下钻到各自的理由层。
      下钻数据走单独接口按需取（塞在 /data 里会让整页每次刷新多跑两次全表 JOIN）。 */
-  function loadMethodDrill(mk, cb) {
-    if (S.drill[mk]) return cb(S.drill[mk]);
-    api('/api/board/method-drill', qs({ method: mk }, ['method', 'exempt_reason', 'single_reason']))
+  var drillPending = {};
+  /** skipReason=true：给切片器取「可选值」，要排除理由自身的筛选（否则选完只剩已选值）；
+      false/省略：图里下钻用，跟着当前筛选走。两种口径各存一份缓存。 */
+  function loadMethodDrill(mk, cb, skipReason) {
+    var key = mk + (skipReason ? '|opt' : '|f');
+    if (S.drill[key]) { if (cb) cb(S.drill[key]); return; }
+    if (drillPending[key]) { if (cb) drillPending[key].push(cb); return; }
+    drillPending[key] = cb ? [cb] : [];
+    api('/api/board/method-drill',
+        qs({ method: mk }, skipReason ? ['method', 'exempt_reason', 'single_reason'] : ['method']))
       .then(function (d) {
-        S.drill[mk] = d;
-        if (S.methodDrill === mk) cb(d);
+        S.drill[key] = d;
+        var q = drillPending[key] || [];
+        delete drillPending[key];
+        q.forEach(function (fn) { if (fn) fn(d); });
       })
-      .catch(function (e) { toast('Failed to load reasons: ' + e.message, 3500); });
+      .catch(function (e) {
+        delete drillPending[key];
+        toast('Failed to load reasons: ' + e.message, 3500);
+      });
   }
-  /* -------- 下钻后的二级筛选（两个 SS 各用自己的单一来源原因字段） --------
-     SS-Exempt → 豁免单一来源的理由；SS-Non Exempt → 单一来源采购理由。
-     勾选写进 S.sel[字段]，和后端 REASON_FILTERS 对得上（整页联动）。 */
-  var mReasonPop = null;
-  function mReasonKey() { return S.methodDrill === 'SS-Exempt' ? 'exempt_reason' : 'single_reason'; }
-  function mReasonLabel() {
-    return S.methodDrill === 'SS-Exempt' ? 'Exemption Reason' : 'Single Source Reason';
-  }
-  function mReasonPack() { return (S.methodDrill && S.drill[S.methodDrill]) || null; }
-  /** 一行理由 ↔ 原始值：S.sel 里存的是 fct_prpo 的原文（后端按原文筛），
-      展示与勾选用的是聚合名，所以要来回映射（和饼图图例点击同一套规则） */
-  function mReasonRaws(row) {
-    return (row && row.raws && row.raws.length) ? row.raws : [row ? row.k : ''];
-  }
-  function mReasonOn(row, sel) {
-    var raws = mReasonRaws(row);
-    for (var i = 0; i < raws.length; i++) if (sel.indexOf(raws[i]) >= 0) return true;
-    return false;
-  }
-  function closeMReasonPop() { if (mReasonPop) mReasonPop.hidden = true; }
-  function renderMReasonBtn() {
-    var b = $('#mReasonBtn');
-    if (!b) return;
-    b.hidden = !S.methodDrill;
-    if (!S.methodDrill) { closeMReasonPop(); return; }
-    var sel = S.sel[mReasonKey()] || [], pk = mReasonPack(), n = sel.length;
-    if (pk) {
-      n = 0;
-      (pk.rows || []).forEach(function (r) { if (mReasonOn(r, sel)) n++; });
-    }
-    b.classList.toggle('on', n > 0);
-    b.title = 'Filter by ' + mReasonLabel() + (n ? ' — ' + n + ' selected' : '');
-    var badge = $('#mReasonN');
-    if (badge) { badge.hidden = !n; badge.textContent = n > 9 ? '9+' : String(n); }
-  }
-  function openMReasonPop() {
-    var pack = mReasonPack();
-    if (!pack) {                       // 理由层还没取回来（点得太快）：取到再开
-      var mk = S.methodDrill;
-      if (mk) loadMethodDrill(mk, function () { if (S.methodDrill === mk) openMReasonPop(); });
-      return;
-    }
-    if (!mReasonPop) {
-      mReasonPop = document.createElement('div');
-      mReasonPop.className = 'mr-pop';
-      mReasonPop.id = 'mReasonPop';
-      document.body.appendChild(mReasonPop);
-    }
-    var key = mReasonKey(), sel = S.sel[key] || [], rows = pack.rows || [];
-    mReasonPop.innerHTML = '<div class="mr-h">' + esc(mReasonLabel()) +
-      '<span>' + esc(S.methodDrill) + '</span></div><div class="mr-b">' +
-      rows.map(function (r) {
-        return '<label><input type="checkbox" value="' + esc(r.k) + '"' +
-          (mReasonOn(r, sel) ? ' checked' : '') + '><span title="' + esc(r.k) + '">' +
-          esc(r.k || 'Unassigned') + '</span><i>' + nf(r.n, 0) + '</i></label>';
-      }).join('') + '</div><div class="mr-acts"><span>' + nf(rows.length, 0) +
-      ' reasons</span><a data-act="all">All</a><a data-act="clear">Clear</a></div>';
-    mReasonPop.hidden = false;
-    var b = $('#mReasonBtn').getBoundingClientRect(), w = 252;
-    mReasonPop.style.left = Math.max(8, Math.min(b.right - w, innerWidth - w - 8)) + 'px';
-    mReasonPop.style.top = Math.min(b.bottom + 6, innerHeight - 80) + 'px';
-  }
-
   function renderMethodDonut() {
     var t = $('#mDonutTitle'), drill = S.methodDrill;
-    var pack = drill ? S.drill[drill] : null;
+    var pack = drill ? S.drill[drill + '|f'] : null;
     if (drill) {
       var rkey = drill === 'SS-Exempt' ? 'exempt_reason' : 'single_reason';
       t.textContent = (drill === 'SS-Exempt' ? 'Exemption Reason' : 'Single Source Reason') + ' · ' + drill;
-      /* 理由层数据本来就不吃理由筛选（接口 skip 了 reason），天然保留全量，
-         这里再按已选理由淡化其余扇区，和第二层下钻的视觉一致 */
-      /* 二级筛选选了理由 → 未选的扇区淡化（口径不变，只是视觉） */
-      var selRaw = S.sel[rkey] || [];
-      var dimOf = selRaw.length ? function (x) {
-        var raws = (x.raws && x.raws.length) ? x.raws : [x.k];
-        return !raws.some(function (v) { return selRaw.indexOf(v) >= 0; });
-      } : null;
-      if (pack) drawDonut(pack.rows || [], 'chMethodDonut', 'methodDonutLegend', 'chMethodDonut', rkey, dimOf);
+      /* 下钻层跟筛选走（切片器选了理由就只剩该理由），不再做「淡化未选项」 */
+      if (pack) drawDonut(pack.rows || [], 'chMethodDonut', 'methodDonutLegend', 'chMethodDonut', rkey);
       else emptyBox('chMethodDonut', 'Loading…');
-      renderMReasonBtn();
       return;
     }
     t.textContent = 'Spend by Method';
     drawDonut(hlBase('chMethodDonut', function (x) { return x.methodDonut; }) || [],
       'chMethodDonut', 'methodDonutLegend', 'chMethodDonut', 'method');
-    renderMReasonBtn();
   }
-  /* dimOf：可选的「淡化判定」函数（理由二级筛选用它把未选的扇区淡化，
-     传了就不再看 S.hl） */
-  function drawDonut(rows, chartId, legendId, src, key, dimOf) {
+  function drawDonut(rows, chartId, legendId, src, key) {
     if (!rows.length) { emptyBox(chartId, 'No data for the current filters'); $('#' + legendId).innerHTML = ''; return; }
     var W = chartW(chartId, 340), H = 230;
     var cx = W / 2, cy = H / 2 + 2, R = Math.min(W, H) * 0.44, r0 = R * 0.58;
@@ -1109,7 +1163,7 @@
       var frac = (x.v || 0) / tot;
       var a1 = a0 + frac * Math.PI * 2;
       var col = CAT_COLORS[i % CAT_COLORS.length];
-      var faded = dimOf ? !!dimOf(x) : (src ? hlDim(src, key, x.k) : false);
+      var faded = src ? hlDim(src, key, x.k) : false;
       if (frac > 0.9999) {
         /* 单值满环：也要带 class/data-exp —— 否则筛到一个类型后这一圈点不动，
            用户会卡在「只剩一个扇区、点哪都回不去」的状态 */
@@ -1140,7 +1194,7 @@
        金额与占比在扇区和悬浮提示里都有，省掉才能两列排开、名字少截断 */
     var compact = rows.length > 6;
     $('#' + legendId).innerHTML = rows.map(function (x, i) {
-      return '<span class="li' + dv(dimOf ? !!dimOf(x) : (src ? hlDim(src, key, x.k) : false)) +
+      return '<span class="li' + dv(src ? hlDim(src, key, x.k) : false) +
         '" data-exp="' + esc(x.k) +
         '"><i style="background:' + CAT_COLORS[i % CAT_COLORS.length] + '"></i>' +
         '<span class="lb" title="' + esc(x.k) + ' · ' + money(x.v, 1) + ' · ' + pct(x.share) + '">' +
@@ -1534,6 +1588,7 @@
     S.detail.stale = true;          // 全局筛选变了：下次进 Detail 页重新取数
     S.geo.stale = true;             // 地图 / 同比同样依赖全局筛选
     S.drill = {};                   // 下钻数据依赖筛选，一起失效
+    S.reasonOpts = {};              // 理由切片器的选项同样依赖筛选
     saveView();                     // 筛选 / 下钻 / 财年 / 币种的任何变化都在这里落盘
     if (S.page === 'detail' && !$('#pgDetail').hidden) loadDetail();
     document.body.classList.add('loading');
@@ -1543,6 +1598,8 @@
       S.data = d; S.rate = d.rate || 1;
       /* 下钻态且缓存已清：重新拉一次理由层，保证与当前筛选一致 */
       if (S.methodDrill) loadMethodDrill(S.methodDrill, function () { renderMethodDonut(); });
+      syncReasonSlicers();          // 让两个理由切片器跟上 Procurement Method
+      loadReasonOpts();
       renderOverviewVisuals();
       /* 首帧落在 Detail/Framework 时概览是隐藏的：这里量到的宽度是 fallback，
          回切到 Overview 时再按真实尺寸重画一次 */
@@ -1655,11 +1712,17 @@
         var scope = a.closest('[data-k]');
         var k = scope.dataset.k;
         var all = a.dataset.act === 'all';
-        var list = all ? $$('input', scope).map(function (i) { return i.value; }) : [];
-        setSel(k, list);
+        if (isReason(k)) {
+          var raws = [];
+          if (all) $$('input', scope).forEach(function (i) { raws = raws.concat(parseRaws(i)); });
+          setSel(k, raws);
+        } else {
+          setSel(k, all ? $$('input', scope).map(function (i) { return i.value; }) : []);
+        }
         $$('input', scope).forEach(function (i) { i.checked = all; });
         updateFilterLabels();
         if (k === 'region') refreshCompanyOptions();
+        if (k === 'method') syncReasonSlicers();
         loadAll();
         return;
       }
@@ -1678,11 +1741,18 @@
       if (!inp) return;
       var scope = inp.closest('[data-k]');
       var k = scope.dataset.k;
-      var list = $$('input', scope).filter(function (i) { return i.checked; })
-        .map(function (i) { return i.value; });
-      setSel(k, list);
+      if (isReason(k)) {
+        var raws = [];
+        $$('input', scope).filter(function (i) { return i.checked; })
+          .forEach(function (i) { raws = raws.concat(parseRaws(i)); });
+        setSel(k, raws);
+      } else {
+        setSel(k, $$('input', scope).filter(function (i) { return i.checked; })
+          .map(function (i) { return i.value; }));
+      }
       updateFilterLabels();
       if (k === 'region') refreshCompanyOptions();
+      if (k === 'method') syncReasonSlicers();
       loadAll();
     });
     document.addEventListener('click', function (e) {
@@ -1694,8 +1764,8 @@
       var b = e.target.closest('button[data-k]');
       if (!b) return;
       var k = b.dataset.k, v = b.dataset.v;
-      /* 下钻态移除 method 或理由 → 整个下钻退出，回采购方式层 */
-      if (S.methodDrill && (k === 'method' || k === 'exempt_reason' || k === 'single_reason')) {
+      /* 下钻态移除 method → 整个下钻退出，回采购方式层 */
+      if (S.methodDrill && k === 'method') {
         S.methodDrill = null;
         delete S.sel.method; delete S.sel.exempt_reason; delete S.sel.single_reason;
         clearHl(); renderFilters(); loadAll();
@@ -1704,49 +1774,13 @@
       /* 移掉子类别筛选 → 回到类别层（留在子类别层会把所有类别的子类别都摊出来） */
       if (k === 'sub') S.subLevel = null;
       clearHl();
-      setSel(k, (S.sel[k] || []).filter(function (x) { return x !== v; }));
+      var item = chipSel(k).filter(function (x) { return x.label === v; })[0];
+      var drop = item ? item.vals : [v];
+      setSel(k, (S.sel[k] || []).filter(function (x) { return drop.indexOf(x) < 0; }));
       renderFilters();
       if (k === 'region') refreshCompanyOptions();
       loadAll();
     });
-
-    /* 采购方式下钻的二级筛选（理由）：勾选即联动整页，字段随 SS 类型切换 */
-    $('#mReasonBtn').addEventListener('click', function (e) {
-      e.stopPropagation();
-      if (mReasonPop && !mReasonPop.hidden) closeMReasonPop(); else openMReasonPop();
-    });
-    document.addEventListener('change', function (e) {
-      if (!mReasonPop || mReasonPop.hidden) return;
-      var inp = e.target.closest('#mReasonPop input');
-      if (!inp) return;
-      var names = [].slice.call(mReasonPop.querySelectorAll('input:checked'))
-        .map(function (i) { return i.value; });
-      var pk = mReasonPack(), raws = [];
-      ((pk && pk.rows) || []).forEach(function (r) {
-        if (names.indexOf(r.k) >= 0) raws = raws.concat(mReasonRaws(r));
-      });
-      var key = mReasonKey();
-      if (raws.length) S.sel[key] = raws; else delete S.sel[key];
-      renderFilters(); renderMReasonBtn(); loadAll();
-    });
-    document.addEventListener('click', function (e) {
-      if (!mReasonPop || mReasonPop.hidden) return;
-      var act = e.target.closest('#mReasonPop .mr-acts a');
-      if (act) {
-        var key = mReasonKey(), pk = mReasonPack();
-        if (act.dataset.act === 'all') {
-          var all = [];
-          ((pk && pk.rows) || []).forEach(function (r) { all = all.concat(mReasonRaws(r)); });
-          S.sel[key] = all;
-        } else {
-          delete S.sel[key];
-        }
-        renderFilters(); renderMReasonBtn(); openMReasonPop(); loadAll();
-        return;
-      }
-      if (!e.target.closest('#mReasonPop')) closeMReasonPop();
-    });
-    window.addEventListener('resize', closeMReasonPop);
 
     // 视觉对象「向上钻取」：层级退一级；已在顶层就清掉这张图自己造成的那个维度
     document.addEventListener('click', function (e) {
@@ -2107,7 +2141,9 @@
         toggleSel('method', [v], 'chMethodDonut');
         return;
       }
-      var pack = S.drill[S.methodDrill];
+      /* 下钻缓存按 mk|f（跟随筛选）/ mk|opt（切片器选项）分开存，
+         这里必须取 |f 那份，否则拿不到 row.raws → 退化成写聚合名，后端 0 行 */
+      var pack = S.drill[S.methodDrill + '|f'];
       var row = ((pack && pack.rows) || []).filter(function (x) { return x.k === v; })[0];
       var raws = (row && row.raws && row.raws.length) ? row.raws : [v];
       var key = MD_REASON_KEY[S.methodDrill];

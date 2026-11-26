@@ -330,6 +330,46 @@ async function waitFor(pg, fn, timeout, label) {
       !!noteOff && noteOff.ellipsis === 'ellipsis' && noteOff.hasTipBox &&
       noteOff.text.length > 0 && noteOff.tip.length > 0, noteOff);
 
+    console.log('=== 5c. 离线单文件里的「单一来源理由」顶部切片器 ===');
+    await page.click('.pg-tab[data-page=overview]');
+    await waitFor(page, () => !document.getElementById('pgOverview').hidden, 8000, 'back overview');
+    await page.click('.fdrop[data-k=method] .fd-btn');
+    await page.evaluate(() => {
+      const i = [...document.querySelectorAll('.fdrop[data-k=method] .fpop-b input')]
+        .find(x => x.value === 'SS-Exempt');
+      i.click();
+    });
+    await waitFor(page, () => !!document.querySelector('.fdrop[data-k=exempt_reason]') &&
+      !document.querySelector('.fdrop[data-k=single_reason]'), 9000, 'offline exempt slicer');
+    chk('离线：SS-Exempt → 顶部出现 Exemption Reason 切片器', true);
+    await page.click('.fdrop[data-k=exempt_reason] .fd-btn');
+    await waitFor(page, () =>
+      document.querySelectorAll('.fdrop[data-k=exempt_reason] .fpop-b input').length >= 5,
+      9000, 'offline reason opts');
+    const oVals = await page.evaluate(() =>
+      [...document.querySelectorAll('.fdrop[data-k=exempt_reason] .fpop-b input')].map(i => i.value));
+    chk('离线：理由选项由前端复算（含 Frame Contract）',
+      oVals.indexOf('Frame Contract') >= 0 && oVals.length >= 5, oVals);
+    const oAmt0 = await page.$eval('.kpi[data-k=amount] .k-val', e => e.textContent.trim());
+    await page.evaluate(v => { window.__OA0 = v; }, oAmt0);
+    await page.evaluate(() => {
+      const i = [...document.querySelectorAll('.fdrop[data-k=exempt_reason] .fpop-b input')]
+        .find(x => x.value === 'Frame Contract');
+      i.click();
+    });
+    await waitFor(page, () => document.querySelectorAll('.chip').length === 2 &&
+      document.querySelector('.kpi[data-k=amount] .k-val').textContent.trim() !== window.__OA0,
+      10000, 'offline reason filter');
+    const oChips = await page.evaluate(() =>
+      [...document.querySelectorAll('.chip')].map(e => e.textContent.trim()));
+    chk('离线：勾选理由 → chip 用聚合名 + 金额联动（原始值由垫片本地复算）',
+      oChips.some(c => /Exemption Reason/.test(c) && /Frame Contract/.test(c)), oChips);
+    await page.click('#btnReset');
+    await waitFor(page, () => document.querySelectorAll('.chip').length === 0 &&
+      !document.querySelector('.fdrop[data-k=exempt_reason]') &&
+      document.querySelectorAll('.fdrop').length === 6, 9000, 'offline reason reset');
+    chk('离线：Reset 后理由切片器消失、恢复 6 个切片器', true);
+
     console.log('=== 6. 运行期错误 ===');
     chk('全程 0 JS 报错', errs.length === 0, errs.slice(0, 3));
     chk('全程 0 对外请求', net.length === 0, net.slice(0, 3));

@@ -341,3 +341,13 @@
 - 交互提示：点 Expand all 后 `toast('Expanded to category level · click a category + to see its rows')`，按钮 `title` 写 `Expand every region, company and category (detail rows stay collapsed)`。`Collapse all` 不变（清三层，39ms）。
 - **`dtSetAll` 里那句「展开全部」的旧语义不要恢复**——真要全展开，几千行 DOM 谁都救不了（分批渲染只能缓解点击那一下，后续滚动/悬停一样卡）。
 - 测试：`detail_table_check` 48/0，断言改为「类目层全开、明细行 0、总行数 = 区域+公司+类目、`+` 只剩类目行」+ 性能断言「Expand all < 600ms」（实测 96ms）；`board` 326/0、`snapshot` 64/0、`ui_focus` 41/0 不受影响。
+
+## 55 修订：两个 SS 的二级理由筛选改到「上方切片器」（11-26，用户纠正）
+- **用户明确**：「不是 Procurement Method 图表的二级筛选，是上方切片器」。§53 那套图内 `.v-reason` 按钮 / `.mr-pop` 浮层 / `dimOf` 淡化**全部撤销**：`board.html` 删 `#mReasonBtn`，`board.css` 删 `.mr-pop`/`.v-reason`/`.v-badge`，`board.js` 删 `renderMReasonBtn`/`mReasonOn`/`mReasonPop`，`drawDonut` 去掉第 6 参。下钻层饼图现在直接吃 `|f` 缓存，跟着筛选走，不再做视觉淡化。
+- **新增两个条件式切片器**：`FDEFS` 里 `exempt_reason`（Exemption Reason，cond `SS-Exempt`）、`single_reason`（Single Source Reason，cond `SS-Non Exempt`）**紧跟 `method` 之后**（不是末尾），`renderFilters()` 按 `cond` 过滤；`syncReasonSlicers()` 负责在 method 选择变化时局部增删这两格（只动这两格，不重建整条筛选条，否则会关掉用户正开着的下拉），并按 FDEFS 顺序插到「后面第一个已存在切片器」之前 —— **两条路径必须同序**，否则切换时理由切片器会在筛选条里跳位。不可见时同时清掉 `S.sel[k]`。
+- **选项来源**：`loadReasonOpts()` 用 `loadMethodDrill(mk, cb, true)` 取 `method-drill` 的 rows（聚合名 + `n` + `raws`）。`loadMethodDrill` 现在按 `mk|f`（图表下钻，跟随筛选）/ `mk|opt`（切片器选项，排除 method 与两个理由自身筛选）**双缓存**，`drillPending` 队列合并并发请求；否则选完理由后下拉只剩已选值。
+- **`S.sel` 存原始值，展示聚合名**（§53 的坑继续有效）：下拉 `<input data-raws='JSON'>`，`parseRaws()` 解析；`optBody`/`reasonText`/`chipSel` 都用 `reasonOpts[k]` 把多个原始值合并成一个聚合名 chip；移除 chip 时 `chipSel(k)` 按 label 反查 `vals` 批量删。`esc(JSON.stringify(...))` 转义后 `dataset.raws` 仍是合法 JSON —— **别改回 `join('\u0001')`**，属性里会被 HTML 转义弄坏。
+- **修掉一个真实 bug**：`onMethodPick` 仍按旧键读 `S.drill[S.methodDrill]`，双缓存后变成 `undefined` → `row.raws` 拿不到 → 退化成写聚合名 → 后端 `REASON_FILTERS` 的子查询 0 行（KPI 变 `—`）。已改为 `S.drill[S.methodDrill + '|f']`。
+- **`waitFor` 测试 helper** 原来只传 4 个参数，`t => ... !== t` 的第 5 个实参被丢掉（恒真）。已支持传参，5b「点理由 → 金额变化」变成真断言。
+- **离线**：`snapshot.js` 早就有 `exc`/`ssr` 行内列 + `readFilters` 的 reason 键 + `methodDrillResp`，无需改代码；但 `exports/` 里官方单文件停在 11-24，缺四级树。已重跑 `board_export.py` → `exports/采购看板_单文件_20261126.html`（12.41 MB，`exports/` 在 .gitignore 里，不入库）。**发给同事前请确认用这个新文件**。
+- **测试**：`board_check` 332/0（删 5 条图内断言、加「图内不再有理由按钮」+ 新增 5x 段 10 条：切片器出现/位置/选项含原始值 JSON/勾选联动/移除/换字段/两 SS 同显顺序/Reset）；`snapshot_check` 68/0（新增 5c 段 4 条离线断言）；`page_tabs` 27、`detail` 48、`visual_tools` 31、`ui_focus` 41、`grid_sum` 14、`colfilter` 34、`perf` 11、`geo` 45 全绿。
