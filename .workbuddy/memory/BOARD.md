@@ -361,3 +361,11 @@
 - **恒 6 个切片器**：任何筛选状态下 `#fbar .fdrop` 都是 6 个（brand/category/expense/method/level/region），`board_check` 的「6 个等宽 / 6 组下拉」断言不用改。
 - **离线**：重跑 `board_export.py` 覆盖 `exports/采购看板_单文件_20261126.html`（12.42 MB）。`snapshot.js` 无需改代码。
 - **测试**：`board_check` 334/0（5x 段整体重写为「Method 下拉子段」：恒 6 格、段顺序 `method,exempt_reason`、段头 within 标注、Method 按钮汇总理由数、三段几何；并把 5b 三个下钻等待 8s→12s 消 flaky、catch 里打印运行期 JS 错误）；`snapshot_check` 68/0（5c 同步重写）；`page_tabs` 27、`detail` 48、`visual_tools` 31、`ui_focus` 41、`grid_sum` 14、`colfilter` 34、`perf` 11、`geo` 45 全绿。
+
+## 57 修：「右上角的？点击没反应」（11-26）
+- **排查结论**：整页筛选条最右侧的圆形 `?`（`.fbar-r > .spec-btn[data-spec=global]`）在线 + 离线、真实鼠标点击都正常弹出「看板整体口径」；**真正失效的是切片器右上角那个小 `?`** —— `SPEC_DEF` 唯独漏了 `filter_method`（`filter_brand/category/expense/level/region/company` 都有），`openSpec()` 里 `if (!def) return` **静默返回**，用户看到的就是「点了没反应」。Method 下拉刚改完，用户正在那一片操作，最容易撞上这个。
+- **修复 1**：补 `SPEC_DEF.filter_method`（标题「筛选 · 采购方式」），口径里同步写清 §56 新增的两段理由筛选（SS-Exempt→Exemption Reason、SS-Non Exempt→Single Source Reason，理由段显示聚合名但筛选写原始值、段间「或」与采购方式「且」）。
+- **修复 2（防复发，关键）**：`openSpec` 不再对未知 key 直接 return，改走 `fallbackSpec(key)` —— 按 `filter_`/`kpi_` 前缀推标题，弹出通用说明 + 「当前生效的条件」，并 `console.warn('[spec] missing definition: ' + key)`。**以后新增任何 `?` 即使忘写定义也必有反馈**，测试再断言警告为空。
+- **修复 3（可发现性）**：`.fdrop .spec-btn` 从 `opacity:0; pointer-events:none`（仅 hover 才出现）改为常驻 `opacity:.55; pointer-events:auto`，尺寸 13→15px，hover/展开时加深。原来完全隐形，用户不易察觉那里有个按钮。
+- **测试**：`board_check` 339/0（新增 5y 段 5 条：所有 ? 带 data-spec、右上角圆 ? 弹出且 display:flex、Method 小 ? 弹出「筛选 · 采购方式」、全量 sweep 逐个 `.click()` 断言每个都弹且标题非空、全程 0 条 missing definition 警告；`page.on('console')` 增加 specWarns 收集）；`snapshot_check` 72/0（新增 5d 段 4 条离线断言）。`page_tabs` 27、`detail` 48、`visual_tools` 31、`ui_focus` 41、`grid_sum` 14、`colfilter` 34、`perf` 11、`geo` 45 全绿。
+- **离线**：`board.js` 改了，已重跑 `board_export.py` 覆盖 `exports/采购看板_单文件_20261126.html`（12.42 MB）；发给同事仍用这一份。

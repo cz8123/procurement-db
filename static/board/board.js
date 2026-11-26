@@ -2619,6 +2619,22 @@
       ],
       fields: [['支出类型', '支出类型（OPEX / TRADE / A&P / CAPEX）', SRC.prpo + ' → ' + SRC.expmap]]
     },
+    filter_method: {
+      title: '筛选 · 采购方式',
+      source: '数据来源：' + SRC.prpo + '（PRPO）→ ' + SRC.methodmap,
+      notes: [
+        '原始的「选择采购方法」经' + SRC.methodmap + '整理成 Micro、Quotation、SS-Exempt、SS-Non Exempt、Tender、VO 等标准取值。',
+        '可以多选，选中之间是「或」的关系。',
+        '选中 SS-Exempt 时，下拉第二段出现「Exemption Reason」（豁免单一来源的理由）；选中 SS-Non Exempt 时出现「Single Source Reason」（单一来源采购理由）；两个都选则两段同显。',
+        '理由段里显示的是归并后的名称，实际筛选写回原始值，所以不会因为一对多而漏掉单据；理由段之间是「或」，与上方的采购方式是「且」。',
+        '下拉里右边的数字是该取值下还剩多少张单。'
+      ],
+      fields: [
+        ['采购方式', '选择采购方法 → 标准取值', SRC.prpo + ' → ' + SRC.methodmap],
+        ['（二级）豁免理由', '豁免单一来源的理由', SRC.prpo],
+        ['（二级）单一来源理由', '单一来源采购理由', SRC.prpo]
+      ]
+    },
     filter_level: {
       title: '筛选 · 供应商属性',
       source: '数据来源：' + SRC.prpo + '（PRPO）',
@@ -2821,9 +2837,31 @@
     return out;
   }
 
+  /* 兜底：任何新加的「?」即使暂时没写口径，也必须弹出说明，绝不能静默无反应。
+     （filter_method 曾因漏写定义，点了完全没反应；这类缺口一律在这里兜住） */
+  function fallbackSpec(key) {
+    var label = key;
+    if (key.indexOf('filter_') === 0) {
+      var k = key.slice(7);
+      var f = FDEFS.filter(function (x) { return x.k === k; })[0];
+      label = '筛选 · ' + (f ? f.name : k);
+    } else if (key.indexOf('kpi_') === 0) {
+      label = 'KPI · ' + key.slice(4);
+    }
+    if (window.console && console.warn) console.warn('[spec] missing definition: ' + key);
+    return {
+      title: label,
+      source: '数据来源：' + SRC.prpo + '（PRPO）',
+      notes: [
+        '这个对象按当前顶部筛选条件，从' + SRC.prpo + '逐行汇总得出。',
+        '本对象的字段对照还在补充中；「当前生效的条件」一栏始终列出本次查询真正用到的条件。'
+      ],
+      fields: []
+    };
+  }
+
   function openSpec(key) {
-    var def = SPEC_DEF[key];
-    if (!def) return;
+    var def = SPEC_DEF[key] || fallbackSpec(key);
     var pop = $('#specPop');
     $('#spTitle').textContent = def.title;
     $('#spSource').textContent = def.source || '';

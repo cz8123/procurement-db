@@ -62,9 +62,12 @@ async function waitFor(pg, fn, timeout, label) {
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 1600, height: 1100, deviceScaleFactor: 1 });
-  const errs = [];
+  const errs = [], specWarns = [];
   page.on('pageerror', e => errs.push('PAGEERROR ' + e.message));
-  page.on('console', m => { if (m.type() === 'error') errs.push('CONSOLE ' + m.text()); });
+  page.on('console', m => {
+    if (m.type() === 'error') errs.push('CONSOLE ' + m.text());
+    if (m.text().indexOf('[spec] missing definition') >= 0) specWarns.push(m.text());
+  });
   /* 记录对外网络请求：单文件不允许连服务器 */
   const net = [];
   page.on('request', r => { if (/^https?:/.test(r.url())) net.push(r.url()); });
@@ -373,6 +376,35 @@ async function waitFor(pg, fn, timeout, label) {
       !document.querySelector('.fdrop[data-k=method] .fsec[data-k=exempt_reason]') &&
       document.querySelectorAll('.fdrop').length === 6, 9000, 'offline reason reset');
     chk('离线：Reset 后理由段消失、筛选条仍是 6 个切片器', true);
+
+    console.log('=== 5d. 离线：「?」口径说明按钮 ===');
+    await page.click('.fbar-r > .spec-btn[data-spec="global"]');
+    await waitFor(page, () => document.getElementById('specPop').classList.contains('on'),
+      8000, 'offline global spec');
+    chk('离线：右上角圆形 ? 弹出「看板整体口径」',
+      (await num('#spTitle')) === '看板整体口径');
+    await page.evaluate(() => document.getElementById('specPop').classList.remove('on'));
+    await page.hover('.fdrop[data-k=method]');
+    await page.click('.fdrop[data-k=method] .spec-btn');
+    await waitFor(page, () => document.getElementById('specPop').classList.contains('on'),
+      8000, 'offline method spec');
+    chk('离线：Method 切片器右上角 ? 弹出「筛选 · 采购方式」',
+      (await num('#spTitle')) === '筛选 · 采购方式');
+    const offSweep = await page.evaluate(() => {
+      const pop = document.getElementById('specPop');
+      const bad = [];
+      [...document.querySelectorAll('.spec-btn')].forEach(b => {
+        pop.classList.remove('on');
+        b.click();
+        if (!pop.classList.contains('on') || !document.getElementById('spTitle').textContent)
+          bad.push(b.dataset.spec);
+      });
+      pop.classList.remove('on');
+      return bad;
+    });
+    await sleep(250);
+    chk('离线：全部 ? 都能弹出说明', offSweep.length === 0, offSweep);
+    chk('离线：无 missing definition 兜底警告', specWarns.length === 0, specWarns);
 
     console.log('=== 6. 运行期错误 ===');
     chk('全程 0 JS 报错', errs.length === 0, errs.slice(0, 3));

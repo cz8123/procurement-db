@@ -972,15 +972,15 @@ body.drawer-open{ overflow:hidden; }
 .kpi:hover .spec-btn{ opacity:1; }
 .kpi .spec-btn:hover{ opacity:1; }
 
-/* 说明按钮：平时不占视觉，悬停/展开时才浮现在卡片右上角 */
+/* 说明按钮：常驻可点（淡显），悬停/展开时加深 —— 完全隐藏会让用户以为点不到 */
 .fdrop .spec-btn{
   position:absolute; right:5px; top:5px;
-  width:13px; height:13px; font-size:8.5px; border-radius:50%;
+  width:15px; height:15px; font-size:9px; border-radius:50%;
   background:#fff; color:#8695A8; border-color:#D8DEE7;
-  opacity:0; pointer-events:none; transition:opacity .14s ease, color .12s ease;
+  opacity:.55; pointer-events:auto; transition:opacity .14s ease, color .12s ease;
 }
-.fdrop:hover .spec-btn, .fdrop.open .spec-btn{ opacity:1; pointer-events:auto; }
-.fdrop .spec-btn:hover{ color:var(--blue); border-color:var(--blue); }
+.fdrop:hover .spec-btn, .fdrop.open .spec-btn{ opacity:1; }
+.fdrop .spec-btn:hover{ opacity:1; color:var(--blue); border-color:var(--blue); }
 
 /* ---------------- 多页面容器（Overview / Detail / Framework） ---------------- */
 main[hidden], .page[hidden], .fbar[hidden], .kpis[hidden]{ display:none !important; }

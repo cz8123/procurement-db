@@ -42,9 +42,13 @@ async function waitFor(pg, fn, timeout, label, arg) {
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 1600, height: 1100, deviceScaleFactor: 1 });
-  const errs = [];
+  const errs = [], specWarns = [];
   page.on('pageerror', e => errs.push('PAGEERROR ' + e.message));
-  page.on('console', m => { if (m.type() === 'error') errs.push('CONSOLE ' + m.text()); });
+  page.on('console', m => {
+    if (m.type() === 'error') errs.push('CONSOLE ' + m.text());
+    /* 口径定义漏写时 openSpec 会走兜底并 warn —— 这正是「? 点了没反应」的根因 */
+    if (m.text().indexOf('[spec] missing definition') >= 0) specWarns.push(m.text());
+  });
 
   const num = sel => page.$eval(sel, e => e.textContent.trim()).catch(() => null);
   const count = sel => page.$$eval(sel, a => a.length).catch(() => 0);
@@ -396,6 +400,49 @@ async function waitFor(pg, fn, timeout, label, arg) {
       !document.querySelector('.fdrop[data-k=method] .fsec[data-k=single_reason]') &&
       document.querySelectorAll('.fdrop').length === 6, 9000, 'reason reset');
     chk('Reset 后理由段消失、筛选条仍是 6 个切片器', true);
+
+    console.log('=== 5y. 「?」口径说明按钮（右上角 + 切片器右上角都必须有反应） ===');
+    const specKeys = await page.evaluate(() =>
+      [...document.querySelectorAll('.spec-btn')].map(e => e.dataset.spec));
+    chk('所有 ? 都带 data-spec', specKeys.length >= 20 && specKeys.every(Boolean), specKeys.length);
+
+    /* 整页筛选条最右上角的圆形 ? */
+    await page.click('.fbar-r > .spec-btn[data-spec="global"]');
+    await waitFor(page, () => document.getElementById('specPop').classList.contains('on'),
+      6000, 'global spec');
+    chk('右上角圆形 ? 弹出「看板整体口径」',
+      (await num('#spTitle')) === '看板整体口径' &&
+      (await page.$eval('#specPop', e => getComputedStyle(e).display)) === 'flex');
+    await page.evaluate(() => document.getElementById('specPop').classList.remove('on'));
+
+    /* Method 切片器右上角的小 ?：曾因 SPEC_DEF 漏写 filter_method，点击静默无反应 */
+    await page.hover('.fdrop[data-k=method]');
+    await page.click('.fdrop[data-k=method] .spec-btn');
+    await waitFor(page, () => document.getElementById('specPop').classList.contains('on'),
+      6000, 'method spec');
+    chk('Method 切片器右上角 ? 弹出「筛选 · 采购方式」（不再静默无反应）',
+      (await num('#spTitle')) === '筛选 · 采购方式');
+    await page.evaluate(() => document.getElementById('specPop').classList.remove('on'));
+
+    /* 全量扫：包括隐藏页里的按钮（DOM 仍在），每个 ? 都必须弹出且标题非空 */
+    const specSweep = await page.evaluate(() => {
+      const pop = document.getElementById('specPop');
+      const out = [];
+      [...document.querySelectorAll('.spec-btn')].forEach(b => {
+        pop.classList.remove('on');
+        b.click();
+        out.push({ k: b.dataset.spec, on: pop.classList.contains('on'),
+                   title: document.getElementById('spTitle').textContent });
+      });
+      pop.classList.remove('on');
+      return out;
+    });
+    await sleep(250);   // console.warn 送达 Node 有延迟，等一下再判空
+    chk('全部 ? 点击都能弹出说明且标题非空',
+      specSweep.length >= 20 && specSweep.every(x => x.on && x.title && x.title !== '计算逻辑'),
+      specSweep.filter(x => !x.on || !x.title).map(x => x.k));
+    chk('没有任何 ? 落到 missing definition 兜底（口径定义齐全）',
+      specWarns.length === 0, specWarns);
 
     console.log('=== 6. 下拉与 chips ===');
     await page.click('.fdrop[data-k=category] .fd-btn');
