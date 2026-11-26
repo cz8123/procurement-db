@@ -183,18 +183,32 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
     chk('表格上方有 Expand all / Collapse all 两个按钮（在滚动容器外，不被吸顶表头盖住）',
       !!xb && xb.btns.join('|') === 'Expand all|Collapse all' && xb.aboveTable && !xb.inScrollBox, xb);
     await page.evaluate(() => document.querySelectorAll('#dtXbar .xbtn')[0].click());
-    await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-child').length > 0,
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-catgroup').length > 0,
       10000, 'expand all');
     const allOn = await page.evaluate(() => ({
       regions: document.querySelectorAll('#dtTbl tbody tr.dt-group').length,
       companies: document.querySelectorAll('#dtTbl tbody tr.dt-company').length,
       cats: document.querySelectorAll('#dtTbl tbody tr.dt-catgroup').length,
       children: document.querySelectorAll('#dtTbl tbody tr.dt-child').length,
+      rows: document.querySelectorAll('#dtTbl tbody tr').length,
       plus: [...document.querySelectorAll('#dtTbl .dt-toggle')].filter(b => b.textContent.trim() === '+').length
     }));
     console.log('    ' + JSON.stringify(allOn));
-    chk('Expand all：三层全开、无残留 + 号、明细行数 = 筛选全集',
-      allOn.companies > 0 && allOn.cats > 0 && allOn.children === base.total && allOn.plus === 0, allOn);
+    /* 11-26 修：一次性铺 5,892 行明细会卡死主线程，Expand all 只到类目层 */
+    chk('Expand all 展开到类目层（区域/公司/类目全开，明细行不展开）',
+      allOn.companies > 0 && allOn.cats > 0 && allOn.children === 0 &&
+      allOn.rows === allOn.regions + allOn.companies + allOn.cats &&
+      allOn.rows < 800 &&
+      /* 只剩类目行的 +（明细未展开），区域/公司层已经没有 + 了 */
+      allOn.plus === allOn.cats, allOn);
+    const tExpand = await page.evaluate(() => new Promise(res => {
+      document.querySelectorAll('#dtXbar .xbtn')[1].click();
+      const t0 = performance.now();
+      document.querySelectorAll('#dtXbar .xbtn')[0].click();
+      requestAnimationFrame(() => requestAnimationFrame(() => res(Math.round(performance.now() - t0))));
+    }));
+    console.log('    expand all took ' + tExpand + 'ms');
+    chk('Expand all 不阻塞（< 600ms，此前 5,892 行需数秒）', tExpand < 600, tExpand);
     await page.evaluate(() => document.querySelectorAll('#dtXbar .xbtn')[1].click());
     await sleep(400);
     chk('Collapse all：只剩区域行', await page.evaluate(() =>

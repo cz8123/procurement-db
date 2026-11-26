@@ -274,9 +274,11 @@ window.__FY_DEFAULT = {{ default_fy|default('', true)|tojson }};
          stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M8 4v16M8 4 5 7.2M8 4l3 3.2"/><path d="M16 20V4M16 20l-3-3.2M16 20l3-3.2"/>
       </svg>
-      <button type="button" class="xbtn" data-xall="1">Expand all</button>
+      <button type="button" class="xbtn" data-xall="1"
+              title="Expand every region, company and category (detail rows stay collapsed)">Expand all</button>
       <i class="xsep"></i>
-      <button type="button" class="xbtn" data-xall="0">Collapse all</button>
+      <button type="button" class="xbtn" data-xall="0"
+              title="Collapse everything back to regions">Collapse all</button>
     </div>
     <div class="dt-wrap">
       <table class="dt-tbl" id="dtTbl"><thead></thead><tbody></tbody><tfoot></tfoot></table>

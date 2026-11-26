@@ -334,3 +334,10 @@
 - **离线快照**：`DETAIL_KEYS` 加 `sub`、`detailResp` 的 field 与行输出补 `sub`、新增 `categoryTotals`（与在线同结构）。`board_export.ROW_COLS` 早就有 `sub`，无需改。
 - **测试**：`detail_table_check` 47/0（11 列名、11 个漏斗、类目层展开 → 明细条数 = `categoryTotals` 的 n、工具条在容器外且在表头上方、Expand all 后 `+` 号 0 个且明细数 = 全集、Collapse all 只剩区域行、子类别列有取值面板；`footCells` 改 9/10、金额列 `nth-child(10)`、币种 `th(10)`、note idx 6→7）；`board_check` 326/0（新增类别卡工具条 3 条）；`snapshot_check` 64/0（离线 11 列 + 展开到类目层）；`page_tabs` 27、`visual_tools` 31、`ui_focus` 41、`grid_sum` 14、`colfilter` 34 全绿。
 - **已知取舍**：明细行第 1 列（Region）现在是空的（树符号只保留在分组行），Company/Category 列在明细行仍显示值 —— 用户要求保留这两列，视觉上略有重复但不影响识别。
+
+## 54.1 修订：Expand all 只展到类目层（11-26 中午）
+- 用户反馈「Detail 的 Expand all 非常卡」。原因：`dtSetAll(true)` 把 `expG` 也全置真，等于一次性把 **5,892 行 × 11 列**（含数据条 + data-tip）铺进 DOM，主线程要 2–4 秒。
+- 改法：`dtSetAll(true)` **只设 `expR` / `expC`**，`expG` 保持空 = 展开到类目层（5 区域 + 52 公司 + 374 类目 = **431 行**）。实测 **73–133ms**（`requestAnimationFrame ×2` 计），滚动、点选都顺。明细行仍由各类目自己的 `+` 按需展开（单个类目最多几十到上百行，也是一瞬）。
+- 交互提示：点 Expand all 后 `toast('Expanded to category level · click a category + to see its rows')`，按钮 `title` 写 `Expand every region, company and category (detail rows stay collapsed)`。`Collapse all` 不变（清三层，39ms）。
+- **`dtSetAll` 里那句「展开全部」的旧语义不要恢复**——真要全展开，几千行 DOM 谁都救不了（分批渲染只能缓解点击那一下，后续滚动/悬停一样卡）。
+- 测试：`detail_table_check` 48/0，断言改为「类目层全开、明细行 0、总行数 = 区域+公司+类目、`+` 只剩类目行」+ 性能断言「Expand all < 600ms」（实测 96ms）；`board` 326/0、`snapshot` 64/0、`ui_focus` 41/0 不受影响。

@@ -3661,16 +3661,19 @@
     d.page = 1; closeDtPop(); renderDtHead(); loadDetail();
   }
   /** 明细树「全展开 / 全收起」：三层键的全集来自 renderDetail 落下的 S.detail.keys */
+  /* 全展开只展到「类目」这一层：区域 + 公司 + 类目 = 几百行，瞬间完成。
+     再往下一层是全量明细（FY2627 有 5,892 行 × 11 列），一次性铺进 DOM 会卡死
+     主线程，所以明细行由各类目自己的 + 按需展开。 */
   function dtSetAll(open) {
     var k = S.detail.keys || { R: [], C: [], G: [] };
     S.detail.expR = {}; S.detail.expC = {}; S.detail.expG = {};
     if (open) {
       k.R.forEach(function (v) { S.detail.expR[v] = true; });
       k.C.forEach(function (v) { S.detail.expC[v] = true; });
-      k.G.forEach(function (v) { S.detail.expG[v] = true; });
     }
     if (S.detail.data) renderDetail(S.detail.data);
     saveView();
+    if (open) toast('Expanded to category level · click a category + to see its rows');
   }
   function bindDetail() {
     var tbl = $('#dtTbl'), pop = $('#dtPop');
