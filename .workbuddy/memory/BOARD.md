@@ -259,3 +259,10 @@
   - `sessionStorage` 允许存空财年（`restoreView` 由 `if (v.fy)` 改成 `typeof === 'string'`），刷新后仍停在日期模式。
 - **首屏预热命中修复**：`/data`、`/top` 与 `/options` 是并行发出的，原来 `/top` 常常还没拿到财年就不带 `fy`，命中不了 `WARMUP_URLS` 的缓存（`perf_check` 会偶发失败）。现在 `/dash` 渲染时直接注入 `window.__FY_DEFAULT`（口径同 `_fy_list`：只算命中有数据的财年；**不能**用 `MAX(FiscalYearName)`，`dash_calendar` 覆盖到未来年度会给出 FY2829，直接空页）。
 - **测试**：`detail_table_check` 扩到 37/0（新增"设日期后财年置空""选财年自动填区间""Clear filters 回最新"）；`perf_check` 增加"等 4 个资源条目到齐再统计"，连跑 3 次 11/0 稳定；board 301、page_tabs 25、geo 45/42、snapshot 64、visual 31、ui_focus 38、grid_sum 14、colfilter 34 全绿。
+
+## 47 修「选了财年后日期切片器无法跨财年」（11-26 上午）
+- **现象**：选 FY2526 后把日期往前/往后拖到本财年之外，输入框直接回弹，改不动。
+- **根因**：`renderDetail()` 里 `rg = (S.options && S.options.range) || (S.data && S.data.range)`。但 `S.options` 存的是 `d.options`（筛选值列表：category/method/region…），**没有 range 字段**，于是永远回退到 `S.data.range`，也就是**当前财年**的日期范围。HTML `input[type=date]` 的 `min/max` 一旦卡在本财年，浏览器会静默拒绝越界输入。
+- **修法**：`loadOptions()` 显式保存顶层的全库范围 `S.range = d.range`，日期框 `min/max` 改用它（实测 `2024-07-25 ~ 2026-11-22`）。
+- **验证**：选 FY2526 后写入 `2025-03-01 ~ 2026-09-30`，值保留、财年置空、`/detail` 带 dateFrom/dateTo 返回 27,304 行。
+- **测试**：`detail_table_check` 扩到 39/0，新增「日期框可选范围是全库」「跨财年区间可以写入（值不被 min/max 挡回）」两条。

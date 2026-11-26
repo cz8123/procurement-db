@@ -39,6 +39,7 @@
   var S = {
     fy: null, cur: 'RMB', rate: 1, page: 'overview',
     fyRange: {},              // 每个财年的实际日期区间（选财年 → 自动填日期切片器）
+    range: null,              // 全库日期范围（日期框 min/max 用，不能取当前财年的）
     latestFy: '',
     sel: {},
     options: {},
@@ -1400,6 +1401,9 @@
     return api('/api/board/options').then(function (d) {
       S.options = d.options || {};
       S.fyRange = d.fyRange || {};
+      /* d.range 是**全库**日期范围；S.options 里装的是筛选值列表，没有 range，
+         以前回退到 S.data.range（当前财年）会让日期框的 min/max 卡在本财年内 */
+      if (d.range && d.range.from) S.range = d.range;
       S.latestFy = d.latestFy || '';
       var sel = $('#fySel');
       /* 第一项是「空财年」：设了日期范围时财年会被置空，两者不叠加 */
@@ -3140,7 +3144,7 @@
     S.detail.data = d;
     /* 日期切片器回填 + 用数据整体范围限制可选区间 */
     var dF = $('#dtFrom'), dT = $('#dtTo'),
-      rg = (S.options && S.options.range) || (S.data && S.data.range) || {};
+      rg = S.range || (S.data && S.data.range) || {};
     if (dF && dT) {
       dF.value = S.detail.from || '';
       dT.value = S.detail.to || '';

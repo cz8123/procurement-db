@@ -358,6 +358,37 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       return { all: a.total, inFy: b.total };
     });
     chk('日期范围可跨财年（指定日期时不再叠加财年）', xyr.all > xyr.inFy * 1.5, xyr);
+
+    /* 日期框的 min/max 必须是**全库**范围：取当前财年范围会让浏览器直接拒绝跨财年输入 */
+    const bounds = await page.evaluate(async () => {
+      const o = await (await fetch('/api/board/options')).json();
+      return { min: document.getElementById('dtFrom').min,
+               max: document.getElementById('dtFrom').max,
+               gFrom: o.range.from, gTo: o.range.to };
+    });
+    chk('日期框可选范围是全库（不受财年限制）',
+      bounds.min === bounds.gFrom && bounds.max === bounds.gTo, bounds);
+
+    const crossWant = await page.evaluate(async () => {
+      const f = document.getElementById('dtFrom'), t = document.getElementById('dtTo');
+      f.value = '2025-03-01'; f.dispatchEvent(new Event('change', { bubbles: true }));
+      t.value = '2026-09-30'; t.dispatchEvent(new Event('change', { bubbles: true }));
+      const j = await (await fetch('/api/board/detail?dateFrom=2025-03-01&dateTo=2026-09-30')).json();
+      return j.total;
+    });
+    await waitFor(page, n => Number(document.getElementById('dtMeta')
+      .textContent.split(' ')[0].replace(/,/g, '')) === n,
+      12000, 'cross fy range', crossWant).catch(() => {});
+    const crossGot = await page.evaluate(() => ({
+      from: document.getElementById('dtFrom').value,
+      to: document.getElementById('dtTo').value,
+      fy: document.getElementById('fySel').value,
+      rows: Number(document.getElementById('dtMeta').textContent.split(' ')[0].replace(/,/g, ''))
+    }));
+    chk('跨财年区间可以写入（值不被 min/max 挡回）',
+      crossGot.from === '2025-03-01' && crossGot.to === '2026-09-30' &&
+      crossGot.fy === '' && crossGot.rows === crossWant,
+      { crossGot, crossWant });
     /* 双向联动：选财年 → 日期切片器填成该财年的实际区间 */
     const fys = await page.$$eval('#fySel option', o => o.map(x => x.value).filter(Boolean));
     const fy0 = await page.$eval('#fySel', e => e.value);
