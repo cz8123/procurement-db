@@ -177,9 +177,10 @@ async function waitFor(pg, fn, timeout, label) {
         const r = document.querySelector(s).getBoundingClientRect();
         return r.top + r.height / 2;
       };
-      return Math.round(Math.abs(mid('#chips') - mid('#btnReset')));
+      return Math.round(Math.abs(mid('#chips') - mid('.fbar-acts')));
     });
-    chk('chips 与 Reset 垂直居中对齐（差 ≤3px）', align <= 3, align);
+    /* 右侧操作组竖排（Export View 在上、Reset Filters 在下），chips 与整组居中对齐 */
+    chk('chips 与操作组垂直居中对齐（差 ≤3px）', align <= 3, align);
     await page.evaluate(() => document.querySelector('#chips .chip button').click());
     await sleep(900);
 

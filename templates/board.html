@@ -44,7 +44,6 @@ window.__FY_DEFAULT = {{ default_fy|default('', true)|tojson }};
       <button data-cur="RM">RM</button>
       <button data-cur="RMB" class="on">RMB</button>
     </div>
-    <button class="btn" id="btnExport" title="Export purchase requisition detail for the current fiscal year and filters">Export View</button>
   </div>
 
   <!-- 页签：多页面切换入口（Power BI 式视觉对象页头），后续新页面只需在
@@ -62,7 +61,10 @@ window.__FY_DEFAULT = {{ default_fy|default('', true)|tojson }};
     <button class="spec-btn" data-spec="global" title="How the whole dashboard is calculated">?</button>
     <!-- 已选筛选：放在筛选条右侧（Reset 左边），不再单独占一行 -->
     <div class="chips" id="chips"></div>
-    <button class="btn ghost" id="btnReset">Reset Filters</button>
+    <div class="fbar-acts">
+      <button class="btn" id="btnExport" title="Export purchase requisition detail for the current fiscal year and filters">Export View</button>
+      <button class="btn ghost" id="btnReset">Reset Filters</button>
+    </div>
   </div>
 </section>
 

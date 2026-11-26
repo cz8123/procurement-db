@@ -360,7 +360,8 @@
         '" data-k="' + f.k + '">' +
         '<div class="fd-row">' +
         '<button type="button" class="fd-btn"><span class="fd-name">' + f.name + '</span>' +
-        '<span class="fd-val">' + esc(fdText(f)) + '</span><span class="fd-caret">▾</span></button>' +
+        '<span class="fd-val">' + esc(fdText(f)) + '</span>' +
+        '<span class="fd-caret" aria-hidden="true"></span></button>' +
         '<button class="spec-btn fdrop-spec" data-spec="filter_' + f.k + '" ' +
         'title="Where ' + esc(f.name) + ' values come from">?</button>' +
         '</div>' +

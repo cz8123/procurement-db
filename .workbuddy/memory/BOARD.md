@@ -266,3 +266,11 @@
 - **修法**：`loadOptions()` 显式保存顶层的全库范围 `S.range = d.range`，日期框 `min/max` 改用它（实测 `2024-07-25 ~ 2026-11-22`）。
 - **验证**：选 FY2526 后写入 `2025-03-01 ~ 2026-09-30`，值保留、财年置空、`/detail` 带 dateFrom/dateTo 返回 27,304 行。
 - **测试**：`detail_table_check` 扩到 39/0，新增「日期框可选范围是全库」「跨财年区间可以写入（值不被 min/max 挡回）」两条。
+
+## 48 筛选条重排：Export 移到 Reset 上方 + 切片器卡片化（11-26 上午）
+- **操作组**：`#btnExport` 从顶栏 `.hd-r` 移进筛选条右侧，新增 `.fbar-acts` 竖向容器（`Export View` 在上、`Reset Filters` 在下，`align-items:stretch` 等宽右对齐）。顶栏只剩财年 + 币种，更清爽。注意：`.fbar` 在 Detail / Framework / Geo 页由 `showChrome(false)` 隐藏，所以导出按钮也随筛选条一起隐藏（与 Reset 一致）。
+- **按钮配色**：`.btn` 原本是"白底白边 + 深蓝字"（为深色顶栏设计），放进白色筛选条后成了隐形按钮。`.fbar-acts .btn` 覆盖为实心海军蓝 + 白字，`.btn.ghost` 为白底描边，层级清晰。
+- **切片器卡片化**：`.fd-btn` 由「小标签 + 13.5px 值 + 右下角 ▾ 字形」改为等宽卡片（圆角 8、`min-height:46`、名称 10.5px `#7A8698` 在上、取值 13px 800 在下），箭头改 CSS 折角（6px、垂直居中、展开时旋转 180 度）；`.fdrop.has` 用浅蓝底 + 品牌描边表示"已选"。
+- **等宽靠 grid**：`.fbar-in` 从 `flex-wrap` 改为 `grid-template-columns:repeat(auto-fit,minmax(150px,1fr))`。原先 flex 在 1100px 下把第 6 个切片器拉到整行宽（857px），grid 换行后仍等宽。实测 1920/1440/1280 一行等宽 265/185/165，1100 两行各 163，`scrollWidth-clientWidth=0`。
+- **说明按钮**：`.fdrop .spec-btn` 平时 `opacity:0`（不再在卡片右上角一直挂着一个小方块），悬停/展开才浮现为 13px 圆形问号；`.fpop` 面板同步改 8px 圆角 + 柔和阴影。
+- **测试**：`page_tabs_check` 的"切页不移动顶栏控件"去掉 `#btnExport`（已不在顶栏）；`ui_focus_check` 的 chips 对齐对象改成 `.fbar-acts`；`board_check` 新增 3 条（按钮在筛选条内且不在顶栏、在 Reset 正上方且同宽右对齐、6 个切片器等宽），并在量测前先切回 Overview。回归：board 304/0、page_tabs 25、detail 39、geo 45/42、snapshot 64、visual 31、ui_focus 38、grid_sum 14、colfilter 34、perf 11 全绿。

@@ -702,8 +702,33 @@ async function waitFor(pg, fn, timeout, label) {
     chk('协议表翻到第 2 页', /51–100/.test(await num('#fcPager') || ''));
 
     console.log('=== 10. 导出 / 旧版下线 ===');
-    chk('顶栏按钮改为「Export View」', (await num('#btnExport')) === 'Export View',
+    chk('导出按钮文案为「Export View」', (await num('#btnExport')) === 'Export View',
       await num('#btnExport'));
+    /* 筛选项/操作组随 Overview 的 chrome 显隐：上一节停在 Framework 页，先切回来再量 */
+    if (await page.evaluate(() => document.querySelector('.fbar').hidden)) {
+      await page.click('.pg-tab[data-page="overview"]');
+      await waitFor(page, () => !document.querySelector('.fbar').hidden, 8000, 'fbar visible');
+      await sleep(400);
+    }
+    const acts = await page.evaluate(() => {
+      const r = s => {
+        const b = document.querySelector(s).getBoundingClientRect();
+        return { x: Math.round(b.x), y: Math.round(b.y), r: Math.round(b.right),
+                 b: Math.round(b.bottom), w: Math.round(b.width), h: Math.round(b.height) };
+      };
+      const ex = r('#btnExport'), rs = r('#btnReset');
+      const dw = [...document.querySelectorAll('.fdrop')].map(e =>
+        Math.round(e.getBoundingClientRect().width));
+      return { ex, rs, dw, inFbar: !!document.querySelector('.fbar-acts #btnExport'),
+               hdHasBtn: !!document.querySelector('.hd #btnExport') };
+    });
+    chk('Export View 在筛选条右侧操作组内（不再占顶栏）',
+      acts.inFbar && !acts.hdHasBtn, acts);
+    chk('Export View 在 Reset Filters 正上方且同宽右对齐',
+      acts.ex.b < acts.rs.y && Math.abs(acts.ex.r - acts.rs.r) <= 1 &&
+      Math.abs(acts.ex.w - acts.rs.w) <= 1, acts);
+    chk('6 个切片器等宽', acts.dw.length === 6 &&
+      Math.max.apply(null, acts.dw) - Math.min.apply(null, acts.dw) <= 1, acts.dw);
 
     /* 导出改走 Node 直连：页面里 fetch 流式中止会刷 ERR_INCOMPLETE_CHUNKED_ENCODING，
        把「0 JS 报错」这条断言污染成假阳性 */

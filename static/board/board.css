@@ -243,39 +243,72 @@ h1,h2,h3,p{ margin:0; }
   background:var(--card); border:1px solid var(--line); border-radius:var(--r);
   box-shadow:var(--shadow);
 }
-.fbar-in{ display:flex; flex-wrap:wrap; gap:10px; flex:1; min-width:0; }
-.fbar-r{ flex:none; display:flex; align-items:center; gap:6px; }
-
-.fdrop{ position:relative; display:flex; align-items:center; }
-.fdrop .fd-row{ position:relative; display:flex; align-items:center; }
-.fdrop .fd-btn{
-  display:flex; flex-wrap:wrap; align-items:center; column-gap:5px;
-  background:#fff; border:1px solid #C8C8C8; border-radius:0;
-  padding:5px 26px 5px 9px; cursor:pointer; color:var(--ink);
-  min-width:132px; max-width:220px; text-align:left;
-  transition:border-color .12s ease, box-shadow .12s ease;
+/* 用 grid 而不是 flex-wrap：窄屏换行时最后一个切片器不会被拉成整行宽 */
+.fbar-in{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:10px; flex:1; min-width:0;
 }
-.fdrop .fd-btn:hover{ border-color:#8C8C8C; }
-.fdrop.open .fd-btn{ border-color:var(--blue); box-shadow:0 0 0 1px var(--blue); }
+.fbar-r{ flex:none; display:flex; align-items:center; gap:10px; }
+/* 右侧操作组：Export View 在上、Reset Filters 在下（同一组，右边缘对齐） */
+.fbar-acts{
+  display:flex; flex-direction:column; align-items:stretch; gap:6px; flex:0 0 auto;
+}
+/* 白色筛选条里不能用顶栏那套「白底白边」按钮：这里给实心主按钮 + 描边次按钮 */
+.fbar-acts .btn{
+  min-width:112px; justify-content:center; padding:4px 12px;
+  border-radius:6px; font-size:12px;
+  background:var(--navy); color:#fff; border:1px solid var(--navy);
+}
+.fbar-acts .btn:hover{ background:#173F63; border-color:#173F63; }
+.fbar-acts .btn.ghost{ background:#fff; color:var(--navy); border-color:#C8CFDA; }
+.fbar-acts .btn.ghost:hover{ background:#F1F5FA; border-color:#9FB0C4; }
+/* 整页口径说明：小圆形问号，跟新样式统一 */
+.fbar-r > .spec-btn{
+  width:20px; height:20px; border-radius:50%; font-size:10px;
+  border-color:#D8DEE7; color:#8695A8;
+}
+.fbar-r > .spec-btn:hover{ background:var(--navy); border-color:var(--navy); color:#fff; }
+
+/* 切片器：等宽卡片式（名称一行 + 取值一行），品牌描边、悬停浮起 */
+.fdrop{ position:relative; display:flex; align-items:stretch; min-width:0; }
+.fdrop .fd-row{ position:relative; display:flex; align-items:stretch; width:100%; }
+.fdrop .fd-btn{
+  display:flex; flex-direction:column; align-items:flex-start; justify-content:center;
+  gap:1px; width:100%; min-height:46px;
+  background:#fff; border:1px solid #D8DEE7; border-radius:8px;
+  padding:5px 30px 6px 11px; cursor:pointer; color:var(--ink); text-align:left;
+  transition:border-color .12s ease, box-shadow .12s ease, background .12s ease;
+}
+.fdrop .fd-btn:hover{ border-color:#A6B7CB; box-shadow:0 1px 3px rgba(16,28,48,.10); }
+.fdrop.open .fd-btn{
+  border-color:var(--blue); background:#FBFDFF;
+  box-shadow:0 0 0 2px rgba(30,77,120,.13);
+}
 .fdrop .fd-name{
-  flex:0 0 100%; font-size:11px; color:var(--ink-2); line-height:1.4;
+  font-size:10.5px; font-weight:600; color:#7A8698; letter-spacing:.2px; line-height:1.35;
 }
 .fdrop .fd-val{
-  color:var(--ink); font-weight:600; font-size:13.5px; line-height:1.4;
-  max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  width:100%; color:#1E2F4B; font-weight:700; font-size:13px; line-height:1.35;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
+/* 下拉箭头：CSS 折角（比 ▾ 字形更细腻，且垂直居中） */
 .fdrop .fd-caret{
-  position:absolute; right:8px; bottom:8px;
-  color:var(--muted); font-size:9px; line-height:1;
+  position:absolute; right:12px; top:50%; width:6px; height:6px;
+  margin-top:-5px; border-right:1.5px solid #7D8797; border-bottom:1.5px solid #7D8797;
+  transform:rotate(45deg); transition:transform .15s ease, border-color .12s ease;
+  pointer-events:none;
 }
-.fdrop.has .fd-val{ color:var(--blue); }
-.fdrop.has .fd-btn{ border-color:var(--blue); background:#F4F7FB; }
+.fdrop .fd-btn:hover .fd-caret, .fdrop.open .fd-caret{ border-color:var(--blue); }
+.fdrop.open .fd-caret{ transform:rotate(-135deg); margin-top:-1px; }
+.fdrop.has .fd-val{ color:var(--navy); }
+.fdrop.has .fd-btn{ border-color:#A9BFD8; background:#F3F7FC; }
+.fdrop.has .fd-name{ color:#5E7FA3; }
 
 .fpop{
   position:absolute; z-index:40; left:0; top:calc(100% + 4px);
   width:300px; max-height:430px; display:none;
-  background:#fff; border:1px solid #C8C8C8; border-radius:0;
-  box-shadow:var(--shadow-lg);
+  background:#fff; border:1px solid #D8DEE7; border-radius:8px;
+  box-shadow:0 12px 28px rgba(16,28,48,.16);
   overflow:hidden;
 }
 .fdrop.open .fpop{ display:flex; flex-direction:column; }
@@ -896,13 +929,15 @@ body.drawer-open{ overflow:hidden; }
 .kpi:hover .spec-btn{ opacity:1; }
 .kpi .spec-btn:hover{ opacity:1; }
 
+/* 说明按钮：平时不占视觉，悬停/展开时才浮现在卡片右上角 */
 .fdrop .spec-btn{
-  position:absolute; right:4px; top:4px;
-  width:14px; height:14px; font-size:9px;
-  opacity:.5; transition:opacity .14s ease;
+  position:absolute; right:5px; top:5px;
+  width:13px; height:13px; font-size:8.5px; border-radius:50%;
+  background:#fff; color:#8695A8; border-color:#D8DEE7;
+  opacity:0; pointer-events:none; transition:opacity .14s ease, color .12s ease;
 }
-.fdrop:hover .spec-btn{ opacity:1; }
-.fdrop .spec-btn:hover{ opacity:1; }
+.fdrop:hover .spec-btn, .fdrop.open .spec-btn{ opacity:1; pointer-events:auto; }
+.fdrop .spec-btn:hover{ color:var(--blue); border-color:var(--blue); }
 
 /* ---------------- 多页面容器（Overview / Detail / Framework） ---------------- */
 main[hidden], .page[hidden], .fbar[hidden], .kpis[hidden]{ display:none !important; }

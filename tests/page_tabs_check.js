@@ -74,7 +74,7 @@ async function waitFor(page, fn, timeout, label) {
     const before = await page.evaluate(() => {
       const p = s => { const b = document.querySelector(s).getBoundingClientRect(); return [Math.round(b.x), Math.round(b.y)]; };
       return { hd: Math.round(document.querySelector('.hd').getBoundingClientRect().height),
-               fy: p('#fySel'), cur: p('#curSeg'), exp: p('#btnExport'),
+               fy: p('#fySel'), cur: p('#curSeg'),
                kpiHidden: document.querySelector('.kpis').hidden };
     });
     await page.click('.pg-tab[data-page="detail"]');
@@ -82,7 +82,7 @@ async function waitFor(page, fn, timeout, label) {
     const after = await page.evaluate(() => {
       const p = s => { const b = document.querySelector(s).getBoundingClientRect(); return [Math.round(b.x), Math.round(b.y)]; };
       return { hd: Math.round(document.querySelector('.hd').getBoundingClientRect().height),
-               fy: p('#fySel'), cur: p('#curSeg'), exp: p('#btnExport'),
+               fy: p('#fySel'), cur: p('#curSeg'),
                kpiHidden: document.querySelector('.kpis').hidden,
                on: [...document.querySelectorAll('.pg-tab.on')].map(e => e.dataset.page),
                detailVisible: !document.getElementById('pgDetail').hidden,
