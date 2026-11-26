@@ -394,3 +394,8 @@
 - **只改显示名 `DT_COLS[].t`**（后端 `DETAIL_TEXT` 的 value 只是语义标注、`columns` 用 key，不受影响）：`Fiscal Year → FY`、`Single Source Reason → Reason`、`Procurement Method → Method`。**列宽、列序、key、colspan 全部不动**，零连锁改动。
 - **依据**：1600 视口实测原来只有 `Single Source Reason`（sw124 > cw106）和 `Fiscal Year`（sw64 > cw49）被省略号截断，`Procurement Method` 虽完整但偏长；`Sub-Category`/`PRPO Amount (RMB)`/`PO Paid (RMB)` 都完整，保留原名。改后 13 个表头 `scrollWidth <= clientWidth` 全部为 true。
 - **测试**：`detail_table_check` 54/0（表头断言改短名 + 新增「13 个表头在 1600 视口下全部完整，无省略号截断」断言）；`snapshot_check` 74/0（离线表头短名）；其余 board 339、page_tabs 27、visual 31、ui_focus 41、grid_sum 14、colfilter 34、perf 11、geo 45 全绿。重导单文件 12.54 MB。
+
+## 62 财年口径确认 + 页签居中（11-26）
+- **财年口径（用户问）**：顶部财年筛选走 `board_api._scope()` 的 `c."FiscalYearName" = ?` —— 由 **PRPO 提交日期**关联日期表 `dash_calendar` 得出，**不是**直接读 `fct_prpo` 的「财年」字段。`_fy_list()` 也从 `dash_calendar.FiscalYearName` 取下拉值。实测 `dash_po.FY` 与 `calendar.FiscalYearName` **46,013 行 0 处不符**，两者等价。Detail 里新加的 FY 列取行级 `p."FY"`，跨财年日期范围时逐行显示；指定 `dateFrom/dateTo` 时不再叠加财年条件（`_scope` 的 `has_date` 分支）。
+- **页签位置（用户反馈「有点靠左」）**：`.pg-tabs` 原是固定 `margin-left:14px` 紧贴标题（1600 下左间距 30px、右间距 111px），与 CSS 注释「.hd-r 与 .pg-tabs 各占一个 auto margin」不符。改 `.pg-tabs{margin-left:auto}` 后两个 auto margin 均分剩余空间：1600 下页签从 x=599 移到 x=639，左右间距各 70px；1024～1600 全部顶栏 68px、无溢出、表头无截断。窄屏媒体查询里的 `margin-left:10px` 保持不变（刻意贴左防溢出）。
+- **测试**：`page_tabs_check` 28/0（新增「页签左右留白接近、不紧贴标题」断言）；board 339、ui_focus 41、detail 54、snapshot 74 全绿。

@@ -116,7 +116,9 @@ h1,h2,h3,p{ margin:0; }
    高度 50px、下沿与顶栏下沿齐平；切页只换 class，不改变顶栏高度。 */
 .pg-tabs{
   display:flex; align-items:stretch; gap:3px; height:40px;
-  margin-left:14px; flex:0 1 auto; min-width:0;
+  /* 与 .hd-r 各占一个 auto margin，均分标题与右侧控件之间的剩余空间：
+     页签因此居中偏右，不再紧贴标题（用户 11-26 反馈「有点靠左」） */
+  margin-left:auto; flex:0 1 auto; min-width:0;
   /* 顶栏上下各有 9px 内边距；页签高 40px，下移 19px 后下沿与顶栏下沿（= KPI 顶边）齐平。
      relative 偏移不占布局高度，顶栏仍是 68px。 */
   position:relative; top:14px;

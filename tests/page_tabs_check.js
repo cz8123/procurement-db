@@ -69,6 +69,14 @@ async function waitFor(page, fn, timeout, label) {
     chk('页签高度 40px（比原先紧凑）', tabs.every(t => t.h === 40), tabs.map(t => t.h));
     chk('页签下沿与顶栏下沿对齐', tabs.every(t => Math.abs(t.bottom - headerBottom) <= 1),
       { headerBottom, bottoms: tabs.map(t => t.bottom) });
+    /* 11-26：页签与右侧控件各占一个 auto margin，均分剩余空间 → 页签居中偏右，不贴标题 */
+    const tabBox = await page.evaluate(() => {
+      const r = s => document.querySelector(s).getBoundingClientRect();
+      return { gapL: Math.round(r('.pg-tabs').left - r('.hd-l').right),
+               gapR: Math.round(r('.hd-r').left - r('.pg-tabs').right) };
+    });
+    chk('页签居中偏右（左右留白接近，不紧贴标题）',
+      tabBox.gapL > 40 && Math.abs(tabBox.gapL - tabBox.gapR) <= 12, tabBox);
 
     console.log('=== 2. 页签都能真正切换 ===');
     const before = await page.evaluate(() => {
