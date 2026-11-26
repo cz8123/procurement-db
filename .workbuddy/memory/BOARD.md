@@ -300,3 +300,13 @@
 - **顺手修的一个真实缺陷**：框架表 Supplier 列显示的是**英文名**（`supplier_en` 由 `supplier_en_map` 现算），但 `_contract_where` 的 `sup` 只 LIKE `"供应商名称"`（单语种、多半是中文）→ 表里明明有 Kaisi，搜 Kaisi 却 0 行。现在 `_contract_where(args, con)` 多接一个连接，命中时用 `_cn_by_en()` 反查中文名并 OR 进 `IN (...)`（上限 500 个），`/contracts` 与 `/contracts.csv` 都传 `c`。实测 `sup=Kaisi` → 1 行（开思时代科技（安徽）有限公司），`sup=开思时代` → 2 行。
 - **测试**：`board_check` 的表头段从 4 条扩到 10 条（4 枚漏斗、搜索框在浮层里且宽 240、输入时浮层不关、Clear 清空、关闭后回池保值、英文名搜索命中）；漏斗点击改用 `evaluate(...).click()` + 到位前 `sleep(600)`，避免 `page.click` 撞上 Reset 触发的 thead 重建（`Node is detached from document`）。回归：board 316/0、snapshot 64/0、ui_focus 41/0。
 - **踩坑记录**：puppeteer 的 `page.screenshot({clip})` 会临时改视口（captureBeyondViewport），**触发 window resize → 浮层被 closeFcPop 关掉**。写截图脚本时别在「打开浮层 → 输入」之间插截图，否则会误判成功能坏了。
+
+## 52 Detail 增加日期列（11-26 中午）
+- **位置**：`DT_COLS` 里插在 `note` 之后、`amount` 之前 → 列序 Region / Company / Category / Supplier / Procurement Method / Single Source Reason / Note / **Date** / PRPO Amount / PO Paid（第 8 列，索引 7）。**注意 `detail_table_check` 里 note 的索引仍是 6，金额列从 7/8 变成 8/9，币种断言取 `th:nth-child(9)`**。
+- **后端**：`DETAIL_EXPR["date"] = 'p."Date"'`（dash_po 已是 ISO 文本，不参与货币换算，`DETAIL_SORTS` 自动生效）。
+  新增 `DETAIL_SEARCH_ONLY = DETAIL_LONG | {"date"}`：日期列**只给列头搜索**（`q_date`，LIKE 前缀匹配，如 `2026-11` 命中整月），**不给取值勾选**（几百个日期勾选没意义），`/detail/values?col=date` 直接 400。
+- **前端**：`DT_COLS` 该列标 `qonly: 1`；`openDtPop` 复用 long 分支但换成日期提示（placeholder `e.g. 2026-11 or 2026-11-02`，说明改用日期范围切片器）；`fetchDtValues` 与搜索框 input 事件两处都加 `qonly` 拦截，不发取值请求。单元格按普通文本渲染（`data-tip` 悬停照旧）。
+- **列宽重新分配（合计 100%）**：6.25 / 8.43 / 8.84 / **15.0**（供应商 18.7→15.0）/ 10.94 / 11.08 / **11.79**（说明 16.59→11.79）/ **7.5**（日期）/ **11.3**（金额 10.81→11.3）/ 8.36。1471px 下实测列宽 92/125/131/222/162/164/174/111/167/124，`scrollWidth-clientWidth=0`，`PRPO Amount (RMB)`、`PO Paid (RMB)`、`Single Source Reason` 均完整不省略。
+- **小计行 colspan**：区域 `6→7`、公司 `5→6`（多了一列）。
+- **离线快照**：`snapshot.js` 的 `DETAIL_KEYS` 加 `date`（`q_date` 搜索可用），`detailResp` 的 field 映射与行输出补 `date`，`detailValuesResp` 对 date 返回空；`board_export.ROW_COLS` 本来就有 `date`，无需改。**`exports/` 里的官方单文件是旧的，要用含日期的版本需重跑 `board_export.py`**（本次未覆盖，按约定）。
+- **测试**：`detail_table_check` → 41/0（列名 10 列 + Date ISO 与排序 + 漏斗 10 个 + 合计下标 8/9 + 金额列 nth-child(9) + 币种 th(9)）；`snapshot_check` 64/0（需用新导出文件，`SNAP_FILE=绝对路径`）；`board_check` 316/0。

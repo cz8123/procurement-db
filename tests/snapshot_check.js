@@ -316,9 +316,9 @@ async function waitFor(pg, fn, timeout, label) {
                     ellipsis: getComputedStyle(td).textOverflow,
                     hasTipBox: !!document.querySelector('#dtTip') } : null;
     });
-    chk('离线 Detail 9 列，理由紧跟方法、Note 在理由之后',
-      dtOff.length === 9 && dtOff[5].indexOf('Single Source Reason') === 0 &&
-      dtOff[6].indexOf('Note') === 0, dtOff);
+    chk('离线 Detail 10 列，理由紧跟方法、Note 之后是 Date',
+      dtOff.length === 10 && dtOff[5].indexOf('Single Source Reason') === 0 &&
+      dtOff[6].indexOf('Note') === 0 && dtOff[7].indexOf('Date') === 0, dtOff);
     chk('离线说明也是单行 + 省略号 + data-tip（悬停浮窗同构）',
       !!noteOff && noteOff.ellipsis === 'ellipsis' && noteOff.hasTipBox &&
       noteOff.text.length > 0 && noteOff.tip.length > 0, noteOff);

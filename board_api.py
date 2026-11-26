@@ -1042,6 +1042,8 @@ DETAIL_TEXT = {
 }
 # 长文本列：只给「搜索」，不给取值勾选（说明有 4 万多种，勾选没意义）
 DETAIL_LONG = {"note"}
+# 只给搜索、不给取值勾选：说明（取值太多）+ 日期（几百个日期勾选没意义）
+DETAIL_SEARCH_ONLY = DETAIL_LONG | {"date"}
 DETAIL_EXPR = {
     "region": 'p."Region_cn"',
     "company": 'p."Company_cn"',
@@ -1054,6 +1056,8 @@ DETAIL_EXPR = {
                'ms."单一来源采购理由", f."单一来源采购理由")'),
     # fct_prpo.说明 → dash_po."Note"（PRPO 的申请说明）
     "note": 'p."Note"',
+    # 申请日期：dash_po."Date" 已是 ISO 文本，直接显示/排序，不参与金额换算
+    "date": 'p."Date"',
     "amount": 'p."Total Price"',
     "paid": 'COALESCE(p."PO Paid",0)',
 }
@@ -1085,7 +1089,7 @@ def _detail_extra(args, skip=None):
             continue
         q = (args.get("q_" + key) or "").strip()
         # 长文本列（说明）只支持全文搜索，不做取值勾选
-        if q and (key in DETAIL_TEXT or key in DETAIL_LONG):
+        if q and (key in DETAIL_TEXT or key in DETAIL_SEARCH_ONLY):
             parts.append("%s LIKE ? ESCAPE '\\'" % expr)
             params.append("%" + _like_esc(q) + "%")
         raw = args.get("f_" + key)

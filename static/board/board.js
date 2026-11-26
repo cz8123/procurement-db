@@ -3163,13 +3163,15 @@
     { k: 'region',   t: 'Region',              w: '6.25%' },
     { k: 'company',  t: 'Company',             w: '8.43%' },
     { k: 'category', t: 'Category',            w: '8.84%' },
-    { k: 'supplier', t: 'Supplier',            w: '18.7%' },
+    { k: 'supplier', t: 'Supplier',            w: '15.0%' },
     { k: 'method',   t: 'Procurement Method',  w: '10.94%' },
     /* 豁免单一来源的理由 / 单一来源采购理由 不会同时出现，合并成一列 */
     { k: 'reason',   t: 'Single Source Reason', w: '11.08%' },
-    /* 说明：一行显示 + 省略号（全文在悬停浮窗里），夹在理由与金额之间 */
-    { k: 'note',     t: 'Note',                w: '16.59%', long: 1 },
-    { k: 'amount',   t: 'PRPO Amount',         w: '10.81%', num: 1 },
+    /* 说明：一行显示 + 省略号（全文在悬停浮窗里），夹在理由与日期之间 */
+    { k: 'note',     t: 'Note',                w: '11.79%', long: 1 },
+    /* 申请日期（ISO 文本）：只给搜索，不给取值勾选 */
+    { k: 'date',     t: 'Date',                w: '7.5%', qonly: 1 },
+    { k: 'amount',   t: 'PRPO Amount',         w: '11.3%', num: 1 },
     { k: 'paid',     t: 'PO Paid',             w: '8.36%', num: 1 }
   ];
   var DT_TEXT = DT_COLS.filter(function (c) { return !c.num; });
@@ -3322,7 +3324,7 @@
         '" title="' + (rOpen ? 'Collapse' : 'Expand') + ' ' + esc(rk) + '">' +
         (rOpen ? '−' : '+') + '</button>' + esc(rk || '(blank)') +
         '<i class="dt-gn">' + nf(rg.n, 0) + '</i></td>' +
-        '<td colspan="6" class="dt-gmeta">region subtotal</td>' +
+        '<td colspan="7" class="dt-gmeta">region subtotal</td>' +
         numCell(rg.amount, 'amount') + numCell(rg.paid, 'paid') + '</tr>');
       if (!rOpen) return;
       g.order.forEach(function (ckName) {
@@ -3333,7 +3335,7 @@
           esc(key) + '" title="' + (cOpen ? 'Collapse' : 'Expand') + ' ' + esc(ckName) + '">' +
           (cOpen ? '−' : '+') + '</button>' + esc(ckName || '(blank)') +
           '<i class="dt-gn">' + nf(cg.n, 0) + '</i></td>' +
-          '<td colspan="5" class="dt-gmeta">company subtotal</td>' +
+          '<td colspan="6" class="dt-gmeta">company subtotal</td>' +
           numCell(cg.amount, 'amount') + numCell(cg.paid, 'paid') + '</tr>');
         if (!cOpen) return;
         g.cos[ckName].forEach(function (r) {
@@ -3386,12 +3388,16 @@
         '<div class="dt-acts" style="margin-top:9px">' +
         '<button type="button" class="btn ghost" data-act="clear">Clear</button>' +
         '<button type="button" class="btn" data-act="apply">Apply</button></div>';
-    } else if (c.long) {
-      /* 长文本列（说明）：4 万多种取值，勾选没有意义，只给全文搜索 */
+    } else if (c.long || c.qonly) {
+      /* 说明 / 日期：取值太多，勾选没有意义，只给搜索 */
       d.tmp = { search: d.q[key] || '' };
+      var ph = c.qonly ? 'e.g. 2026-11 or 2026-11-02' : 'Search within note…';
+      var hint = c.qonly
+        ? 'Matches the ISO date prefix. Use the date range slicer for a range.'
+        : 'Matches the whole PRPO note text (case-insensitive, contains).';
       pop.innerHTML = '<div class="dt-pt">' + esc(c.t) + ' · search</div>' +
-        '<input type="search" data-f="search" placeholder="Search within note…" value="' + esc(d.tmp.search) + '">' +
-        '<div class="dt-none" style="margin:7px 0 0">Matches the whole PRPO note text (case-insensitive, contains).</div>' +
+        '<input type="search" data-f="search" placeholder="' + ph + '" value="' + esc(d.tmp.search) + '">' +
+        '<div class="dt-none" style="margin:7px 0 0">' + hint + '</div>' +
         '<div class="dt-acts" style="margin-top:9px">' +
         '<button type="button" class="btn ghost" data-act="clear">Clear</button>' +
         '<button type="button" class="btn" data-act="apply">Apply</button></div>';
@@ -3415,7 +3421,7 @@
   }
   function fetchDtValues(key, search) {
     var c0 = dtCol(key);
-    if (!key || !c0 || c0.long) return;      // 长文本列没有取值列表
+    if (!key || !c0 || c0.long || c0.qonly) return;   // 长文本 / 日期列没有取值列表
     var p = dtParams();
     p.delete('q_' + key); p.delete('f_' + key);
     p.delete('page'); p.delete('size'); p.delete('sort'); p.delete('dir');
@@ -3559,7 +3565,7 @@
       clearTimeout(timer);
       var cur = S.detail.pop, c2 = dtCol(cur);
       /* 长文本列只有搜索、没有取值列表，不用去拉候选 */
-      if (!cur || !c2 || c2.long) return;
+      if (!cur || !c2 || c2.long || c2.qonly) return;
       timer = setTimeout(function () {
         if (S.detail.pop !== cur) return;   // 期间已 Apply/关闭，丢弃这次请求
         fetchDtValues(cur, e.target.value);
