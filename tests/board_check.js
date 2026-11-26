@@ -672,17 +672,21 @@ async function waitFor(pg, fn, timeout, label) {
     /* 11-26：Type / Status 两个下拉从卡片工具条搬进表头（列头漏斗 + 选项浮层） */
     const hdr = await page.evaluate(() => ({
       inTools: !!document.querySelector('#fcCard .card-tools #fcType') ||
-               !!document.querySelector('#fcCard .card-tools #fcStatus'),
+               !!document.querySelector('#fcCard .card-tools #fcStatus') ||
+               !!document.querySelector('#fcCard .card-tools #fcQ') ||
+               !!document.querySelector('#fcCard .card-tools #fcSup'),
       funnels: document.querySelectorAll('#fcTbl thead .fc-hflt').length,
       svg: [...document.querySelectorAll('#fcTbl thead .fc-hflt')].every(b => !!b.querySelector('svg')),
       cols: [...document.querySelectorAll('#fcTbl thead .fc-hflt')]
         .map(b => b.closest('th').dataset.sort)
     }));
-    chk('两个下拉已移出卡片工具条', !hdr.inTools, hdr);
-    chk('表头新增 2 枚漏斗（Type / Remain Days）且是矢量图标',
-      hdr.funnels === 2 && hdr.svg &&
-      JSON.stringify(hdr.cols) === JSON.stringify(['remain', 'type']), hdr);
-    await page.click('#fcTbl thead th[data-sort=type] .fc-hflt');
+    chk('4 个局部筛选都已移出卡片工具条', !hdr.inTools, hdr);
+    chk('表头 4 枚漏斗（Contract / Supplier / Remain Days / Type）且是矢量图标',
+      hdr.funnels === 4 && hdr.svg &&
+      JSON.stringify(hdr.cols) ===
+        JSON.stringify(['contract', 'supplier', 'remain', 'type']), hdr);
+    await page.evaluate(() => document.querySelector(
+      '#fcTbl thead th[data-sort=type] .fc-hflt').click());
     await page.waitForSelector('.fc-pop button[data-v]', { timeout: 5000 });
     chk('表头漏斗浮层列出与下拉相同的选项',
       JSON.stringify(await page.$$eval('.fc-pop button[data-v]',
@@ -704,13 +708,44 @@ async function waitFor(pg, fn, timeout, label) {
     chk('Reset 后列头高亮消失', !(await page.evaluate(() =>
       document.querySelector('#fcTbl thead th[data-sort=type]').classList.contains('has'))));
 
-    // 合同名搜索：'代驾' 命中 3 份
+    // 合同名搜索：'代驾' 命中 3 份 —— 搜索框现在住在 Contract 列的漏斗浮层里
+    /* Reset 触发的重载会重建 thead，等它落定再用 evaluate 点击（避免句柄失效） */
+    await sleep(600);
+    await page.evaluate(() => document.querySelector(
+      '#fcTbl thead th[data-sort=contract] .fc-hflt').click());
+    await page.waitForSelector('.fc-pop input#fcQ', { visible: true, timeout: 5000 });
+    chk('Contract 列漏斗里是搜索框本体（宽 240 的 wide 浮层）', await page.evaluate(() => {
+      const pop = document.querySelector('.fc-pop'), inp = pop.querySelector('input#fcQ');
+      return !pop.hidden && pop.classList.contains('wide') &&
+        Math.round(pop.getBoundingClientRect().width) === 240 && !!inp;
+    }));
     await page.type('#fcQ', '代驾');
     await waitFor(page, () => new RegExp('\\b' + window.__FCQ + '\\s*rows').test(document.querySelector('#fcPager').textContent), 8000, 'fc search');
     chk('搜索「代驾」命中数与库一致',
       new RegExp('\\b' + CTQ.total + '\\s*rows').test(await num('#fcPager') || ''));
-    await page.$eval('#fcQ', e => { e.value = ''; e.dispatchEvent(new Event('input', { bubbles: true })); });
+    chk('搜索中浮层不自动关闭、列头高亮',
+      await page.evaluate(() => !document.querySelector('.fc-pop').hidden &&
+        document.querySelector('#fcTbl thead th[data-sort=contract]').classList.contains('has')));
+    /* Clear 链接 = 清空搜索并回到全量 */
+    await page.click('.fc-pop .fc-pop-clr');
     await waitFor(page, () => new RegExp('\\b' + window.__FCT + '\\s*rows').test(document.querySelector('#fcPager').textContent), 8000, 'fc clear');
+    chk('浮层 Clear 清空搜索框', (await page.$eval('#fcQ', e => e.value)) === '');
+    /* 关掉浮层：输入框搬回隐藏池，值保留 */
+    await page.evaluate(() => document.querySelector(
+      '#fcTbl thead th[data-sort=contract] .fc-hflt').click());
+    chk('关闭浮层后搜索框回隐藏池且保留取值', await page.evaluate(() => {
+      const q = document.querySelector('#fcQ');
+      return document.querySelector('.fc-pop').hidden && !!q.closest('#fcHdrPool');
+    }));
+    /* 供应商列显示英文，搜索框要能按英文命中（后端按英文名反查中文名） */
+    const supEq = await page.evaluate(async () => {
+      const get = async u => (await (await fetch('/api/board/contracts?sup=' + u)).json());
+      const cn = await get(encodeURIComponent('开思时代')), en = await get('Kaisi');
+      return { cn: cn.total, en: en.total, enSups: en.rows.map(r => r.supplier) };
+    });
+    chk('供应商搜索按英文名能命中对应中文供应商',
+      supEq.en > 0 && supEq.en <= supEq.cn &&
+      supEq.enSups.every(x => /开思/.test(x)), supEq);
 
     // 类型筛选（CP=103）
     await page.select('#fcType', 'CP');

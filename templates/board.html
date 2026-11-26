@@ -270,8 +270,6 @@ window.__FY_DEFAULT = {{ default_fy|default('', true)|tojson }};
           <span>–</span>
           <input id="fcTo" class="mini-inp" type="date" title="Start date to">
         </span>
-        <input id="fcQ" class="mini-inp" type="search" placeholder="Search contract">
-        <input id="fcSup" class="mini-inp" type="search" placeholder="Search supplier">
         <button class="btn ghost sm" id="fcReset">Reset</button>
         <button class="btn ghost sm" id="fcExport">Export</button>
         <button type="button" class="v-ico v-flt" data-flt="contracts" aria-label="Filters affecting this visual" title="Filters affecting this visual">
@@ -280,9 +278,12 @@ window.__FY_DEFAULT = {{ default_fy|default('', true)|tojson }};
              aria-hidden="true"><path d="M3 5h18l-7.2 8.4V20l-3.6-2v-4.6z"/></svg></button>
       </div>
     </div>
-    <!-- Type / Status 两个筛选下拉不住在工具条里：渲染表头时挂进对应列的 <th>
-         （停留在这个隐藏池里只是为了让节点一直存在，事件绑定不会丢） -->
+    <!-- 四个局部筛选的去处：Type / Status 是列头漏斗的下拉，
+         Contract / Supplier 是列头漏斗里的搜索框。控件节点常驻这个隐藏池
+         （事件绑定不会丢），打开浮层时再搬进 .fc-pop，关闭后搬回来。 -->
     <span class="fc-hdr-pool" id="fcHdrPool" hidden>
+      <input id="fcQ" class="mini-inp fc-hinp" type="search" placeholder="Search contract">
+      <input id="fcSup" class="mini-inp fc-hinp" type="search" placeholder="Search supplier">
       <select id="fcType" class="mini-sel fc-hsel"><option value="">All types</option></select>
       <select id="fcStatus" class="mini-sel fc-hsel">
         <option value="">All statuses</option>

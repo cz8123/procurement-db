@@ -860,7 +860,18 @@ CONTRACT_COLS = (
 )
 
 
-def _contract_where(args):
+def _cn_by_en(con, s):
+    """供应商英文名 → 中文名。框架协议表显示的是英文，搜索框却打的「供应商名称」
+    （单语种，多半是中文），不反查就会出现「表里明明有 Kaisi，搜 Kaisi 却 0 行」。"""
+    low = s.lower()
+    try:
+        m = supplier_en_map(con)
+    except sqlite3.Error:
+        return []
+    return [cn for cn, en in m.items() if en and low in en.lower()][:500]
+
+
+def _contract_where(args, con=None):
     """合同表是独立数据源，不吃 PRPO 的全局筛选（无品牌/区域/品类字段）"""
     parts, params = ["1=1"], []
     if args.get("type"):
@@ -876,8 +887,15 @@ def _contract_where(args):
         s = (args.get(key) or "").strip()
         if s:
             like = "%" + s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-            parts.append(col + ' LIKE ? ESCAPE "\\"')
-            params.append(like)
+            cn_hits = _cn_by_en(con, s) if (key == "sup" and con is not None) else []
+            if cn_hits:
+                parts.append('(' + col + ' LIKE ? ESCAPE "\\" OR ' + col + ' IN (' +
+                             ",".join("?" * len(cn_hits)) + '))')
+                params.append(like)
+                params.extend(cn_hits)
+            else:
+                parts.append(col + ' LIKE ? ESCAPE "\\"')
+                params.append(like)
     status = args.get("status")
     if status == "expired":
         parts.append('"剩余天数" < 0')
@@ -892,7 +910,7 @@ def _contract_where(args):
 def contracts():
     c = con()
     try:
-        where, params = _contract_where(request.args)
+        where, params = _contract_where(request.args, c)
         page = max(int(request.args.get("page", 1) or 1), 1)
         size = min(max(int(request.args.get("size", 50) or 50), 10), 200)
         sort = CONTRACT_SORTS.get(request.args.get("sort", "start"), '"开始日期"')
@@ -968,7 +986,11 @@ def contracts():
 @board_bp.get("/contracts.csv")
 def contracts_csv():
     import urllib.parse
-    where, params = _contract_where(request.args)
+    _c0 = con()
+    try:
+        where, params = _contract_where(request.args, _c0)
+    finally:
+        _c0.close()
     cur, rate = _rate(request.args)
     sort = CONTRACT_SORTS.get(request.args.get("sort", "start"), '"开始日期"')
     dirn = "ASC" if request.args.get("dir") == "asc" else "DESC"

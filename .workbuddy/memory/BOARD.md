@@ -289,3 +289,14 @@
 - **列宽微调**：Type 4%→7%（要放列名+漏斗），Contract 23%→21%、Supplier 16%→15% 补回来，其余不动。
 - **chips 恒定预留一行**（用户要求"点图时页面不动"）：`.chips` 去掉了 `:empty{display:none}`，改 `min-height:20px` + `flex-wrap:nowrap` + 横向滚动（隐藏滚动条）。实测有/无筛选、点图前后 `fbar` 恒 75px、`sticky-head` 恒 325px、`#chMonthly` 恒 y=400，即**零位移**；超过一行宽度的 chip 走横向滚动，高度永不变化。筛选条比 §49 的无筛选态高 25px（这就是预留行的代价）。
 - **测试**：`ui_focus_check` 4a 又改回零位移语义（fbarH/stickyH/各图 top 全等 + chips 行恒占位 + chips 通栏）；`board_check` 新增 6 条（下拉已移出工具条、表头 2 枚漏斗且是 SVG、浮层选项与下拉一致、筛 CP 等效、列头高亮、Reset 取消高亮）；`detail_table_check` 新增 1 条（9 个漏斗都是 18×18 且内部是 SVG、无文字）。回归：board 311/0、ui_focus 40/0（4a 10 条）、detail 40/0、page_tabs 27、visual 31、snapshot 64 全绿。
+
+## 51 Framework 的搜索框也进表头（11-26 中午）
+- **Contract / Supplier 两个搜索框**从 `.card-tools` 撤掉，改成列头漏斗：`FC_COLS` 里加 `hf: 'contract' | 'supplier'`，点漏斗弹 `.fc-pop.wide`（240px），里面**装的就是 `#fcQ` / `#fcSup` 本体**。
+  - 两个 input 常驻模板里的 `#fcHdrPool[hidden]`；`openFcPop()` 先 `fcParkCtl()` 把控件搬回池、重建浮层内容、再 `appendChild` 进 `.fc-pop-s`，`closeFcPop()` 再搬回去。**节点始终是同一个** → `bindFc()` 的防抖监听、`#fcReset` 清空、离线快照全部照旧，不用改口径。
+  - 打开时 `setTimeout(focus,0)` 抢焦点（直接 focus 会被 click 的默认行为抢走），并 `select()` 全选，方便直接覆盖输入。
+  - `renderFc()` **不再**无条件 `closeFcPop()`：搜索每敲一下都会重载表格，关了浮层就等于输入到一半被打断。浮层只在表格滚动 / 窗口 resize / 点外部 / 再次点漏斗时关闭。
+  - 浮层带 `Clear` 链接（清空输入并触发 `input`），原生 search 小叉用 `::-webkit-search-cancel-button{display:none}` 隐掉，避免两个清空入口。
+  - `markFcHdrSel()` 现在两类控件都看：下拉看 `value`、搜索框看 `value.trim()`，列头 `th.has` 统一高亮。
+- **顺手修的一个真实缺陷**：框架表 Supplier 列显示的是**英文名**（`supplier_en` 由 `supplier_en_map` 现算），但 `_contract_where` 的 `sup` 只 LIKE `"供应商名称"`（单语种、多半是中文）→ 表里明明有 Kaisi，搜 Kaisi 却 0 行。现在 `_contract_where(args, con)` 多接一个连接，命中时用 `_cn_by_en()` 反查中文名并 OR 进 `IN (...)`（上限 500 个），`/contracts` 与 `/contracts.csv` 都传 `c`。实测 `sup=Kaisi` → 1 行（开思时代科技（安徽）有限公司），`sup=开思时代` → 2 行。
+- **测试**：`board_check` 的表头段从 4 条扩到 10 条（4 枚漏斗、搜索框在浮层里且宽 240、输入时浮层不关、Clear 清空、关闭后回池保值、英文名搜索命中）；漏斗点击改用 `evaluate(...).click()` + 到位前 `sleep(600)`，避免 `page.click` 撞上 Reset 触发的 thead 重建（`Node is detached from document`）。回归：board 316/0、snapshot 64/0、ui_focus 41/0。
+- **踩坑记录**：puppeteer 的 `page.screenshot({clip})` 会临时改视口（captureBeyondViewport），**触发 window resize → 浮层被 closeFcPop 关掉**。写截图脚本时别在「打开浮层 → 输入」之间插截图，否则会误判成功能坏了。

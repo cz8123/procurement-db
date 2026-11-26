@@ -1210,8 +1210,8 @@
      右侧金额与日期挤成一团。改为 CSS 里的百分比列宽（table-layout:fixed），
      见 board.css 的 .fc-tbl th:nth-child(n)。 */
   var FC_COLS = [
-    { k: 'contract', t: 'Contract' },
-    { k: 'supplier', t: 'Supplier' },
+    { k: 'contract', t: 'Contract', hf: 'contract' },
+    { k: 'supplier', t: 'Supplier', hf: 'supplier' },
     { k: 'cv', t: 'CV', num: 1 },
     { k: 'pa', t: 'PA', num: 1 },
     { k: 'usage', t: 'Usage', num: 1, tip: 'PA counts framework-contract POs only' },
@@ -1236,8 +1236,23 @@
     '<path d="M3 5h18l-7.2 8.4V20l-3.6-2v-4.6z"/></svg>';
   /* Type / Status 两个下拉的实际取值仍存在隐藏池里的 <select>（事件、选项来源不变），
      表头只放一枚漏斗按钮，点开就是这两个下拉的选项 —— 与 Detail 的列头筛选同一套交互 */
-  var FC_HF = { type: { sel: '#fcType', t: 'Agreement type' },
-                status: { sel: '#fcStatus', t: 'Status' } };
+  var FC_HF = {
+    contract: { kind: 'text', inp: '#fcQ', t: 'Contract contains' },
+    supplier: { kind: 'text', inp: '#fcSup', t: 'Supplier contains' },
+    type:     { kind: 'list', sel: '#fcType', t: 'Agreement type' },
+    status:   { kind: 'list', sel: '#fcStatus', t: 'Status' }
+  };
+  /** 浮层里的控件都要先收回隐藏池：直接 innerHTML 会把节点（和事件）一起销毁 */
+  function fcParkCtl() {
+    var pool = $('#fcHdrPool');
+    if (!pool) return;
+    Object.keys(FC_HF).forEach(function (k) {
+      var sp = FC_HF[k];
+      if (sp.kind !== 'text') return;
+      var inp = $(sp.inp);
+      if (inp && !pool.contains(inp)) pool.appendChild(inp);
+    });
+  }
   function fcHeadHtml() {
     return '<tr>' + FC_COLS.map(function (c) {
       var arr = S.fc.sort === c.k ? '<span class="arr">' + (S.fc.dir === 'asc' ? '▲' : '▼') + '</span>' : '';
@@ -1249,34 +1264,49 @@
         '<span class="fc-ht">' + c.t + arr + '</span>' + flt + '</th>';
     }).join('') + '</tr>';
   }
-  /** 表头漏斗的高亮态：这一列正在筛 */
+  /** 表头漏斗的高亮态：这一列正在筛（下拉看 value，搜索框看输入值） */
   function markFcHdrSel() {
     Object.keys(FC_HF).forEach(function (k) {
+      var sp = FC_HF[k];
       var th = $('#fcTbl thead th[data-sort="' + k + '"]');
-      var sel = $(FC_HF[k].sel);
-      if (th) th.classList.toggle('has', !!(sel && sel.value));
+      var ctl = $(sp.kind === 'text' ? sp.inp : sp.sel);
+      if (th) th.classList.toggle('has', !!(ctl && String(ctl.value || '').trim()));
     });
   }
   /* -------- 表头筛选浮层：选项直接来自隐藏的 <select> -------- */
   var fcPopEl = null;
   function closeFcPop() {
-    if (fcPopEl) { fcPopEl.hidden = true; fcPopEl.dataset.k = ''; }
+    if (!fcPopEl || fcPopEl.hidden) return;
+    fcParkCtl();
+    fcPopEl.hidden = true;
+    fcPopEl.dataset.k = '';
   }
   function openFcPop(btn, key) {
-    var sel = $(FC_HF[key].sel);
-    if (!sel) return;
+    var sp = FC_HF[key];
+    var ctl = $(sp.kind === 'text' ? sp.inp : sp.sel);
+    if (!ctl) return;
     if (!fcPopEl) {
       fcPopEl = document.createElement('div');
       fcPopEl.className = 'fc-pop';
       fcPopEl.hidden = true;
       document.body.appendChild(fcPopEl);
     }
+    fcParkCtl();                                  // 先收回控件，再重建浮层内容
     fcPopEl.dataset.k = key;
-    fcPopEl.innerHTML = '<div class="fc-pop-h">' + esc(FC_HF[key].t) + '</div>' +
-      '<div class="fc-pop-b">' + Array.prototype.map.call(sel.options, function (o) {
-        return '<button type="button" data-v="' + esc(o.value) + '"' +
-          (o.value === sel.value ? ' class="on"' : '') + '>' + esc(o.textContent) + '</button>';
-      }).join('') + '</div>';
+    fcPopEl.classList.toggle('wide', sp.kind === 'text');
+    if (sp.kind === 'text') {
+      fcPopEl.innerHTML = '<div class="fc-pop-h">' + esc(sp.t) +
+        '<a class="fc-pop-clr">Clear</a></div><div class="fc-pop-s"></div>';
+      fcPopEl.querySelector('.fc-pop-s').appendChild(ctl);
+      /* 等这一轮 click 的默认焦点处理完再抢焦点，否则焦点落在漏斗按钮上 */
+      setTimeout(function () { ctl.focus(); if (ctl.select) ctl.select(); }, 0);
+    } else {
+      fcPopEl.innerHTML = '<div class="fc-pop-h">' + esc(sp.t) + '</div>' +
+        '<div class="fc-pop-b">' + Array.prototype.map.call(ctl.options, function (o) {
+          return '<button type="button" data-v="' + esc(o.value) + '"' +
+            (o.value === ctl.value ? ' class="on"' : '') + '>' + esc(o.textContent) + '</button>';
+        }).join('') + '</div>';
+    }
     fcPopEl.hidden = false;
     var r = btn.getBoundingClientRect(), w = 196;
     /* 贴右端时改成右边对齐按钮，浮层不会顶到视口边缘 */
@@ -1343,7 +1373,6 @@
         return '<div class="fs"><div class="fs-l">' + x[0] + '</div>' +
           '<div class="fs-v ' + x[2] + '">' + x[1] + '</div></div>';
       }).join('');
-      closeFcPop();
       $('#fcTbl thead').innerHTML = fcHeadHtml();
       markFcHdrSel();
       $('#fcTbl tbody').innerHTML = fcRowsHtml(d.rows || []);
@@ -2103,6 +2132,15 @@
           sel.dispatchEvent(new Event('change', { bubbles: true }));
         }
         closeFcPop();
+        return;
+      }
+      if (e.target.closest('.fc-pop-clr')) {          // 搜索浮层里的 Clear
+        var inp = $(FC_HF[fcPopEl.dataset.k].inp);
+        if (inp) {
+          inp.value = '';
+          inp.dispatchEvent(new Event('input', { bubbles: true }));
+          inp.focus();
+        }
         return;
       }
       if (!e.target.closest('.fc-pop') && !e.target.closest('.fc-hflt')) closeFcPop();
