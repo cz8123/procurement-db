@@ -853,7 +853,7 @@ async function waitFor(pg, fn, timeout, label) {
       const t = s => +document.querySelector(s).getBoundingClientRect().top.toFixed(1);
       return { hd: t('.hd'), kpi: t('.kpis'), fbar: t('.fbar'), grid: t('.grid') };
     });
-    await page.evaluate(() => window.scrollTo(0, 700));
+    await page.evaluate(() => window.scrollTo(0, 99999));
     await sleep(350);
     const top1 = await page.evaluate(() => {
       const t = s => +document.querySelector(s).getBoundingClientRect().top.toFixed(1);
@@ -861,11 +861,13 @@ async function waitFor(pg, fn, timeout, label) {
         y: window.scrollY, pos: getComputedStyle(document.querySelector('.sticky-head')).position };
     });
     chk('固定区 position:sticky', top1.pos === 'sticky', top1.pos);
-    chk('页面确实滚动了', top1.y >= 600, top1.y);
+    chk('页面确实滚动了', top1.y >= 300, top1.y);
     chk('标题栏滚动后不动', Math.abs(top1.hd - top0.hd) < 1, [top0.hd, top1.hd]);
     chk('KPI 滚动后不动', Math.abs(top1.kpi - top0.kpi) < 1, [top0.kpi, top1.kpi]);
     chk('筛选框滚动后不动', Math.abs(top1.fbar - top0.fbar) < 1, [top0.fbar, top1.fbar]);
-    chk('图表区正常滚过', top1.grid < top0.grid - 600, [top0.grid, top1.grid]);
+    /* 图表区随滚动等比位移：位移量 == 滚动距离（不写死像素，页高变化不影响） */
+    chk('图表区正常滚过',
+      Math.abs((top0.grid - top1.grid) - top1.y) < 3, [top0.grid, top1.grid, top1.y]);
     await page.evaluate(() => window.scrollTo(0, 0));
 
     console.log('=== 12. 运行期错误 ===');

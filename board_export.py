@@ -231,6 +231,10 @@ def build(out_path=None):
 
     client = app.test_client()
     html = client.get("/dash").get_data(as_text=True)
+    # 离线单文件是 file:// 打开的：腾讯地图 JS SDK 明确不支持该协议，
+    # 内嵌 Key 只会让控制台刷错误、并且把 Key 泄漏进可转发的文件。统一清空，
+    # 地图区届时显示配置提示，公司列表与同比表照常可用。
+    html = re.sub(r'window\.TMAP_KEY\s*=\s*"[^"]*"', 'window.TMAP_KEY = ""', html)
 
     # 1) 样式内联
     css = open(os.path.join(STATIC, "board.css"), encoding="utf-8").read() + SNAP_CSS

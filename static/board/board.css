@@ -176,8 +176,8 @@ h1,h2,h3,p{ margin:0; }
 .kpi{
   position:relative; overflow:hidden;
   background:#F8F9FB;
-  border:1px solid #D7DAE1; border-radius:var(--r); padding:8px 10px 7px 13px;
-  min-height:96px; box-shadow:var(--shadow);
+  border:1px solid #D7DAE1; border-radius:var(--r); padding:7px 10px 6px 13px;
+  min-height:74px; box-shadow:var(--shadow);
   transition:box-shadow .14s ease;
 }
 /* 参考图样式：卡片左内缘一道品牌色竖条（随外框圆角裁切） */
@@ -196,7 +196,7 @@ h1,h2,h3,p{ margin:0; }
 /* 大数值与红绿色块同一行、垂直居中 */
 .kpi .k-mid{
   display:flex; align-items:center; gap:8px;
-  margin-top:5px; min-width:0;
+  margin-top:4px; min-width:0;
 }
 .kpi .k-val{
   flex:1 1 auto; min-width:0;
@@ -220,11 +220,12 @@ h1,h2,h3,p{ margin:0; }
 .kpi .k-delta.down em{ color:#C62828; }
 .kpi .k-delta.flat em{ color:#6E6E6E; }
 .kpi .k-bd{
-  width:12px; height:12px; border-radius:50%;
+  width:12px; height:12px; border-radius:50%; flex:0 0 12px;
   display:inline-flex; align-items:center; justify-content:center;
-  font-style:normal; font-size:6.5px; line-height:1; color:#fff;
+  font-style:normal; line-height:0; color:#fff;
 }
-.kpi .k-bd svg{ display:block; }
+/* 箭头 12×12 视框、1:1 落像素，不再被缩放 */
+.kpi .k-bd svg{ display:block; width:12px; height:12px; }
 .kpi .k-delta.up .k-bd{ background:#1B8A4B; }
 .kpi .k-delta.down .k-bd{ background:#C62828; }
 .kpi .k-delta.flat .k-bd{ background:#9AA3AF; }
@@ -449,7 +450,9 @@ rect.seg, rect.pbar, rect.pseg, .dseg, .trow, .hcell, .cd-row{ cursor:pointer; }
 .cd-subrow .cs-list li.cs-item{ cursor:pointer; padding-left:2px; padding-right:2px; }
 .cd-subrow .cs-list li.cs-item:hover{ background:#F1F5FA; }
 .cd-subrow .cs-list li.cs-item.on{ background:#E4EEF9; }
-.chart svg{ display:block; width:100%; height:auto; }
+/* 不再用 width:100% 拉伸：svg 的 width 属性已按容器内宽取整生成，
+   拉伸会引入 0.95~0.98 的缩放，把细线和文字重采样成锯齿。 */
+.chart svg{ display:block; max-width:100%; height:auto; }
 .chart:empty::after,
 .chart[data-empty].is-empty::after{
   content:attr(data-empty); display:flex; align-items:center; justify-content:center;

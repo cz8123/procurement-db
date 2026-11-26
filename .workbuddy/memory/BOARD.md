@@ -237,3 +237,14 @@
 - **Category Details 子类别可点**：`li.cs-item[data-subcat]` 点击按 `S.sel.sub` 交叉筛选（`beginHl('catdetail','sub',…)`、`setSel/renderFilters/loadAll`），选中行 `.on` 高亮；再点取消。chip 走既有 `EXTRA_CHIP_LABEL.sub = Sub-category`。
 - **Detail 日期切片器跨财年**：`_scope()` 里只要带 `dateFrom/dateTo` 就不再追加 `c."FiscalYearName"=?`，日期按 ISO 闭区间；财年切换不再清空日期；换财年后 `dtMeta` 显示 `起 ~ 止` 而不是 FY；可选范围取 `/options.range`（全库范围，不受当前财年限制）。实测 2026-03-01~09-30 跨 FY2526/FY2627 返回 10,301 行，同区间限 FY2627 为 4,136 行。
 - **测试**：board 301/0（KPI 绿升红降 + SVG 箭头、抽屉 6 列/浮动尺寸、子类别点击与取消）、detail 35/0（跨财年、换财年不清空）、page_tabs 25/0、geo 45/0+42/0、snapshot 64/0、visual 31/0、ui_focus 38/0、grid 14/0、colfilter 34/0、perf 11/0。
+
+## 45 图表 1:1 像素（去缩放）/ KPI 描边箭头与卡高 / 参考图入库（11-26 上午）
+- **锯齿感的真正根因：所有图表 SVG 都被缩放了 2~5%。** `chartW()` 取的是 `el.clientWidth`（**含左右 padding 各 8px**），所以 svg 的 `width` 属性比实际可绘制区宽 16px；CSS 又用 `.chart svg{width:100%}` 把它压回内容宽 → 每张图恒定缩放 0.955~0.981（实测 chDonut 341/357=0.9559、chTop 594/610=0.9739）。矢量图一旦被 CSS 缩放，细线与小字全部重采样，观感就是"分辨率低、有锯齿"。
+  - 修法一：`chartW()` 扣掉 `paddingLeft/Right` 并 `Math.floor`，svg 宽度 = 内容宽整数；
+  - 修法二：`.chart svg{ display:block; max-width:100%; height:auto }`，不再 `width:100%` 拉伸。
+  - 实测修后 `attrWidth / renderedWidth = 1.0000`，`resize` 仍走 180ms 重绘，窗口变化不会留旧宽度。
+- **KPI 箭头**：改成 12×12 视框的**描边箭头**（`stroke-width:1.3`、`stroke-linecap:round`、无填充），1 单位 = 1px 不缩放；关于 (6,6) 对称绘制。像素级实测圆标 48px（DPR4）时箭头 bbox 26×26、四边留白 **11/11/11/11**，完全居中；线宽约占直径 11%，比原来 6.8/8 的粗箭头细一半。
+- **KPI 卡高**：`min-height` 96→74、padding `8/7`→`7/6`、`.k-mid` 上边距 5→4，卡高 96→**76**（含 2px 边框），下方空白（原 18~25px）归零；1920/1280 下 7 张卡无溢出、数值无截断、顶栏仍 68px。
+- **离线导出不再内嵌地图 Key**：`board_export.py` 在拿到 `/dash` HTML 后把 `window.TMAP_KEY` 置空。理由：file:// 协议腾讯地图 SDK 明确不支持（控制台刷错误），且 Key 会随可转发文件泄漏。离线文件地图区显示配置提示，公司列表与 Zebra 表照常。
+- **测试**：`board_check` 吸顶段改稳（滚到文档底部、断言"图表位移 == 滚动距离"而非写死 600px，KPI 变矮后原断言会误报）；`page_tabs_check` 的 Top10 宽度断言改为对比"容器内宽"并校验 `rendered == attr`。回归：board 301/0、page_tabs 25/0、detail 35/0、geo 在线 45/0、离线 42/0、snapshot 64/0、visual 31/0、ui_focus 38/0、grid_sum 14/0、colfilter 34/0、perf 11/0。
+- **参考图入库**：`前端建设/microsoft官方 powerBI示例/` 新增 17 张视觉对照图（GEO/Zebra1~3/kpi/category/公司/卡片/工具提示/条图/气泡图/面积图/表格2~5，共 23MB）纳入版本库。

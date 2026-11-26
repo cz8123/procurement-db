@@ -175,10 +175,15 @@ async function waitFor(page, fn, timeout, label) {
       const svg = document.querySelector('#chTop svg');
       if (!svg) return null;
       const box = document.getElementById('chTop');
-      return { w: +svg.getAttribute('width'), box: Math.round(box.clientWidth) };
+      const cs = getComputedStyle(box);
+      const inner = box.clientWidth -
+        parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      return { w: +svg.getAttribute('width'), box: Math.round(inner),
+               rendered: +svg.getBoundingClientRect().width.toFixed(2) };
     });
-    chk('Top10 SVG 宽度=容器宽度（没被 width:100% 放大）',
-      !!top && Math.abs(top.w - top.box) <= 2, top);
+    chk('Top10 SVG 宽度=容器内宽（1:1 不缩放）',
+      !!top && Math.abs(top.w - top.box) <= 1 &&
+      Math.abs(top.rendered - top.w) <= 1, top);
     if (fy1) { await page.select('#fySel', fy0); await sleep(1200); }
 
     console.log('\n=== 7. 刷新首帧不闪回 Overview ===');

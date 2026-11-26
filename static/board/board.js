@@ -202,9 +202,16 @@
     var s = m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10;
     return s * e;
   }
+  /* 图表内宽：必须扣掉容器左右 padding，否则 svg 的 width 属性会比实际可绘制区宽
+     16px，CSS 的 max-width:100% 再把它压回来 → 整张图被缩小 2~5%，线条与文字全部
+     重采样发糊（锯齿感的根源）。取整到整数 px 才能 1:1 落像素。 */
   function chartW(id, fallback) {
     var el = $('#' + id);
-    return Math.max(320, (el ? el.clientWidth : 0) || fallback);
+    if (!el) return fallback;
+    var cs = window.getComputedStyle(el);
+    var w = el.clientWidth - (parseFloat(cs.paddingLeft) || 0) -
+      (parseFloat(cs.paddingRight) || 0);
+    return Math.max(320, Math.floor(w) || fallback);
   }
   function emptyBox(id, msg) {
     var el = $('#' + id);
@@ -247,14 +254,18 @@
     var sgn = x < 0 ? '-' : (x > 0 ? '+' : '');
     return sgn + kpiVal(k, Math.abs(x));
   }
-  /** KPI 右侧的一行差额：ΔPY +4.2M ↑ / -1.9M ↓（真正的箭头，不是三角） */
+  /** KPI 右侧的一行差额：ΔPY +4.2M ↑ / -1.9M ↓
+      箭头用 1:1 像素的描边箭头（12×12 视框、不缩放），细线带杆，
+      关于圆心对称绘制，避免缩放后亚像素模糊看起来"偏了"。 */
   function kDelta(label, txt, dir) {
-    var up = dir === 'up';
-    var path = up ? 'M4 0.6 L7.4 4.1 H5.45 V7.4 H2.55 V4.1 H0.6 Z'
-                  : 'M4 7.4 L0.6 3.9 H2.55 V0.6 H5.45 V3.9 H7.4 Z';
+    var d = dir === 'up'
+      ? 'M6 8.8V3.3M3.3 5.9 6 3.3l2.7 2.6'
+      : 'M6 3.2v5.5M3.3 6.1 6 8.7l2.7-2.6';
     return '<span class="k-delta ' + dir + '"><b>' + esc(label) + '</b>' +
-      '<em>' + esc(txt) + '</em><i class="k-bd"><svg viewBox="0 0 8 8" width="6.6" ' +
-      'height="6.6" aria-hidden="true"><path d="' + path + '" fill="#fff"/></svg></i></span>';
+      '<em>' + esc(txt) + '</em><i class="k-bd"><svg viewBox="0 0 12 12" ' +
+      'width="12" height="12" aria-hidden="true" fill="none" stroke="#fff" ' +
+      'stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="' + d + '"/></svg></i></span>';
   }
 
   function renderKpis() {
