@@ -755,7 +755,7 @@ body.drawer-open{ overflow:hidden; }
 /* 只拉长类别卡（默认比右侧热力卡矮 60px 左右）；热力卡保持自身高度，
    展开子类别把类别卡撑高时，不至于让右侧矩阵下面空一大片 */
 #catCard{ align-self:stretch; }
-.cd-wrap{ padding:2px 8px 10px; overflow:auto; flex:1 1 auto; min-height:0; }
+.cd-wrap{ padding:1px 8px 10px; overflow:auto; flex:1 1 auto; min-height:0; }
 .cd-tbl{ width:100%; border-collapse:collapse; table-layout:fixed; font-size:12.5px; }
 .cd-tbl thead th{
   text-align:left; font-weight:600; color:#122745; font-size:12px;
@@ -1007,8 +1007,24 @@ html.boot-other #pgOverview, html.boot-other #kpis, html.boot-other .fbar{ displ
 }
 .dt-date-in:focus{ outline:none; border-color:var(--blue); }
 .dt-date-sep{ color:var(--faint); }
-.dt-wrap{ position:relative; flex:1 1 auto; min-height:0; margin:6px 12px 0; overflow:auto; }
-.dt-tbl{ width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed; font-size:12px; }
+/* 表头工具条：表格上方一行「展开全部 / 收起全部」（Detail 与类别明细共用）
+   放在滚动容器外面 —— 表头是 sticky 的，工具条留在里面会被列头盖住 */
+.xbar{
+  display:flex; align-items:center; gap:7px; flex:0 0 auto;
+  margin:6px 12px 0; color:#7D8797;
+}
+.xbar > svg{ flex:none; opacity:.7; }
+.xbtn{
+  border:0; background:transparent; padding:0; cursor:pointer;
+  font:600 10.5px/1.6 var(--font); color:#1E4D78; letter-spacing:.2px;
+}
+.xbtn:hover{ color:#0E385E; text-decoration:underline; }
+.xsep{ width:1px; height:9px; background:#C8D2DF; }
+#catCard > .xbar{ margin:2px 12px 2px; }
+.dt-wrap{ position:relative; flex:1 1 auto; min-height:0; margin:2px 12px 0; overflow:auto; }
+/* 11 列（多出 Sub-Category）在 1500 以下放不满：按实测临界给一个最小宽度，
+   窄屏横向滚动，宁可滚也不要表头被省略号吃掉 */
+.dt-tbl{ width:100%; min-width:1470px; border-collapse:separate; border-spacing:0; table-layout:fixed; font-size:12px; }
 .dt-tbl thead th{
   position:sticky; top:0; z-index:3; height:34px; padding:0 2px 0 8px;
   background:var(--hdr-bg); color:#122745; border:0;
@@ -1062,6 +1078,12 @@ html.boot-other #pgOverview, html.boot-other #kpis, html.boot-other .fbar{ displ
 .dt-tbl tr.dt-company .dt-gmeta{ color:#66758A; font-size:10.5px; font-weight:600; }
 .dt-tbl tr.dt-company .dt-gn{ color:#66758A; }
 .dt-tbl tr.dt-company .dt-toggle{ width:15px; height:15px; line-height:13px; font-size:11px; }
+/* 类目分组行：第三级树，比公司行再浅一档；名字落在 Category 列 */
+.dt-tbl tr.dt-catgroup td{ background:#F7FAFD; font-weight:600; color:#22456C; }
+.dt-tbl tr.dt-catgroup td.dt-tree{ text-align:center; color:#B4BFCE; padding-left:8px; }
+.dt-tbl tr.dt-catgroup .dt-gmeta{ color:#7C8798; font-size:10.5px; font-weight:600; }
+.dt-tbl tr.dt-catgroup .dt-gn{ color:#7C8798; }
+.dt-tbl tr.dt-catgroup .dt-toggle{ width:14px; height:14px; line-height:12px; font-size:10.5px; }
 .dt-tbl tr.dt-child td:nth-child(2){ padding-left:20px; }
 .dt-tbl tr.dt-child td.dt-tree{ text-align:center; color:#9AA6B5; }
 /* 说明列：永远单行 + 省略号（全文在 title 里），tab 形宽度不会被长文本撑开 */

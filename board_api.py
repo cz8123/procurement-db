@@ -1038,6 +1038,7 @@ def contracts_csv():
 # 每列都可搜索（LIKE）、筛选（多选取值 / 数值区间）、排序；三级树 + 全集合计，不分页。
 DETAIL_TEXT = {
     "region": "Region", "company": "Company", "category": "Category",
+    "sub": "Sub-Category",
     "supplier": "Supplier", "method": "Method",
     # 豁免理由 / 单一来源理由 两列互斥（FY2627 同时非空 0 条），合并成一列
     "reason": "Single Source Reason",
@@ -1050,6 +1051,8 @@ DETAIL_EXPR = {
     "region": 'p."Region_cn"',
     "company": 'p."Company_cn"',
     "category": 'p."Category"',
+    # 采购子类别：走 dim_agg 聚合（244 原始值 → 144 聚合名），与筛选口径同一表达式
+    "sub": SUB_EXPR,
     "supplier": 'p."Supplier_cn"',
     "method": 'p."Procurement Method"',
     # 豁免单一来源的理由 与 单一来源采购理由 不会同时出现，合并一列：
@@ -1172,17 +1175,27 @@ def detail():
             'GROUP BY 1, 2 ORDER BY 1, 3 DESC'
             % (DETAIL_EXPR["region"], DETAIL_EXPR["company"],
                DETAIL_EXPR["amount"], DETAIL_EXPR["paid"], base), params)]
-        for group in (rt, ct):
+        # 第四级（类目）小计：Region → Company → Category → 明细
+        gt = [dict(r) for r in c.execute(
+            'SELECT %s region, %s company, %s category, COUNT(*) n, '
+            'SUM(%s) amount, SUM(%s) paid %s '
+            'GROUP BY 1, 2, 3 ORDER BY 1, 2, 5 DESC'
+            % (DETAIL_EXPR["region"], DETAIL_EXPR["company"], DETAIL_EXPR["category"],
+               DETAIL_EXPR["amount"], DETAIL_EXPR["paid"], base), params)]
+        for group in (rt, ct, gt):
             for r in group:
                 r["region"] = r["region"] or ""
                 if "company" in r:
                     r["company"] = r["company"] or ""
+                if "category" in r:
+                    r["category"] = r["category"] or ""
                 for k in ("amount", "paid"):
                     r[k] = None if r[k] is None else round(r[k] / rate, 2)
         return jsonify({"rows": rows, "total": int(tot["n"] or 0), "sums": sums,
                         "regionTotals": rt, "companyTotals": ct,
+                        "categoryTotals": gt,
                         "fy": fy, "cur": cur, "rate": rate,
-                        "columns": list(DETAIL_TEXT) + ["note", "amount", "paid"]})
+                        "columns": list(DETAIL_TEXT) + ["note", "date", "amount", "paid"]})
     finally:
         c.close()
 

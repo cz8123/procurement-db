@@ -320,3 +320,17 @@
 - **Category Details 子类别改成 Detail 式树行**：类别行首加 `.cd-tog`（15px +/−，同 `.dt-toggle` 观感），展开后**每个子类别是一行** `tr.cd-subrow`：第 1 列 `└`、第 2 列缩进 20px 显示子类别名，Suppliers / Orders / Spend / PO Paid / Share 各自对齐到本列；点了按 Sub-category 交叉筛选（`.on` 高亮）。原来整行塞一个 `ul.cs-list` 的写法连同 `.cs-*` 样式一起删掉。后端 `pareto.subsMap` 每项新增 `sup`（`COUNT(DISTINCT p."Supplier_cn")`）供子类别行填供应商数。`fitCatTable` 的「展开时锁高 + 内部滚动」逻辑不变。
 - **测试**：`board_check` 323/0（新增：每根柱都有金额、子类别是 7 列树行且首列 `└`、下钻层出现二级筛选按钮、浮层标题含字段名、勾选后 chip + 金额收窄、取消恢复、SS-Non Exempt 用 Single Source Reason 字段；`li[data-subcat]`/`cs-tog` 选择器改为 `tr.cd-subrow`/`.cd-tog`）；`visual_tools` 31/0、`snapshot` 64/0（离线类别首行改读 `.cd-cat span`，否则会把 +/− 一起读进去）、`detail` 41/0、`page_tabs` 27/0。
 - 性能：`/data` 加了一个 `COUNT(DISTINCT Supplier_cn)` 后仍 0.52s（连测 3 次）。
+
+## 54 Detail 增第四级（类目）+ Sub-Category 列；两处「展开全部 / 收起全部」（11-26 傍晚）
+- **Detail 树升到四级**：Region → Company → **Category** → 明细行。分组行 td 数与 colspan：区域 `1 + colspan 8 + 2`、公司 `2 + colspan 7 + 2`、类目 `3 + colspan 6 + 2`（总 11）。类目行的名字落在 **Category 列**（td3）、公司名在 Company 列（td2），每层一个 `.dt-toggle`（`data-toggle-category` 键 = `region\u0001company\u0001category`）。
+- **分组小计**：后端新增 `categoryTotals`（`GROUP BY region, company, category`，与 rt/ct 同样按筛选全集算、同样做 rate 换算与空串归一）。前端 `renderDetail` 建三层 map（`reg` / `co` / `ca`），各层按金额降序；**兜底条件也加了 `!categoryTotals.length`**，否则老快照有 rt/ct 没有 gt 时类目小计会全 0。
+- **计数从名字后移到右侧说明**：`.dt-gn` 在分组行里删掉，改成 `region subtotal · 3,332 orders` 这类写法 —— 因为四级缩进把 Region/Company 列压到 85/109px，名字后面再挂计数就溢出了。
+- **新增 `Sub-Category` 列**（第 4 列，紧跟 Category）：`DETAIL_EXPR["sub"] = SUB_EXPR`（`dim_agg_采购子类别` 聚合名，和筛选用同一表达式）；`DETAIL_TEXT` 也加 `"sub"`，所以该列**有取值勾选面板**（`/detail/values?col=sub` 返回 117 个聚合名），不是只搜索。
+- **列宽 11 列（合计 100%）**：5.8 / 7.4 / 6.6 / 9.8 / 12.4 / 10.9 / 10.9 / 10.5 / 6.4 / 11.0 / 8.3。1471px 下实测 82/109/97/144/191/159/159/154/94/161/122，`.dt-sort` 全部 `scrollWidth == clientWidth`。**临界宽度是 1470**：`table-layout:fixed` 下百分比按表格宽度算，所以给 `.dt-tbl{min-width:1470px}` —— 1600 视口（1471）不出横向滚动，1440/1366 横向滚 159/233px，换取表头不被省略号吃掉（窄屏不许再缩列宽，缩了必然截断）。
+- **两处「展开全部 / 收起全部」**（用户："能展开的位置，在父表头加个可以展开所有与收起所有的按钮"）：新增 `.xbar`（模板静态节点 `#dtXbar`、`#catXbar`），放在**表格容器外、表头之上**（表头是 sticky 的，放滚动容器里会被列头盖住），两个按钮 `.xbtn[data-xall=1|0]`。
+  - Detail：`dtSetAll(open)` 用 `S.detail.keys`（renderDetail 时落下的 R/C/G 全集）全设/全清 `expR/expC/expG`，再 `renderDetail` + `saveView`。
+  - Category Details：展开 = 所有 `subsMap[k].length > 1` 的类别写进 `S.catSub`（与 `.v-exp` 同口径）；收起 = `S.catSub = {}`（与 `.v-back` 同口径）。
+- **状态持久化**：`S.detail.expG` 进 `board-view-v1`（saveView/restoreView），刷新后四级展开态保持（实测 374 类目 / 5892 明细行还原）。
+- **离线快照**：`DETAIL_KEYS` 加 `sub`、`detailResp` 的 field 与行输出补 `sub`、新增 `categoryTotals`（与在线同结构）。`board_export.ROW_COLS` 早就有 `sub`，无需改。
+- **测试**：`detail_table_check` 47/0（11 列名、11 个漏斗、类目层展开 → 明细条数 = `categoryTotals` 的 n、工具条在容器外且在表头上方、Expand all 后 `+` 号 0 个且明细数 = 全集、Collapse all 只剩区域行、子类别列有取值面板；`footCells` 改 9/10、金额列 `nth-child(10)`、币种 `th(10)`、note idx 6→7）；`board_check` 326/0（新增类别卡工具条 3 条）；`snapshot_check` 64/0（离线 11 列 + 展开到类目层）；`page_tabs` 27、`visual_tools` 31、`ui_focus` 41、`grid_sum` 14、`colfilter` 34 全绿。
+- **已知取舍**：明细行第 1 列（Region）现在是空的（树符号只保留在分组行），Company/Category 列在明细行仍显示值 —— 用户要求保留这两列，视觉上略有重复但不影响识别。

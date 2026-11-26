@@ -60,7 +60,7 @@
     geo: { metric: 'prpo', data: null, selected: [], q: '',
            loaded: false, stale: true, seq: 0, map: null, overlay: null },
     detail: { sort: 'region', dir: 'asc',
-              q: {}, f: {}, min: {}, max: {}, expR: {}, expC: {},
+              q: {}, f: {}, min: {}, max: {}, expR: {}, expC: {}, expG: {},
               from: '', to: '',
               loaded: false, stale: true, seq: 0, pop: null, tmp: null },
     seq: 0, rowSeq: 0, drawerSeq: 0
@@ -2015,6 +2015,22 @@
       beginHl('monthly', 'region', list);
       setSel('region', list); renderFilters(); refreshCompanyOptions(); loadAll();
     });
+    /* 类别表头上方的「展开全部 / 收起全部」：与 .v-exp / .v-back 同一口径 */
+    var cx = $('#catXbar');
+    if (cx) cx.addEventListener('click', function (e) {
+      var b = e.target.closest('.xbtn');
+      if (!b) return;
+      if (b.dataset.xall === '1') {
+        var pack = (S.data && S.data.pareto) || {};
+        var subs = pack.subsMap || {};
+        Object.keys(subs).forEach(function (k) {
+          if ((subs[k] || []).length > 1) S.catSub[k] = 1;
+        });
+      } else {
+        S.catSub = {};
+      }
+      renderCatDetails(); updateVisualTools();
+    });
     $('#chCat').addEventListener('click', function (e) {
       /* 点行首 +/− 只展开收起子类别，不触发类别筛选 */
       var tog = e.target.closest('.cd-tog');
@@ -3139,6 +3155,7 @@
         geoQ: S.geo.q || '',
         expR: S.detail.expR || {},
         expC: S.detail.expC || {},
+        expG: S.detail.expG || {},
         dFrom: S.detail.from || '',
         dTo: S.detail.to || ''
       }));
@@ -3171,6 +3188,7 @@
     if (typeof v.fy === 'string') S.fy = v.fy;
     if (v.expR && typeof v.expR === 'object') S.detail.expR = v.expR;
     if (v.expC && typeof v.expC === 'object') S.detail.expC = v.expC;
+    if (v.expG && typeof v.expG === 'object') S.detail.expG = v.expG;
     if (typeof v.dFrom === 'string') S.detail.from = v.dFrom;
     if (typeof v.dTo === 'string') S.detail.to = v.dTo;
   }
@@ -3287,19 +3305,21 @@
        Company / Category 再压一档（分组行仍放得下），多出来的宽度都给说明；
        金额两列要容得下表头「PRPO Amount (RMB)」，否则表头被省略号截掉。 */
   var DT_COLS = [
-    { k: 'region',   t: 'Region',              w: '6.25%' },
-    { k: 'company',  t: 'Company',             w: '8.43%' },
-    { k: 'category', t: 'Category',            w: '8.84%' },
-    { k: 'supplier', t: 'Supplier',            w: '15.0%' },
-    { k: 'method',   t: 'Procurement Method',  w: '10.94%' },
+    { k: 'region',   t: 'Region',              w: '5.8%' },
+    { k: 'company',  t: 'Company',             w: '7.4%' },
+    { k: 'category', t: 'Category',            w: '6.6%' },
+    /* 子类别：dim_agg 聚合名，紧跟在类别之后 */
+    { k: 'sub',      t: 'Sub-Category',        w: '9.8%' },
+    { k: 'supplier', t: 'Supplier',            w: '12.4%' },
+    { k: 'method',   t: 'Procurement Method',  w: '10.9%' },
     /* 豁免单一来源的理由 / 单一来源采购理由 不会同时出现，合并成一列 */
-    { k: 'reason',   t: 'Single Source Reason', w: '11.08%' },
+    { k: 'reason',   t: 'Single Source Reason', w: '10.9%' },
     /* 说明：一行显示 + 省略号（全文在悬停浮窗里），夹在理由与日期之间 */
-    { k: 'note',     t: 'Note',                w: '11.79%', long: 1 },
+    { k: 'note',     t: 'Note',                w: '10.5%', long: 1 },
     /* 申请日期（ISO 文本）：只给搜索，不给取值勾选 */
-    { k: 'date',     t: 'Date',                w: '7.5%', qonly: 1 },
-    { k: 'amount',   t: 'PRPO Amount',         w: '11.3%', num: 1 },
-    { k: 'paid',     t: 'PO Paid',             w: '8.36%', num: 1 }
+    { k: 'date',     t: 'Date',                w: '6.4%', qonly: 1 },
+    { k: 'amount',   t: 'PRPO Amount',         w: '11.0%', num: 1 },
+    { k: 'paid',     t: 'PO Paid',             w: '8.3%', num: 1 }
   ];
   var DT_TEXT = DT_COLS.filter(function (c) { return !c.num; });
 
@@ -3362,6 +3382,9 @@
     }).join('') + '</tr>';
   }
   function dtCoKey(region, company) { return (region || '') + '\u0001' + (company || ''); }
+  function dtCaKey(region, company, category) {
+    return dtCoKey(region, company) + '\u0001' + (category || '');
+  }
   /* -------- 单元格悬停浮窗 --------
      只对被裁掉的内容浮窗：说明列永远单行，一定有浮窗；其余列按 scrollWidth 判断。
      定位贴单元格下沿、越界翻到上方并夹在视口内；滚动 / 移出表格 / 重渲染都收起。 */
@@ -3400,7 +3423,7 @@
       if (rg.from) { dF.min = rg.from; dT.min = rg.from; }
       if (rg.to) { dF.max = rg.to; dT.max = rg.to; }
     }
-    var max = { amount: 0, paid: 0 }, reg = {}, co = {}, tree = [];
+    var max = { amount: 0, paid: 0 }, reg = {}, co = {}, ca = {}, tree = [];
     (d.rows || []).forEach(function (r) {
       ['amount', 'paid'].forEach(function (k) {
         if (r[k] > max[k]) max[k] = r[k];
@@ -3409,23 +3432,35 @@
     /* 分组小计：后端按筛选全集算；老快照没带就按全集兜底 */
     (d.regionTotals || []).forEach(function (r) { reg[r.region || ''] = r; });
     (d.companyTotals || []).forEach(function (r) { co[dtCoKey(r.region, r.company)] = r; });
-    if (!(d.regionTotals || []).length || !(d.companyTotals || []).length) {
+    (d.categoryTotals || []).forEach(function (r) {
+      ca[dtCaKey(r.region, r.company, r.category)] = r;
+    });
+    if (!(d.regionTotals || []).length || !(d.companyTotals || []).length ||
+        !(d.categoryTotals || []).length) {
       (d.rows || []).forEach(function (r) {
         var rk = r.region || '', ck = dtCoKey(rk, r.company);
         var g = reg[rk] || (reg[rk] = { region: rk, n: 0, amount: 0, paid: 0 });
         var h = co[ck] || (co[ck] = { region: rk, company: r.company || '', n: 0, amount: 0, paid: 0 });
-        g.n++; g.amount += r.amount || 0; g.paid += r.paid || 0;
-        h.n++; h.amount += r.amount || 0; h.paid += r.paid || 0;
+        var gk = dtCaKey(rk, r.company, r.category);
+        var q = ca[gk] || (ca[gk] = { region: rk, company: r.company || '',
+                                      category: r.category || '', n: 0, amount: 0, paid: 0 });
+        [g, h, q].forEach(function (o) {
+          o.n++; o.amount += r.amount || 0; o.paid += r.paid || 0;
+        });
       });
     }
-    /* 建区域→公司树；区域按采购额降序、公司按采购额降序（小计来自筛选全集），
+    /* 建 区域 → 公司 → 类目 三层树；各层按采购额降序（小计来自筛选全集），
        明细行在组内保持后端排序。 */
     var rmap = {};
     (d.rows || []).forEach(function (r) {
-      var rk = r.region || '', ck = r.company || '';
-      var g = rmap[rk] || (rmap[rk] = { region: rk, cos: {}, order: [] });
-      if (!g.cos[ck]) { g.cos[ck] = []; g.order.push(ck); }
-      g.cos[ck].push(r);
+      var rk = r.region || '', ck = r.company || '', gk = r.category || '';
+      var g = rmap[rk];
+      if (!g) { g = rmap[rk] = { region: rk, cos: {}, order: [] }; }
+      var h = g.cos[ck];
+      if (!h) { h = g.cos[ck] = { company: ck, cats: {}, order: [] }; g.order.push(ck); }
+      var q = h.cats[gk];
+      if (!q) { q = h.cats[gk] = { category: gk, rows: [] }; h.order.push(gk); }
+      q.rows.push(r);
     });
     Object.keys(rmap).forEach(function (rk) { tree.push(rmap[rk]); });
     tree.sort(function (a, b) {
@@ -3436,7 +3471,23 @@
         var cx = co[dtCoKey(g.region, x)], cy = co[dtCoKey(g.region, y)];
         return (cy ? cy.amount : 0) - (cx ? cx.amount : 0);
       });
+      g.order.forEach(function (cn) {
+        g.cos[cn].order.sort(function (x, y) {
+          var cx = ca[dtCaKey(g.region, cn, x)], cy = ca[dtCaKey(g.region, cn, y)];
+          return (cy ? cy.amount : 0) - (cx ? cx.amount : 0);
+        });
+      });
     });
+    /* 三层可展开键的全集：表头那枚「展开全部 / 收起全部」据此判断当前是否全开 */
+    var keys = { R: [], C: [], G: [] };
+    tree.forEach(function (g) {
+      keys.R.push(g.region);
+      g.order.forEach(function (cn) {
+        keys.C.push(dtCoKey(g.region, cn));
+        g.cos[cn].order.forEach(function (gk) { keys.G.push(dtCaKey(g.region, cn, gk)); });
+      });
+    });
+    S.detail.keys = keys;
     function numCell(v, key) {
       var w = max[key] > 0 && v > 0 ? Math.min(100, Math.max(3, Math.round(v / max[key] * 100))) : 0;
       return '<td class="num"><i class="dt-bar' + (key === 'paid' ? ' paid' : '') +
@@ -3449,9 +3500,9 @@
       body.push('<tr class="dt-group" data-region="' + esc(rk) + '">' +
         '<td data-tip="' + esc(rk) + '"><button type="button" class="dt-toggle" data-toggle-region="' + esc(rk) +
         '" title="' + (rOpen ? 'Collapse' : 'Expand') + ' ' + esc(rk) + '">' +
-        (rOpen ? '−' : '+') + '</button>' + esc(rk || '(blank)') +
-        '<i class="dt-gn">' + nf(rg.n, 0) + '</i></td>' +
-        '<td colspan="7" class="dt-gmeta">region subtotal</td>' +
+        (rOpen ? '−' : '+') + '</button>' + esc(rk || '(blank)') + '</td>' +
+        '<td colspan="8" class="dt-gmeta">region subtotal · ' +
+        nf(rg.n, 0) + ' orders</td>' +
         numCell(rg.amount, 'amount') + numCell(rg.paid, 'paid') + '</tr>');
       if (!rOpen) return;
       g.order.forEach(function (ckName) {
@@ -3460,25 +3511,41 @@
         body.push('<tr class="dt-company" data-region="' + esc(rk) + '" data-company="' + esc(ckName) + '">' +
           '<td class="dt-tree">└</td><td data-tip="' + esc(ckName) + '"><button type="button" class="dt-toggle" data-toggle-company="' +
           esc(key) + '" title="' + (cOpen ? 'Collapse' : 'Expand') + ' ' + esc(ckName) + '">' +
-          (cOpen ? '−' : '+') + '</button>' + esc(ckName || '(blank)') +
-          '<i class="dt-gn">' + nf(cg.n, 0) + '</i></td>' +
-          '<td colspan="6" class="dt-gmeta">company subtotal</td>' +
+          (cOpen ? '−' : '+') + '</button>' + esc(ckName || '(blank)') + '</td>' +
+          '<td colspan="7" class="dt-gmeta">company subtotal · ' +
+          nf(cg.n, 0) + ' orders</td>' +
           numCell(cg.amount, 'amount') + numCell(cg.paid, 'paid') + '</tr>');
         if (!cOpen) return;
-        g.cos[ckName].forEach(function (r) {
-          body.push('<tr class="dt-child">' + DT_COLS.map(function (c, i) {
-            var v = r[c.k];
-            if (c.num) return numCell(v, c.k);
-            if (i === 0) return '<td class="dt-tree">└</td>';
-            var tip = v == null ? '' : String(v);
-            /* 文本列把原值放进 data-tip，悬停时由浮窗给全文（说明保留换行、
-               供应商给中英文全称，宽度不够时不再靠浏览器原生 title） */
-            if (c.long) {
-              return '<td class="dt-note" data-tip="' + esc(tip) + '">' + esc(v || '—') + '</td>';
-            }
-            var disp = c.k === 'supplier' ? supEn(v) : (v || '—');
-            return '<td data-tip="' + esc(tip) + '">' + esc(disp) + '</td>';
-          }).join('') + '</tr>');
+        var ch = g.cos[ckName];
+        ch.order.forEach(function (gkName) {
+          var gkey = dtCaKey(rk, ckName, gkName);
+          var gg = ca[gkey] || { n: 0, amount: 0, paid: 0 };
+          var gOpen = !!S.detail.expG[gkey];
+          body.push('<tr class="dt-catgroup" data-region="' + esc(rk) + '" data-company="' + esc(ckName) +
+            '" data-category="' + esc(gkName) + '">' +
+            '<td class="dt-tree"></td><td class="dt-tree">└</td>' +
+            '<td data-tip="' + esc(gkName) + '"><button type="button" class="dt-toggle" data-toggle-category="' +
+            esc(gkey) + '" title="' + (gOpen ? 'Collapse' : 'Expand') + ' ' + esc(gkName) + '">' +
+            (gOpen ? '−' : '+') + '</button>' + esc(gkName || '(blank)') + '</td>' +
+            '<td colspan="6" class="dt-gmeta">category subtotal · ' +
+            nf(gg.n, 0) + ' orders</td>' +
+            numCell(gg.amount, 'amount') + numCell(gg.paid, 'paid') + '</tr>');
+          if (!gOpen) return;
+          ch.cats[gkName].rows.forEach(function (r) {
+            body.push('<tr class="dt-child">' + DT_COLS.map(function (c, i) {
+              var v = r[c.k];
+              if (c.num) return numCell(v, c.k);
+              if (i === 0) return '<td class="dt-tree"></td>';
+              var tip = v == null ? '' : String(v);
+              /* 文本列把原值放进 data-tip，悬停时由浮窗给全文（说明保留换行、
+                 供应商给中英文全称，宽度不够时不再靠浏览器原生 title） */
+              if (c.long) {
+                return '<td class="dt-note" data-tip="' + esc(tip) + '">' + esc(v || '—') + '</td>';
+              }
+              var disp = c.k === 'supplier' ? supEn(v) : (v || '—');
+              return '<td data-tip="' + esc(tip) + '">' + esc(disp) + '</td>';
+            }).join('') + '</tr>');
+          });
         });
       });
     });
@@ -3593,9 +3660,29 @@
     delete d.q[key]; delete d.f[key]; delete d.min[key]; delete d.max[key];
     d.page = 1; closeDtPop(); renderDtHead(); loadDetail();
   }
+  /** 明细树「全展开 / 全收起」：三层键的全集来自 renderDetail 落下的 S.detail.keys */
+  function dtSetAll(open) {
+    var k = S.detail.keys || { R: [], C: [], G: [] };
+    S.detail.expR = {}; S.detail.expC = {}; S.detail.expG = {};
+    if (open) {
+      k.R.forEach(function (v) { S.detail.expR[v] = true; });
+      k.C.forEach(function (v) { S.detail.expC[v] = true; });
+      k.G.forEach(function (v) { S.detail.expG[v] = true; });
+    }
+    if (S.detail.data) renderDetail(S.detail.data);
+    saveView();
+  }
   function bindDetail() {
     var tbl = $('#dtTbl'), pop = $('#dtPop');
     if (!tbl || !pop) return;
+    var xb = $('#dtXbar');
+    if (xb) {
+      xb.addEventListener('click', function (e) {
+        var b = e.target.closest('.xbtn');
+        if (!b) return;
+        dtSetAll(b.dataset.xall === '1');
+      });
+    }
     dtTipEl = $('#dtTip');
     /* 悬停浮窗：同一格只在首次进入时启动，移动鼠标不重复定位 */
     tbl.addEventListener('mouseover', function (e) {
@@ -3616,6 +3703,14 @@
       if (c) {
         var key = c.dataset.toggleCompany;
         S.detail.expC[key] = !S.detail.expC[key];
+        if (S.detail.data) renderDetail(S.detail.data);
+        saveView();
+        return;
+      }
+      var g = e.target.closest('[data-toggle-category]');
+      if (g) {
+        var gkey = g.dataset.toggleCategory;
+        S.detail.expG[gkey] = !S.detail.expG[gkey];
         if (S.detail.data) renderDetail(S.detail.data);
         saveView();
         return;

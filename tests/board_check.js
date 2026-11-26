@@ -609,6 +609,30 @@ async function waitFor(pg, fn, timeout, label) {
     chk('再点一次取消子类别筛选', (await count('.chip')) === 0 &&
       (await count('#chCat tr.cd-subrow.on')) === 0);
 
+    /* 11-26：类别表头上方的「展开全部 / 收起全部」工具条 */
+    const cxb = await page.evaluate(() => {
+      const bar = document.getElementById('catXbar');
+      if (!bar) return null;
+      const r = bar.getBoundingClientRect();
+      const head = document.querySelector('#chCat thead th').getBoundingClientRect();
+      return { btns: [...bar.querySelectorAll('.xbtn')].map(b => b.textContent.trim()),
+               aboveHead: Math.round(r.bottom) <= Math.round(head.top) + 2 };
+    });
+    chk('类别卡片有 Expand all / Collapse all 工具条（在表头上方）',
+      !!cxb && cxb.btns.join('|') === 'Expand all|Collapse all' && cxb.aboveHead, cxb);
+    await page.evaluate(() => document.querySelectorAll('#catXbar .xbtn')[0].click());
+    await sleep(500);
+    const cOn = await page.evaluate(() => ({
+      subrows: document.querySelectorAll('#chCat tr.cd-subrow').length,
+      open: document.querySelectorAll('#chCat .cd-tog.on').length
+    }));
+    chk('Expand all 展开所有有子类别的类别', cOn.open > 1 && cOn.subrows > cOn.open, cOn);
+    await page.evaluate(() => document.querySelectorAll('#catXbar .xbtn')[1].click());
+    await sleep(500);
+    chk('Collapse all 全部收起', await page.evaluate(() =>
+      document.querySelectorAll('#chCat tr.cd-subrow').length === 0 &&
+      document.querySelectorAll('#chCat .cd-tog.on').length === 0));
+
     console.log('=== 8.7 月度图两种图示切换 ===');
     chk('有图示切换控件', await count('#mSw button') === 2, await count('#mSw button'));
     chk('默认是区域堆叠', (await num('#mTitle')) === 'Monthly Spend by Region' &&

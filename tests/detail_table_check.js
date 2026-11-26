@@ -55,8 +55,8 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       width: Math.round(th.getBoundingClientRect().width)
     })));
     console.log('    ' + JSON.stringify(head.map(h => [h.text, h.width])));
-    chk('十列且名称正确（理由、说明、日期都在方法与本单金额之间）', head.length === 10 &&
-      ['Region', 'Company', 'Category', 'Supplier', 'Procurement Method',
+    chk('十一列且名称正确（类目后紧跟子类别，理由/说明/日期在方法与本单金额之间）', head.length === 11 &&
+      ['Region', 'Company', 'Category', 'Sub-Category', 'Supplier', 'Procurement Method',
        'Single Source Reason', 'Note', 'Date', 'PRPO Amount (RMB)', 'PO Paid (RMB)']
         .every((t, i) => head[i].text.indexOf(t) === 0), head);
     /* 日期列：ISO 文本（此刻表格默认全折叠，直接查 API 更干净） */
@@ -71,7 +71,7 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
     /* 11-26：筛选入口从一枚淡到看不见的 ▾ 字形换成 18px 描边方块 + 矢量漏斗 */
     chk('筛选入口是 18px 描边按钮 + 矢量漏斗图标', await page.evaluate(() => {
       const a = [...document.querySelectorAll('#dtTbl thead .dt-funnel')];
-      return a.length === 10 && a.every(b => {
+      return a.length === 11 && a.every(b => {
         const r = b.getBoundingClientRect();
         return !!b.querySelector('svg') && Math.round(r.width) === 18 &&
           Math.round(r.height) === 18 && b.textContent.trim() === '';
@@ -85,8 +85,8 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
     console.log('    ' + JSON.stringify(shown) + ' api total=' + base.total);
     chk('行数与 API 一致', metaNum(shown.meta) === base.total, shown);
     chk('合计 = 筛选全集（不是当前页）',
-      Math.abs(num(shown.footCells[8]) - base.sums.amount) < 0.05 &&
-      Math.abs(num(shown.footCells[9]) - base.sums.paid) < 0.05,
+      Math.abs(num(shown.footCells[9]) - base.sums.amount) < 0.05 &&
+      Math.abs(num(shown.footCells[10]) - base.sums.paid) < 0.05,
       { foot: shown.footCells, sums: base.sums });
 
     console.log('=== 1b. 三级树默认全折叠 ===');
@@ -129,25 +129,79 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
     const coKey = await page.evaluate(() => document.querySelector('#dtTbl tr.dt-company .dt-toggle').dataset.toggleCompany);
     const coRow = base.companyTotals.find(r => (r.region || '') + '\u0001' + (r.company || '') === coKey);
     await page.click('#dtTbl tr.dt-company .dt-toggle');
-    await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-child').length > 0,
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-catgroup').length > 0,
       8000, 'expand company');
     const lvl3 = await page.evaluate(() => ({
       glyph: document.querySelector('#dtTbl tr.dt-company .dt-toggle').textContent.trim(),
-      children: document.querySelectorAll('#dtTbl tbody tr.dt-child').length,
-      first: document.querySelector('#dtTbl tr.dt-child td:nth-child(2)').textContent.trim()
+      cats: document.querySelectorAll('#dtTbl tbody tr.dt-catgroup').length,
+      children: document.querySelectorAll('#dtTbl tbody tr.dt-child').length
     }));
-    console.log('    ' + JSON.stringify(lvl3) + ' expect children=' + (coRow && coRow.n));
-    chk('展开公司后出现明细行且条数一致', lvl3.glyph === '−' &&
-      lvl3.children === (coRow ? coRow.n : -1), lvl3);
+    console.log('    ' + JSON.stringify(lvl3));
+    chk('展开公司后出现类目行（类目仍折叠、无明细行）',
+      lvl3.glyph === '−' && lvl3.cats > 0 && lvl3.cats <= coRow.n && lvl3.children === 0, lvl3);
+
+    /* 第四层：展开一个类目 → 明细行（条数等于该 region×company×category 的单数） */
+    const caKey = await page.evaluate(() =>
+      document.querySelector('#dtTbl tr.dt-catgroup .dt-toggle').dataset.toggleCategory);
+    const caRow = (base.categoryTotals || []).find(r =>
+      (r.region || '') + '\u0001' + (r.company || '') + '\u0001' + (r.category || '') === caKey);
+    await page.click('#dtTbl tr.dt-catgroup .dt-toggle');
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-child').length > 0,
+      8000, 'expand category');
+    const lvl4 = await page.evaluate(() => ({
+      glyph: document.querySelector('#dtTbl tr.dt-catgroup .dt-toggle').textContent.trim(),
+      children: document.querySelectorAll('#dtTbl tbody tr.dt-child').length,
+      sub: document.querySelector('#dtTbl tr.dt-child td:nth-child(4)').textContent.trim()
+    }));
+    console.log('    ' + JSON.stringify(lvl4) + ' expect children=' + (caRow && caRow.n));
+    chk('展开类目后出现明细行且条数一致（第 4 列是子类别）', lvl4.glyph === '−' &&
+      lvl4.children === (caRow ? caRow.n : -1) && lvl4.sub.length > 0, lvl4);
+    await page.click('#dtTbl tr.dt-catgroup .dt-toggle');
+    await sleep(200);
+    chk('再点类目 + 收起明细', await page.evaluate(() =>
+      document.querySelectorAll('#dtTbl tbody tr.dt-child').length === 0));
     await page.click('#dtTbl tr.dt-company .dt-toggle');
     await sleep(200);
-    chk('再点公司 + 收起明细', await page.evaluate(() =>
-      document.querySelectorAll('#dtTbl tbody tr.dt-child').length === 0));
+    chk('再点公司 + 收起类目行', await page.evaluate(() =>
+      document.querySelectorAll('#dtTbl tbody tr.dt-catgroup').length === 0));
     await page.evaluate(r => document.querySelector('#dtTbl tr.dt-group[data-region="' +
       CSS.escape(r) + '"] .dt-toggle').click(), target);
     await sleep(200);
     chk('再点区域 + 收起公司行', await page.evaluate(() =>
       document.querySelectorAll('#dtTbl tbody tr.dt-company').length === 0));
+
+    console.log('=== 1b2. 表头工具条：展开全部 / 收起全部 ===');
+    const xb = await page.evaluate(() => {
+      const bar = document.getElementById('dtXbar');
+      if (!bar) return null;
+      const r = bar.getBoundingClientRect();
+      const head = document.querySelector('#dtTbl thead').getBoundingClientRect();
+      return { btns: [...bar.querySelectorAll('.xbtn')].map(b => b.textContent.trim()),
+               aboveTable: Math.round(r.bottom) <= Math.round(head.top) + 1,
+               inScrollBox: !!bar.closest('.dt-wrap') };
+    });
+    chk('表格上方有 Expand all / Collapse all 两个按钮（在滚动容器外，不被吸顶表头盖住）',
+      !!xb && xb.btns.join('|') === 'Expand all|Collapse all' && xb.aboveTable && !xb.inScrollBox, xb);
+    await page.evaluate(() => document.querySelectorAll('#dtXbar .xbtn')[0].click());
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-child').length > 0,
+      10000, 'expand all');
+    const allOn = await page.evaluate(() => ({
+      regions: document.querySelectorAll('#dtTbl tbody tr.dt-group').length,
+      companies: document.querySelectorAll('#dtTbl tbody tr.dt-company').length,
+      cats: document.querySelectorAll('#dtTbl tbody tr.dt-catgroup').length,
+      children: document.querySelectorAll('#dtTbl tbody tr.dt-child').length,
+      plus: [...document.querySelectorAll('#dtTbl .dt-toggle')].filter(b => b.textContent.trim() === '+').length
+    }));
+    console.log('    ' + JSON.stringify(allOn));
+    chk('Expand all：三层全开、无残留 + 号、明细行数 = 筛选全集',
+      allOn.companies > 0 && allOn.cats > 0 && allOn.children === base.total && allOn.plus === 0, allOn);
+    await page.evaluate(() => document.querySelectorAll('#dtXbar .xbtn')[1].click());
+    await sleep(400);
+    chk('Collapse all：只剩区域行', await page.evaluate(() =>
+      document.querySelectorAll('#dtTbl tbody tr.dt-group').length > 0 &&
+      document.querySelectorAll('#dtTbl tbody tr.dt-company').length === 0 &&
+      document.querySelectorAll('#dtTbl tbody tr.dt-catgroup').length === 0 &&
+      document.querySelectorAll('#dtTbl tbody tr.dt-child').length === 0));
 
     console.log('=== 1c. 说明列（单行省略 + 悬停浮窗给全文 + 搜索） ===');
     /* 重新展开一个区域 + 一个公司，拿到明细行 */
@@ -156,8 +210,11 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
     await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-company').length > 0,
       8000, 're-expand region');
     await page.click('#dtTbl tr.dt-company .dt-toggle');
-    await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-child').length > 0,
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-catgroup').length > 0,
       8000, 're-expand company');
+    await page.click('#dtTbl tr.dt-catgroup .dt-toggle');
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tbody tr.dt-child').length > 0,
+      8000, 're-expand category');
 
     const noteCell = await page.evaluate(() => {
       const td = document.querySelector('#dtTbl tr.dt-child td.dt-note');
@@ -171,7 +228,7 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       };
     });
     console.log('    ' + JSON.stringify(noteCell));
-    chk('明细行有说明列（第 7 列，理由与本单金额之间）', !!noteCell && noteCell.idx === 6, noteCell);
+    chk('明细行有说明列（第 8 列，理由与日期之间）', !!noteCell && noteCell.idx === 7, noteCell);
     chk('说明单行 + 省略号（不会被长文本撑开）', !!noteCell &&
       noteCell.ellipsis === 'ellipsis' && noteCell.nowrap === 'nowrap', noteCell);
     chk('data-tip 给全文（长于可见文字）', !!noteCell &&
@@ -260,6 +317,17 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       document.querySelectorAll('#dtTbl tbody tr.dt-child').length === 0), sorted);
 
     console.log('=== 3. 文本列筛选（取值 + 搜索）===');
+    /* 子类别列：与 Region / Category 同一套取值勾选面板 */
+    await page.click('#dtTbl thead .dt-funnel[data-col="sub"]');
+    await waitFor(page, () => document.querySelectorAll('#dtPop .dt-list label').length > 0, 8000, 'sub values');
+    const subPop = await page.evaluate(() => ({
+      n: document.querySelectorAll('#dtPop .dt-list label').length,
+      head: document.querySelector('#dtPop .dt-pt').textContent
+    }));
+    chk('子类别列头有取值面板（可勾选，不是只搜索）',
+      subPop.n > 0 && /Sub-Category · filter/.test(subPop.head), subPop);
+    await page.click('#dtMeta');
+    await sleep(200);
     await page.click('#dtTbl thead .dt-funnel[data-col="region"]');
     await waitFor(page, () => document.querySelectorAll('#dtPop .dt-list label').length > 0, 8000, 'region values');
     const picked = await page.evaluate(() => {
@@ -336,9 +404,11 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       '"] .dt-toggle').click(), small);
     await sleep(200);
     await page.click('#dtTbl tr.dt-company .dt-toggle');
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tr.dt-catgroup').length > 0, 8000, 'range cats');
+    await page.click('#dtTbl tr.dt-catgroup .dt-toggle');
     await waitFor(page, () => document.querySelectorAll('#dtTbl tr.dt-child').length > 0, 8000, 'range rows');
     chk('筛选后明细金额均 ≥ 下限', await page.evaluate(() =>
-      [...document.querySelectorAll('#dtTbl tr.dt-child td:nth-child(9)')]
+      [...document.querySelectorAll('#dtTbl tr.dt-child td:nth-child(10)')]
         .every(e => Number(String(e.textContent).replace(/[^\d.-]/g, '')) >= 1000000)));
     await page.click('#dtReset');
     await waitFor(page, t => Number(document.getElementById('dtMeta').textContent.split(' ')[0].replace(/,/g, '')) === t,
@@ -444,7 +514,7 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       const r = await fetch('/api/board/detail?sort=region&dir=asc'); return (await r.json()).regionTotals[0].amount;
     });
     await page.click('#curSeg button[data-cur="RM"]');
-    await waitFor(page, () => document.querySelector('#dtTbl thead th:nth-child(9)').textContent.indexOf('(RM)') >= 0,
+    await waitFor(page, () => document.querySelector('#dtTbl thead th:nth-child(10)').textContent.indexOf('(RM)') >= 0,
       8000, 'currency RM');
     const rmFirst = await page.evaluate(async () => {
       const r = await fetch('/api/board/detail?sort=region&dir=asc&cur=RM'); return (await r.json()).regionTotals[0].amount;

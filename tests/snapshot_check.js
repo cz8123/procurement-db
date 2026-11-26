@@ -313,6 +313,8 @@ async function waitFor(pg, fn, timeout, label) {
     await page.evaluate(() => document.querySelector('#dtTbl tr.dt-group .dt-toggle').click());
     await waitFor(page, () => document.querySelectorAll('#dtTbl tr.dt-company').length > 0, 8000, 'offline company');
     await page.evaluate(() => document.querySelector('#dtTbl tr.dt-company .dt-toggle').click());
+    await waitFor(page, () => document.querySelectorAll('#dtTbl tr.dt-catgroup').length > 0, 8000, 'offline cat');
+    await page.evaluate(() => document.querySelector('#dtTbl tr.dt-catgroup .dt-toggle').click());
     await waitFor(page, () => document.querySelectorAll('#dtTbl tr.dt-child').length > 0, 8000, 'offline child');
     const noteOff = await page.evaluate(() => {
       const td = document.querySelector('#dtTbl tr.dt-child td.dt-note');
@@ -320,9 +322,10 @@ async function waitFor(pg, fn, timeout, label) {
                     ellipsis: getComputedStyle(td).textOverflow,
                     hasTipBox: !!document.querySelector('#dtTip') } : null;
     });
-    chk('离线 Detail 10 列，理由紧跟方法、Note 之后是 Date',
-      dtOff.length === 10 && dtOff[5].indexOf('Single Source Reason') === 0 &&
-      dtOff[6].indexOf('Note') === 0 && dtOff[7].indexOf('Date') === 0, dtOff);
+    chk('离线 Detail 11 列，类目后是子类别、理由紧跟方法、Note 之后是 Date',
+      dtOff.length === 11 && dtOff[3].indexOf('Sub-Category') === 0 &&
+      dtOff[6].indexOf('Single Source Reason') === 0 &&
+      dtOff[7].indexOf('Note') === 0 && dtOff[8].indexOf('Date') === 0, dtOff);
     chk('离线说明也是单行 + 省略号 + data-tip（悬停浮窗同构）',
       !!noteOff && noteOff.ellipsis === 'ellipsis' && noteOff.hasTipBox &&
       noteOff.text.length > 0 && noteOff.tip.length > 0, noteOff);
