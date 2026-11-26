@@ -85,6 +85,16 @@ async function waitFor(pg, fn, timeout, label) {
     chk('月度画满 12 个财月', (await page.$eval('#chMonthly svg',
       e => (e.textContent.match(/Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/g) || []).length)) >= 12);
     chk('帕累托 11 类', await count('#chPareto rect.pbar') === 11, await count('#chPareto rect.pbar'));
+    /* 11-26：每根柱都标注金额（高柱白字在柱内、矮柱深色字在柱顶上方） */
+    const pamt = await page.evaluate(() => {
+      const bars = document.querySelectorAll('#chPareto rect.pbar');
+      const amts = [...document.querySelectorAll('#chPareto text.pamt')];
+      return { bars: bars.length, amts: amts.length,
+               txt: amts.slice(0, 3).map(e => e.textContent),
+               inBar: amts.filter(e => e.getAttribute('fill') === '#fff').length };
+    });
+    chk('每根柱都标了金额', pamt.bars > 0 && pamt.amts === pamt.bars &&
+      pamt.txt.every(t => /^[\d.,]+[KMB]?$/.test(t)), pamt);
     chk('环形 4 个支出类型', await count('#chDonut [data-exp]') === 4, await count('#chDonut [data-exp]'));
     chk('采购方式环形 = API methodDonut 条数', await count('#chMethodDonut [data-exp]') ===
       (await page.evaluate(async () => (await (await fetch('/api/board/data?cur=RMB')).json()).methodDonut.length)),
@@ -214,6 +224,46 @@ async function waitFor(pg, fn, timeout, label) {
       drill1.keys.indexOf('Frame Contract') >= 0 && drill1.keys.length >= 5 &&
       drill1.chips === 0 && drill1.back, drill1);
 
+    /* 11-26：下钻层提供「理由」二级筛选器（SS-Exempt 用豁免理由字段） */
+    const mrf = await page.evaluate(() => ({
+      btn: !document.getElementById('mReasonBtn').hidden,
+      title: document.getElementById('mReasonBtn').title
+    }));
+    chk('下钻层出现理由二级筛选按钮', mrf.btn && /Exemption Reason/.test(mrf.title), mrf);
+    await page.evaluate(() => document.getElementById('mReasonBtn').click());
+    await waitFor(page, () => document.querySelectorAll('#mReasonPop input').length > 0,
+      5000, 'reason pop');
+    const pop1 = await page.evaluate(() => ({
+      head: document.querySelector('#mReasonPop .mr-h').textContent,
+      n: document.querySelectorAll('#mReasonPop input').length
+    }));
+    chk('二级筛选器标题写明字段（Exemption Reason / SS-Exempt）',
+      /Exemption Reason/.test(pop1.head) && /SS-Exempt/.test(pop1.head) && pop1.n >= 5, pop1);
+    const mAmt0 = await num('.kpi[data-k=amount] .k-val');
+    await page.evaluate(() => {
+      const lb = [...document.querySelectorAll('#mReasonPop label')]
+        .find(x => /Frame Contract/.test(x.textContent));
+      lb.querySelector('input').click();
+    });
+    /* /data 回来前 KPI 会短暂停在旧值，等 chip 出现后给足刷新时间再比数值 */
+    await waitFor(page, () => document.querySelectorAll('.chip').length >= 1,
+      8000, 'reason hd chip');
+    await sleep(2200);
+    const hdChips = await page.evaluate(() =>
+      [...document.querySelectorAll('.chip')].map(e => e.textContent.trim()));
+    const mAmt1 = await num('.kpi[data-k=amount] .k-val');
+    chk('勾选理由 → 整页联动（出现 Exemption Reason chip + 金额收窄）',
+      hdChips.some(c => /Exemption Reason/.test(c)) && mAmt1 !== mAmt0,
+      { chips: hdChips, before: mAmt0, after: mAmt1 });
+    await page.evaluate(() => {
+      const lb = [...document.querySelectorAll('#mReasonPop label')]
+        .find(x => /Frame Contract/.test(x.textContent));
+      lb.querySelector('input').click();
+      document.querySelector('#mReasonBtn').click();   // 收起浮层
+    });
+    await waitFor(page, () => document.querySelectorAll('.chip').length === 0, 8000, 'reason hd clear');
+    chk('取消勾选恢复全量', (await count('.chip')) === 0);
+
     /* 第二层点一个理由 → 交叉筛选（方式 + 理由两个 chip） */
     const mdBefore = await page.$eval('.kpi[data-k=amount] .k-val', e => e.textContent.trim());
     await pickSeg('Frame Contract');
@@ -246,6 +296,18 @@ async function waitFor(pg, fn, timeout, label) {
       .map(e => e.dataset.exp));
     console.log('    ' + JSON.stringify(drill2));
     chk('SS-Non Exempt 下钻到单一来源理由', drill2.indexOf('Inadequate Competition') >= 0, drill2);
+    /* 二级筛选换字段：SS-Non Exempt 用「单一来源采购理由」 */
+    await page.evaluate(() => document.getElementById('mReasonBtn').click());
+    await waitFor(page, () => document.querySelectorAll('#mReasonPop input').length > 0,
+      5000, 'single reason pop');
+    const pop2 = await page.evaluate(() => ({
+      head: document.querySelector('#mReasonPop .mr-h').textContent,
+      first: [...document.querySelectorAll('#mReasonPop input')].slice(0, 3).map(i => i.value)
+    }));
+    chk('SS-Non Exempt 的二级筛选用 Single Source Reason 字段',
+      /Single Source Reason/.test(pop2.head) && /SS-Non Exempt/.test(pop2.head) &&
+      pop2.first.indexOf('Inadequate Competition') >= 0, pop2);
+    await page.evaluate(() => document.getElementById('mReasonBtn').click());
     await page.evaluate(() => document.querySelector('.v-back[data-clear=method]').click());
     await waitFor(page, () => /Spend by Method/.test(
       document.getElementById('mDonutTitle').textContent), 8000, 'back method');
@@ -512,27 +574,40 @@ async function waitFor(pg, fn, timeout, label) {
     chk('再点一次取消筛选', await count('#chCat .cd-row') === 11,
       await count('#chCat .cd-row'));
 
-    await page.evaluate(() => document.querySelector('#chCat .cs-tog').click());
-    await waitFor(page, () => document.querySelectorAll('#chCat li[data-subcat]').length > 0,
+    await page.evaluate(() => document.querySelector('#chCat .cd-tog').click());
+    await waitFor(page, () => document.querySelectorAll('#chCat tr.cd-subrow[data-subcat]').length > 0,
       6000, 'sub rows');
     const subPick = await page.evaluate(() => {
-      const li = document.querySelector('#chCat li[data-subcat]');
-      const v = li.dataset.subcat; li.click(); return v;
+      const tr = document.querySelector('#chCat tr.cd-subrow[data-subcat]');
+      const v = tr.dataset.subcat; tr.click(); return v;
     });
     await waitFor(page, () => document.querySelectorAll('.chip').length === 1 &&
       /Sub-category/.test(document.querySelector('.chip').textContent),
       10000, 'sub chip');
+    /* 11-26：子类别改成 Detail 那种树行（缩进 └、各列对齐） */
+    const treeRow = await page.evaluate(() => {
+      const tr = document.querySelector('#chCat tr.cd-subrow');
+      if (!tr) return null;
+      const tds = [...tr.children];
+      return { n: tds.length, first: tds[0].textContent.trim(),
+               sub: tds[1].textContent.trim().slice(0, 12),
+               pad: getComputedStyle(tds[1]).paddingLeft,
+               money: /^[¥RM]/.test(tds[4].textContent.trim()) };
+    });
+    chk('子类别是缩进树行（7 列、首列 └、第 2 列子类别、金额列对齐）',
+      !!treeRow && treeRow.n === 7 && treeRow.first === '└' &&
+      parseInt(treeRow.pad, 10) >= 18 && treeRow.money, treeRow);
     chk('子类别可点击联动（chip=Sub-category）',
       /Sub-category/.test(await num('.chip') || ''), await num('.chip'));
-    await waitFor(page, () => document.querySelectorAll('#chCat li.cs-item.on').length === 1,
+    await waitFor(page, () => document.querySelectorAll('#chCat tr.cd-subrow.on').length === 1,
       10000, 'sub highlighted').catch(() => {});
     chk('被选子类别行高亮',
-      await count('#chCat li.cs-item.on') === 1, await count('#chCat li.cs-item.on'));
-    await page.evaluate(() => document.querySelector('#chCat li.cs-item.on').click());
+      await count('#chCat tr.cd-subrow.on') === 1, await count('#chCat tr.cd-subrow.on'));
+    await page.evaluate(() => document.querySelector('#chCat tr.cd-subrow.on').click());
     await waitFor(page, () => document.querySelectorAll('.chip').length === 0,
       8000, 'sub reset');
     chk('再点一次取消子类别筛选', (await count('.chip')) === 0 &&
-      (await count('#chCat li.cs-item.on')) === 0);
+      (await count('#chCat tr.cd-subrow.on')) === 0);
 
     console.log('=== 8.7 月度图两种图示切换 ===');
     chk('有图示切换控件', await count('#mSw button') === 2, await count('#mSw button'));

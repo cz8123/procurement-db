@@ -480,9 +480,6 @@ tr.dv{ opacity:.45; }
 .chart{ position:relative; padding:2px 8px 8px; min-height:120px; }
 /* 可点击的图表元素统一手型（筛选 / 下钻都靠点击） */
 rect.seg, rect.pbar, rect.pseg, .dseg, .trow, .hcell, .cd-row{ cursor:pointer; }
-.cd-subrow .cs-list li.cs-item{ cursor:pointer; padding-left:2px; padding-right:2px; }
-.cd-subrow .cs-list li.cs-item:hover{ background:#F1F5FA; }
-.cd-subrow .cs-list li.cs-item.on{ background:#E4EEF9; }
 /* 不再用 width:100% 拉伸：svg 的 width 属性已按容器内宽取整生成，
    拉伸会引入 0.95~0.98 的缩放，把细线和文字重采样成锯齿。 */
 .chart svg{ display:block; max-width:100%; height:auto; }
@@ -782,7 +779,8 @@ body.drawer-open{ overflow:hidden; }
 .cd-tbl td.num{ text-align:right; font-variant-numeric:tabular-nums; }
 .cd-tbl td.cd-money{ color:var(--ink); font-weight:600; }
 .cd-tbl td.cd-cat span{
-  display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  display:inline-block; max-width:calc(100% - 24px); vertical-align:middle;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 .cd-tbl td.cd-sub{ color:var(--ink-2); }
 .cd-sub .cs-line{ display:flex; align-items:center; gap:5px; min-width:0; }
@@ -790,50 +788,27 @@ body.drawer-open{ overflow:hidden; }
   flex:1 1 auto; min-width:0;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-/* 子类别多时默认折叠，只露金额最高的一条；点 +N 展开全部 */
-.cs-tog{
-  flex:none; min-width:19px; height:16px; padding:0 3px; cursor:pointer;
+/* 类别行首的展开按钮：和 Detail 的 .dt-toggle 同一套观感 */
+.cd-tog{
+  flex:none; width:15px; height:15px; margin-right:6px; padding:0; cursor:pointer;
   border:1px solid #C3D2E6; background:#EFF4FA; color:#2C4771;
-  font-family:var(--font); font-size:10.5px; font-weight:700; line-height:14px;
-  text-align:center; border-radius:0;
+  font-family:var(--font); font-size:11px; font-weight:700; line-height:13px;
+  text-align:center; border-radius:3px; vertical-align:middle;
 }
-.cs-tog:hover{ background:#DCE8F6; border-color:#9FBBDA; }
-.cs-tog.on{ background:#2C4771; border-color:#2C4771; color:#fff; }
-.cd-subrow td{
-  padding:0; background:#F7F9FC; border-bottom:1px solid var(--line);
-  white-space:normal; overflow:visible;
+.cd-tog:hover{ background:#DCE8F6; border-color:#9FBBDA; }
+.cd-tog.on{ background:#2C4771; border-color:#2C4771; color:#fff; }
+.cd-tog-sp{ display:inline-block; width:21px; }
+/* 子类别行：和 Detail 的「区域 → 公司」同一种树行（缩进 └、浅底、可点联动） */
+.cd-tree{ color:#9AA6B5; text-align:center; }
+.cd-tbl td.cd-sub2{
+  padding-left:20px; color:var(--ink-2);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-.cs-wrap{ padding:5px 12px 8px 10px; }
-.cs-h{
-  display:flex; align-items:baseline; gap:6px; margin-bottom:2px;
-  font-size:11.5px; font-weight:600; color:var(--ink-2);
-}
-.cs-h span{ color:var(--faint); font-weight:500; font-size:10.5px; }
-/* 子类别动辄二三十条，给个高度上限，展开不至于把整行卡片撑到上千像素 */
-.cs-list{ list-style:none; margin:0; padding:0; max-height:290px; overflow:auto; }
-/* 用 fr 而不是 %：百分比列 + gap 会撑出容器，最后一列被卡片裁掉 */
-.cs-list li{
-  display:grid; grid-template-columns:30fr 21fr 14fr 14fr 21fr;
-  align-items:center; gap:6px; padding:2px 0;
-  font-size:11.5px; color:var(--ink-2);
-}
-.cs-list .cs-head{
-  font-size:10.5px; color:var(--muted); padding:1px 0 3px;
-  position:sticky; top:0; background:#F7F9FC; z-index:1;
-}
-.cs-list .cs-head span:nth-child(3),
-.cs-list .cs-head span:nth-child(4),
-.cs-list .cs-head span:nth-child(5){ text-align:right; }
-.cs-k{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.cs-bar{ display:block; height:8px; background:#E3EAF3; }
-.cs-bar b{ display:block; height:100%; }
-.cs-v{ text-align:right; font-variant-numeric:tabular-nums; font-weight:600; color:var(--ink); }
-.cs-p{ text-align:right; font-variant-numeric:tabular-nums; color:var(--ink-2); }
-.cs-n{ text-align:right; font-variant-numeric:tabular-nums; color:var(--faint); }
-.cd-row{ cursor:pointer; }
-.cd-subrow .cs-list li.cs-item{ cursor:pointer; padding-left:2px; padding-right:2px; }
-.cd-subrow .cs-list li.cs-item:hover{ background:#F1F5FA; }
-.cd-subrow .cs-list li.cs-item.on{ background:#E4EEF9; }
+.cd-subrow td{ background:#F7F9FC; }
+.cd-subrow:hover td{ background:#EDF2F9; }
+.cd-subrow.on td{ background:#E4EEF9; }
+.cd-subrow td.cd-money{ font-weight:600; color:var(--ink); }
+.cd-row{ cursor:pointer; }.cd-row{ cursor:pointer; }
 .cd-row:hover td{ background:#EDF1F7; }
 .cd-row.on td{ background:#DFE7F2; }
 .cd-share{ display:flex; align-items:center; gap:6px; min-width:0; }
@@ -1263,3 +1238,42 @@ html.boot-other #pgOverview, html.boot-other #kpis, html.boot-other .fbar{ displ
   .geo-yoy{ flex:46 1 0; }
   .geo-yoy-h span{ display:none; }
 }
+
+
+/* ---------------- 采购方式下钻的二级筛选（理由多选） ----------------
+   按钮只在 SS-Exempt / SS-Non Exempt 下钻层出现，右上角带已选数量角标 */
+.v-ico.v-reason{ position:relative; }
+.v-ico.v-reason.on{ color:var(--navy); background:#E3ECF7; border-color:#A9BFD8; }
+.v-ico .v-badge{
+  position:absolute; top:-5px; right:-5px; min-width:13px; height:13px; padding:0 3px;
+  border-radius:7px; background:#2C4771; color:#fff;
+  font:700 9px/13px var(--font); text-align:center; font-style:normal;
+}
+.mr-pop{
+  position:fixed; z-index:90; width:252px; padding:6px;
+  background:#fff; border:1px solid #C9D4E3; border-radius:6px;
+  box-shadow:0 8px 22px rgba(16,28,48,.20);
+}
+.mr-pop[hidden]{ display:none; }
+.mr-pop .mr-h{
+  display:flex; align-items:baseline; justify-content:space-between; gap:8px;
+  font-size:11px; font-weight:700; color:#122745; padding:2px 6px 5px;
+  border-bottom:1px solid #E3E8F0; margin-bottom:4px;
+}
+.mr-pop .mr-h span{ font-weight:600; font-size:10px; color:#7D8797; }
+.mr-pop .mr-b{ max-height:250px; overflow:auto; display:flex; flex-direction:column; }
+.mr-pop .mr-b label{
+  display:flex; align-items:center; gap:7px; padding:4px 7px; border-radius:3px;
+  font-size:11.5px; color:var(--ink-2); cursor:pointer;
+}
+.mr-pop .mr-b label:hover{ background:#F1F5FA; }
+.mr-pop .mr-b input{ accent-color:#2C4771; margin:0; flex:none; }
+.mr-pop .mr-b span{ flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mr-pop .mr-b i{ font-style:normal; color:#7D8797; font-size:10.5px; font-variant-numeric:tabular-nums; }
+.mr-pop .mr-acts{
+  display:flex; align-items:center; gap:10px; padding:5px 6px 1px;
+  border-top:1px solid #E3E8F0; margin-top:4px;
+}
+.mr-pop .mr-acts span{ flex:1 1 auto; font-size:10.5px; color:#8695A8; }
+.mr-pop .mr-acts a{ color:#1E4D78; font-size:11px; font-weight:600; cursor:pointer; }
+.mr-pop .mr-acts a:hover{ text-decoration:underline; }

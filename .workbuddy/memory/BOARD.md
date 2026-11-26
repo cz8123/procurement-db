@@ -310,3 +310,13 @@
 - **小计行 colspan**：区域 `6→7`、公司 `5→6`（多了一列）。
 - **离线快照**：`snapshot.js` 的 `DETAIL_KEYS` 加 `date`（`q_date` 搜索可用），`detailResp` 的 field 映射与行输出补 `date`，`detailValuesResp` 对 date 返回空；`board_export.ROW_COLS` 本来就有 `date`，无需改。**`exports/` 里的官方单文件是旧的，要用含日期的版本需重跑 `board_export.py`**（本次未覆盖，按约定）。
 - **测试**：`detail_table_check` → 41/0（列名 10 列 + Date ISO 与排序 + 漏斗 10 个 + 合计下标 8/9 + 金额列 nth-child(9) + 币种 th(9)）；`snapshot_check` 64/0（需用新导出文件，`SNAP_FILE=绝对路径`）；`board_check` 316/0。
+
+## 53 帕累托柱内金额 / 采购方式理由二级筛选 / 类别明细树行（11-26 下午）
+- **帕累托柱内金额**：`renderPareto` 每根柱都标 `barMoney(v)`（`45.9M` 这种，不带币种，币种由坐标轴与口径说明体现）。柱子 `h>=19` 时白字 9px（柱宽 <34 用 8px）放柱内垂直居中；更矮的放**柱顶上方 4px**、7.5px 深色字——累计折线恒在柱顶之上，不会压字。`class="pamt"` + `pointer-events="none"`，点击仍然命中 `rect.pbar`。
+- **采购方式下钻的二级筛选**（用户："两个 SS 补充二级筛选，是两个单一来源原因字段"）：下钻到 SS-Exempt / SS-Non Exempt 后，卡片工具栏出现 `.v-reason` 按钮（滑杆图标 + 右上角已选数量角标），点开 `.mr-pop` 浮层列出该层的理由（带订单数），可多选，**字段随 SS 切换**：SS-Exempt → `豁免单一来源的理由`（`exempt_reason`），SS-Non Exempt → `单一来源采购理由`（`single_reason`）。
+  - **踩坑（务必保留）**：`S.sel[exempt_reason|single_reason]` 必须写**原始值**（`row.raws`），不能写聚合名。后端 `REASON_FILTERS` 是 `p."No." IN (SELECT 表单编号 FROM fct_prpo WHERE 原列 IN …)`，拿聚合名去筛会 0 行（KPI 直接变 `—`）。勾选态用 `mReasonOn(row, sel)` 反查原始值是否命中；`All` 展开全部 raws。和饼图图例点击（`row.raws`）同一套规则。
+  - 选中后 `drawDonut` 新增第 6 参 `dimOf`：未选中的扇区/图例淡化（不改口径，只做视觉），选了才传，不选时行为与原来完全一致。
+  - 浮层在窗口 resize / 点外部关闭；退出下钻时 `renderMReasonBtn()` 自动隐藏按钮并收起浮层。
+- **Category Details 子类别改成 Detail 式树行**：类别行首加 `.cd-tog`（15px +/−，同 `.dt-toggle` 观感），展开后**每个子类别是一行** `tr.cd-subrow`：第 1 列 `└`、第 2 列缩进 20px 显示子类别名，Suppliers / Orders / Spend / PO Paid / Share 各自对齐到本列；点了按 Sub-category 交叉筛选（`.on` 高亮）。原来整行塞一个 `ul.cs-list` 的写法连同 `.cs-*` 样式一起删掉。后端 `pareto.subsMap` 每项新增 `sup`（`COUNT(DISTINCT p."Supplier_cn")`）供子类别行填供应商数。`fitCatTable` 的「展开时锁高 + 内部滚动」逻辑不变。
+- **测试**：`board_check` 323/0（新增：每根柱都有金额、子类别是 7 列树行且首列 `└`、下钻层出现二级筛选按钮、浮层标题含字段名、勾选后 chip + 金额收窄、取消恢复、SS-Non Exempt 用 Single Source Reason 字段；`li[data-subcat]`/`cs-tog` 选择器改为 `tr.cd-subrow`/`.cd-tog`）；`visual_tools` 31/0、`snapshot` 64/0（离线类别首行改读 `.cd-cat span`，否则会把 +/− 一起读进去）、`detail` 41/0、`page_tabs` 27/0。
+- 性能：`/data` 加了一个 `COUNT(DISTINCT Supplier_cn)` 后仍 0.52s（连测 3 次）。

@@ -533,13 +533,15 @@ def data():
                 'COALESCE(NULLIF(TRIM(sm."采购子类别"),\'\'), '
                 'NULLIF(TRIM(p."Sub-Category"),\'\'), \'Unassigned\') sub, '
                 'SUM(p."Total Price") v, COUNT(p."No.") n, '
-                'SUM(COALESCE(p."PO Paid",0)) po_paid ' + sbase +
+                'SUM(COALESCE(p."PO Paid",0)) po_paid, '
+                'COUNT(DISTINCT p."Supplier_cn") sup ' + sbase +
                 ' GROUP BY 1,2 ORDER BY 1,3 DESC')
         spec["subs"] = ssql
         sub_map, subs_map = {}, {}
         for r in c.execute(ssql, params):
             it = {"k": r["sub"], "v": round(r["v"] or 0, 2),
-                  "n": r["n"] or 0, "po": round(r["po_paid"] or 0, 2)}
+                  "n": r["n"] or 0, "po": round(r["po_paid"] or 0, 2),
+                  "sup": r["sup"] or 0}
             subs_map.setdefault(r["cat"], []).append(it)
             if r["cat"] not in sub_map and r["sub"] != "Unassigned":
                 sub_map[r["cat"]] = r["sub"]

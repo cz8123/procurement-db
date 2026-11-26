@@ -214,7 +214,11 @@ async function waitFor(pg, fn, timeout, label) {
       const total = document.querySelector('#chCat .cd-total');
       return {
         n: rows.length,
-        first: (rows[0] || {}).textContent ? rows[0].textContent.replace(/\s+/g, ' ').trim() : '',
+        /* 类别单元格里现在有行首 +/− 按钮，取 .cd-cat span 才是类别名 */
+        first: rows[0] ? [
+          (rows[0].querySelector('.cd-cat span') || {}).textContent || '',
+          ...[...rows[0].children].slice(2).map(td => td.textContent.trim())
+        ].join(' ') : '',
         bars: rows.map(r => parseFloat((r.querySelector('.cd-share i') || {}).style ?
           r.querySelector('.cd-share i').style.width : '0')),
         total: total ? total.textContent.replace(/\s+/g, ' ').trim() : ''

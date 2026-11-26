@@ -135,6 +135,14 @@ window.__FY_DEFAULT = {{ default_fy|default('', true)|tojson }};
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
              stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
              aria-hidden="true"><path d="M12 4v15"/><path d="m19 12-7 7-7-7"/></svg></button>
+        <!-- 下钻后的二级筛选：SS-Exempt → 豁免单一来源的理由；SS-Non Exempt → 单一来源采购理由 -->
+        <button type="button" class="v-ico v-reason" id="mReasonBtn" hidden
+                aria-label="Filter by reason" title="Filter by reason">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M4 7h9M18.5 7H20M4 17h4M13.5 17H20"/>
+            <circle cx="16" cy="7" r="2.1"/><circle cx="10.7" cy="17" r="2.1"/></svg>
+          <i class="v-badge" id="mReasonN" hidden></i></button>
         <button type="button" class="v-ico v-flt" data-flt="methodDonut" aria-label="Filters affecting this visual" title="Filters affecting this visual">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
              stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"

@@ -191,6 +191,14 @@
     if (Math.abs(x) >= 1e3) return nf(x / 1e3, 0) + 'K';
     return nf(x, 0);
   }
+  /** 柱内金额标签：带一位小数、不带币种（币种由坐标轴与卡片口径说明） */
+  function barMoney(v) {
+    var x = (v || 0) / S.rate, a = Math.abs(x);
+    if (a >= 1e9) return nf(x / 1e9, 1) + 'B';
+    if (a >= 1e6) return nf(x / 1e6, 1) + 'M';
+    if (a >= 1e3) return nf(x / 1e3, 0) + 'K';
+    return nf(x, 0);
+  }
   /** 矩阵单元格里的数字：比坐标轴更紧凑（K 不带小数，避免 264.1K 这类噪声） */
   function cellMoney(v) {
     var x = v / S.rate, a = Math.abs(x);
@@ -828,6 +836,14 @@
         '" fill="' + (faded ? '#AFC0D6' : '#3B5E96') + '" rx="0"/>';
       pts.push([x + bw / 2, T + ih - (r.cum || 0) * ih]);
 
+      /* 柱内金额（11-26 用户要求）：够高的柱子把金额放柱内白字；
+         太矮的放在柱顶上方 4px（累计折线始终在柱顶之上，不会压字） */
+      var inBar = h >= 19;
+      bars += '<text class="pamt' + dv(faded) + '" x="' + (x + bw / 2).toFixed(1) +
+        '" y="' + (inBar ? (y + h / 2 + 3.2).toFixed(1) : (y - 4).toFixed(1)) +
+        '" text-anchor="middle" font-size="' + (inBar ? (bw < 34 ? 8 : 9) : 7.5) +
+        '" font-weight="700" fill="' + (inBar ? '#fff' : (faded ? '#98A6B8' : '#1E2F4B')) +
+        '" pointer-events="none">' + barMoney(r.v) + '</text>';
       var nm = truncPx(r.k, Math.max(46, slot * 2.1), 13);
       bars += '<text transform="translate(' + (x + bw / 2).toFixed(1) + ',' + (T + ih + 8) +
         ') rotate(-40)" text-anchor="end" font-size="10" font-weight="600" fill="' +
@@ -869,25 +885,27 @@
     /* 条形按「占最大类别的比例」缩放（PBI 数据条默认就是比最大值） */
     var maxShare = tot ? (d.rows[0].v || 0) / tot : 1;
     var subOpen = S.catSub || {};
+    /* 子类别按 Detail 的「区域 → 公司」树来展开：类别行首一枚 +/−，展开后每个
+       子类别是**一行**（缩进 └），各列直接对齐到 Suppliers / Orders / Spend /
+       PO Paid / Share，不再是整行塞一个嵌套列表。 */
     var body = rows.map(function (r) {
       var share = tot ? (r.v || 0) / tot : 0;
       var on = sel.indexOf(r.k) >= 0;
       var sl = subsMap[r.k] || [];
       var sub = (d.subMap || {})[r.k] || '—';
-      /* 子类别一多就折起来：默认只显示金额最高的一条，点 +N 展开全部 */
-      var more = Math.max(0, sl.length - 1);
       var open = !!subOpen[r.k];
-      var cell = '<td class="cd-sub" title="' + esc(sub) + '"><div class="cs-line">' +
-        '<span class="cs-main">' + esc(sub) + '</span>' +
-        (more ? '<button type="button" class="cs-tog' + (open ? ' on' : '') +
+      var tog = sl.length
+        ? '<button type="button" class="cd-tog' + (open ? ' on' : '') +
           '" data-sub="' + esc(r.k) + '" title="' +
-          (open ? 'Collapse' : more + ' more sub-categories') + '">' +
-          (open ? '−' : '+' + more) + '</button>' : '') +
-        '</div></td>';
+          (open ? 'Collapse ' + sl.length + ' sub-categories'
+                : 'Expand ' + sl.length + ' sub-categories') + '">' +
+          (open ? '−' : '+') + '</button>'
+        : '<span class="cd-tog-sp"></span>';
       var tr = '<tr class="cd-row' + (on ? ' on' : '') +
         dv(hlDim('catdetail', 'category', r.k)) + '" data-cat="' + esc(r.k) + '">' +
-        '<td class="cd-cat" title="' + esc(r.k) + '"><span>' + esc(r.k) + '</span></td>' +
-        cell +
+        '<td class="cd-cat" title="' + esc(r.k) + '">' + tog +
+        '<span>' + esc(r.k) + '</span></td>' +
+        '<td class="cd-sub" title="' + esc(sub) + '">' + esc(sub) + '</td>' +
         '<td class="num">' + nf(r.sup, 0) + '</td>' +
         '<td class="num">' + nf(r.n, 0) + '</td>' +
         '<td class="num cd-money">' + money(r.v, 1) + '</td>' +
@@ -896,25 +914,22 @@
           ((maxShare ? share / maxShare : 0) * MAXB * 100).toFixed(1) + '%;background:#3B5E96"></i>' +
         '<b>' + pct(share) + '</b></td></tr>';
       if (!open || !sl.length) return tr;
-      var smax = sl[0].v || 1;
-      var items = sl.map(function (s) {
-        var ss = r.v ? (s.v || 0) / r.v : 0;
-        var sOn = (S.sel.sub || []).indexOf(s.k) >= 0;
-        return '<li class="cs-item' + (sOn ? ' on' : '') + '" data-subcat="' +
-          esc(s.k) + '" title="Click to filter this sub-category">' +
-          '<span class="cs-k" title="' + esc(s.k) + '">' + esc(s.k) + '</span>' +
-          '<i class="cs-bar"><b style="width:' + Math.max(2, (s.v / smax) * 100).toFixed(1) +
-          '%;background:#8FB3D9"></b></i>' +
-          '<span class="cs-v">' + money(s.v, 1) + '</span>' +
-          '<span class="cs-p">' + money(s.po, 1) + '</span>' +
-          '<span class="cs-n">' + nf(s.n, 0) + ' orders · ' + pct(ss) + '</span></li>';
+      return tr + sl.map(function (sm) {
+        var sOn = (S.sel.sub || []).indexOf(sm.k) >= 0;
+        var ss = tot ? (sm.v || 0) / tot : 0;
+        return '<tr class="cd-subrow' + (sOn ? ' on' : '') +
+          dv(hlDim('catdetail', 'sub', sm.k)) + '" data-cat="' + esc(r.k) +
+          '" data-subcat="' + esc(sm.k) + '" title="Click to filter this sub-category">' +
+          '<td class="cd-tree">└</td>' +
+          '<td class="cd-sub2" title="' + esc(sm.k) + '">' + esc(sm.k) + '</td>' +
+          '<td class="num">' + nf(sm.sup, 0) + '</td>' +
+          '<td class="num">' + nf(sm.n, 0) + '</td>' +
+          '<td class="num cd-money">' + money(sm.v, 1) + '</td>' +
+          '<td class="num">' + money(sm.po, 1) + '</td>' +
+          '<td class="cd-share"><i style="width:' +
+            ((maxShare ? ss / maxShare : 0) * MAXB * 100).toFixed(1) +
+            '%;background:#8FB3D9"></i><b>' + pct(ss) + '</b></td></tr>';
       }).join('');
-      return tr + '<tr class="cd-subrow" data-cat="' + esc(r.k) + '"><td colspan="7">' +
-        '<div class="cs-wrap"><div class="cs-h">' + esc(r.k) + ' · Sub-categories' +
-        '<span>' + sl.length + ' items</span></div><ul class="cs-list">' +
-        '<li class="cs-head"><span>Sub-category</span><span></span>' +
-        '<span>Spend</span><span>PO Paid</span><span>Orders</span></li>' + items +
-        '</ul></div></td></tr>';
     }).join('');
     if (!body) body = '<tr><td class="empty" colspan="7">No matching categories</td></tr>';
 
@@ -994,6 +1009,69 @@
       })
       .catch(function (e) { toast('Failed to load reasons: ' + e.message, 3500); });
   }
+  /* -------- 下钻后的二级筛选（两个 SS 各用自己的单一来源原因字段） --------
+     SS-Exempt → 豁免单一来源的理由；SS-Non Exempt → 单一来源采购理由。
+     勾选写进 S.sel[字段]，和后端 REASON_FILTERS 对得上（整页联动）。 */
+  var mReasonPop = null;
+  function mReasonKey() { return S.methodDrill === 'SS-Exempt' ? 'exempt_reason' : 'single_reason'; }
+  function mReasonLabel() {
+    return S.methodDrill === 'SS-Exempt' ? 'Exemption Reason' : 'Single Source Reason';
+  }
+  function mReasonPack() { return (S.methodDrill && S.drill[S.methodDrill]) || null; }
+  /** 一行理由 ↔ 原始值：S.sel 里存的是 fct_prpo 的原文（后端按原文筛），
+      展示与勾选用的是聚合名，所以要来回映射（和饼图图例点击同一套规则） */
+  function mReasonRaws(row) {
+    return (row && row.raws && row.raws.length) ? row.raws : [row ? row.k : ''];
+  }
+  function mReasonOn(row, sel) {
+    var raws = mReasonRaws(row);
+    for (var i = 0; i < raws.length; i++) if (sel.indexOf(raws[i]) >= 0) return true;
+    return false;
+  }
+  function closeMReasonPop() { if (mReasonPop) mReasonPop.hidden = true; }
+  function renderMReasonBtn() {
+    var b = $('#mReasonBtn');
+    if (!b) return;
+    b.hidden = !S.methodDrill;
+    if (!S.methodDrill) { closeMReasonPop(); return; }
+    var sel = S.sel[mReasonKey()] || [], pk = mReasonPack(), n = sel.length;
+    if (pk) {
+      n = 0;
+      (pk.rows || []).forEach(function (r) { if (mReasonOn(r, sel)) n++; });
+    }
+    b.classList.toggle('on', n > 0);
+    b.title = 'Filter by ' + mReasonLabel() + (n ? ' — ' + n + ' selected' : '');
+    var badge = $('#mReasonN');
+    if (badge) { badge.hidden = !n; badge.textContent = n > 9 ? '9+' : String(n); }
+  }
+  function openMReasonPop() {
+    var pack = mReasonPack();
+    if (!pack) {                       // 理由层还没取回来（点得太快）：取到再开
+      var mk = S.methodDrill;
+      if (mk) loadMethodDrill(mk, function () { if (S.methodDrill === mk) openMReasonPop(); });
+      return;
+    }
+    if (!mReasonPop) {
+      mReasonPop = document.createElement('div');
+      mReasonPop.className = 'mr-pop';
+      mReasonPop.id = 'mReasonPop';
+      document.body.appendChild(mReasonPop);
+    }
+    var key = mReasonKey(), sel = S.sel[key] || [], rows = pack.rows || [];
+    mReasonPop.innerHTML = '<div class="mr-h">' + esc(mReasonLabel()) +
+      '<span>' + esc(S.methodDrill) + '</span></div><div class="mr-b">' +
+      rows.map(function (r) {
+        return '<label><input type="checkbox" value="' + esc(r.k) + '"' +
+          (mReasonOn(r, sel) ? ' checked' : '') + '><span title="' + esc(r.k) + '">' +
+          esc(r.k || 'Unassigned') + '</span><i>' + nf(r.n, 0) + '</i></label>';
+      }).join('') + '</div><div class="mr-acts"><span>' + nf(rows.length, 0) +
+      ' reasons</span><a data-act="all">All</a><a data-act="clear">Clear</a></div>';
+    mReasonPop.hidden = false;
+    var b = $('#mReasonBtn').getBoundingClientRect(), w = 252;
+    mReasonPop.style.left = Math.max(8, Math.min(b.right - w, innerWidth - w - 8)) + 'px';
+    mReasonPop.style.top = Math.min(b.bottom + 6, innerHeight - 80) + 'px';
+  }
+
   function renderMethodDonut() {
     var t = $('#mDonutTitle'), drill = S.methodDrill;
     var pack = drill ? S.drill[drill] : null;
@@ -1002,15 +1080,25 @@
       t.textContent = (drill === 'SS-Exempt' ? 'Exemption Reason' : 'Single Source Reason') + ' · ' + drill;
       /* 理由层数据本来就不吃理由筛选（接口 skip 了 reason），天然保留全量，
          这里再按已选理由淡化其余扇区，和第二层下钻的视觉一致 */
-      if (pack) drawDonut(pack.rows || [], 'chMethodDonut', 'methodDonutLegend', 'chMethodDonut', rkey);
+      /* 二级筛选选了理由 → 未选的扇区淡化（口径不变，只是视觉） */
+      var selRaw = S.sel[rkey] || [];
+      var dimOf = selRaw.length ? function (x) {
+        var raws = (x.raws && x.raws.length) ? x.raws : [x.k];
+        return !raws.some(function (v) { return selRaw.indexOf(v) >= 0; });
+      } : null;
+      if (pack) drawDonut(pack.rows || [], 'chMethodDonut', 'methodDonutLegend', 'chMethodDonut', rkey, dimOf);
       else emptyBox('chMethodDonut', 'Loading…');
+      renderMReasonBtn();
       return;
     }
     t.textContent = 'Spend by Method';
     drawDonut(hlBase('chMethodDonut', function (x) { return x.methodDonut; }) || [],
       'chMethodDonut', 'methodDonutLegend', 'chMethodDonut', 'method');
+    renderMReasonBtn();
   }
-  function drawDonut(rows, chartId, legendId, src, key) {
+  /* dimOf：可选的「淡化判定」函数（理由二级筛选用它把未选的扇区淡化，
+     传了就不再看 S.hl） */
+  function drawDonut(rows, chartId, legendId, src, key, dimOf) {
     if (!rows.length) { emptyBox(chartId, 'No data for the current filters'); $('#' + legendId).innerHTML = ''; return; }
     var W = chartW(chartId, 340), H = 230;
     var cx = W / 2, cy = H / 2 + 2, R = Math.min(W, H) * 0.44, r0 = R * 0.58;
@@ -1021,7 +1109,7 @@
       var frac = (x.v || 0) / tot;
       var a1 = a0 + frac * Math.PI * 2;
       var col = CAT_COLORS[i % CAT_COLORS.length];
-      var faded = src ? hlDim(src, key, x.k) : false;
+      var faded = dimOf ? !!dimOf(x) : (src ? hlDim(src, key, x.k) : false);
       if (frac > 0.9999) {
         /* 单值满环：也要带 class/data-exp —— 否则筛到一个类型后这一圈点不动，
            用户会卡在「只剩一个扇区、点哪都回不去」的状态 */
@@ -1052,7 +1140,8 @@
        金额与占比在扇区和悬浮提示里都有，省掉才能两列排开、名字少截断 */
     var compact = rows.length > 6;
     $('#' + legendId).innerHTML = rows.map(function (x, i) {
-      return '<span class="li' + dv(src ? hlDim(src, key, x.k) : false) + '" data-exp="' + esc(x.k) +
+      return '<span class="li' + dv(dimOf ? !!dimOf(x) : (src ? hlDim(src, key, x.k) : false)) +
+        '" data-exp="' + esc(x.k) +
         '"><i style="background:' + CAT_COLORS[i % CAT_COLORS.length] + '"></i>' +
         '<span class="lb" title="' + esc(x.k) + ' · ' + money(x.v, 1) + ' · ' + pct(x.share) + '">' +
         esc(x.k) + '</span>' +
@@ -1621,6 +1710,44 @@
       loadAll();
     });
 
+    /* 采购方式下钻的二级筛选（理由）：勾选即联动整页，字段随 SS 类型切换 */
+    $('#mReasonBtn').addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (mReasonPop && !mReasonPop.hidden) closeMReasonPop(); else openMReasonPop();
+    });
+    document.addEventListener('change', function (e) {
+      if (!mReasonPop || mReasonPop.hidden) return;
+      var inp = e.target.closest('#mReasonPop input');
+      if (!inp) return;
+      var names = [].slice.call(mReasonPop.querySelectorAll('input:checked'))
+        .map(function (i) { return i.value; });
+      var pk = mReasonPack(), raws = [];
+      ((pk && pk.rows) || []).forEach(function (r) {
+        if (names.indexOf(r.k) >= 0) raws = raws.concat(mReasonRaws(r));
+      });
+      var key = mReasonKey();
+      if (raws.length) S.sel[key] = raws; else delete S.sel[key];
+      renderFilters(); renderMReasonBtn(); loadAll();
+    });
+    document.addEventListener('click', function (e) {
+      if (!mReasonPop || mReasonPop.hidden) return;
+      var act = e.target.closest('#mReasonPop .mr-acts a');
+      if (act) {
+        var key = mReasonKey(), pk = mReasonPack();
+        if (act.dataset.act === 'all') {
+          var all = [];
+          ((pk && pk.rows) || []).forEach(function (r) { all = all.concat(mReasonRaws(r)); });
+          S.sel[key] = all;
+        } else {
+          delete S.sel[key];
+        }
+        renderFilters(); renderMReasonBtn(); openMReasonPop(); loadAll();
+        return;
+      }
+      if (!e.target.closest('#mReasonPop')) closeMReasonPop();
+    });
+    window.addEventListener('resize', closeMReasonPop);
+
     // 视觉对象「向上钻取」：层级退一级；已在顶层就清掉这张图自己造成的那个维度
     document.addEventListener('click', function (e) {
       var b = e.target.closest('.v-back');
@@ -1889,8 +2016,8 @@
       setSel('region', list); renderFilters(); refreshCompanyOptions(); loadAll();
     });
     $('#chCat').addEventListener('click', function (e) {
-      /* 点 +N / − 只展开收起子类别，不触发类别筛选 */
-      var tog = e.target.closest('.cs-tog');
+      /* 点行首 +/− 只展开收起子类别，不触发类别筛选 */
+      var tog = e.target.closest('.cd-tog');
       if (tog) {
         e.stopPropagation();
         var c = tog.dataset.sub;
@@ -1899,7 +2026,7 @@
         return;
       }
       /* 展开后的子类别行也可点：按 Sub-category 交叉筛选 */
-      var li = e.target.closest('li[data-subcat]');
+      var li = e.target.closest('[data-subcat]');
       if (li) {
         var sv = li.dataset.subcat;
         var slist = (S.sel.sub || []).slice();
