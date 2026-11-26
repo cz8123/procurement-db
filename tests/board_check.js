@@ -669,6 +669,41 @@ async function waitFor(pg, fn, timeout, label) {
       await count('#fcTbl .remain.bad') > 0 && await count('#fcTbl .remain.ok') > 0);
     chk('Remain Days 带状态圆点', await count('#fcTbl .remain i') > 0);
 
+    /* 11-26：Type / Status 两个下拉从卡片工具条搬进表头（列头漏斗 + 选项浮层） */
+    const hdr = await page.evaluate(() => ({
+      inTools: !!document.querySelector('#fcCard .card-tools #fcType') ||
+               !!document.querySelector('#fcCard .card-tools #fcStatus'),
+      funnels: document.querySelectorAll('#fcTbl thead .fc-hflt').length,
+      svg: [...document.querySelectorAll('#fcTbl thead .fc-hflt')].every(b => !!b.querySelector('svg')),
+      cols: [...document.querySelectorAll('#fcTbl thead .fc-hflt')]
+        .map(b => b.closest('th').dataset.sort)
+    }));
+    chk('两个下拉已移出卡片工具条', !hdr.inTools, hdr);
+    chk('表头新增 2 枚漏斗（Type / Remain Days）且是矢量图标',
+      hdr.funnels === 2 && hdr.svg &&
+      JSON.stringify(hdr.cols) === JSON.stringify(['remain', 'type']), hdr);
+    await page.click('#fcTbl thead th[data-sort=type] .fc-hflt');
+    await page.waitForSelector('.fc-pop button[data-v]', { timeout: 5000 });
+    chk('表头漏斗浮层列出与下拉相同的选项',
+      JSON.stringify(await page.$$eval('.fc-pop button[data-v]',
+        a => a.map(e => e.textContent))) === JSON.stringify(typeOpts));
+    const cpN = (CT.types.find(x => x.k === 'CP') || {}).n;
+    await page.evaluate(() => [...document.querySelectorAll('.fc-pop button[data-v]')]
+      .find(b => b.dataset.v === 'CP').click());
+    await page.waitForFunction(n => new RegExp('\\b' + n + '\\s*rows').test(
+      document.querySelector('#fcPager').textContent), { timeout: 8000 }, cpN);
+    chk('表头漏斗筛 CP 与下拉等效',
+      new RegExp('\\b' + cpN + '\\s*rows').test(await num('#fcPager') || ''));
+    chk('筛选中的列头高亮',
+      await page.evaluate(() => document.querySelector('#fcTbl thead th[data-sort=type]')
+        .classList.contains('has')));
+    chk('浮层选完自动收起', await page.evaluate(() =>
+      document.querySelector('.fc-pop').hidden));
+    await page.click('#fcReset');
+    await waitFor(page, () => /\b\d+/.test(document.querySelector('#fcPager').textContent), 8000, 'hd reset');
+    chk('Reset 后列头高亮消失', !(await page.evaluate(() =>
+      document.querySelector('#fcTbl thead th[data-sort=type]').classList.contains('has'))));
+
     // 合同名搜索：'代驾' 命中 3 份
     await page.type('#fcQ', '代驾');
     await waitFor(page, () => new RegExp('\\b' + window.__FCQ + '\\s*rows').test(document.querySelector('#fcPager').textContent), 8000, 'fc search');

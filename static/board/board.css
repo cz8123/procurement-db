@@ -344,11 +344,13 @@ h1,h2,h3,p{ margin:0; }
    · 通栏、可换行（切片器那行不再被 chips 挤占宽度）
    · :empty 时直接不显示（没有筛选就没有任何留白） */
 .chips{
-  display:flex; flex-wrap:wrap; align-items:center; gap:4px 5px;
-  width:100%; min-width:0;
+  display:flex; flex-wrap:nowrap; align-items:center; gap:4px 5px;
+  width:100%; min-width:0; min-height:20px;   /* 恒定预留一行：有无筛选都不改筛选条高度 */
+  overflow-x:auto; overflow-y:hidden;
+  scrollbar-width:none; -ms-overflow-style:none;
   padding:0;
 }
-.chips:empty{ display:none; }
+.chips::-webkit-scrollbar{ display:none; }
 .chip{
   display:inline-flex; align-items:center; gap:4px; flex:0 0 auto;
   background:#E8EDF4; color:var(--navy); border:1px solid #CBD8E6;
@@ -664,17 +666,48 @@ body.drawer-open{ overflow:hidden; }
 .fc-summary .fs-v.bad{ color:var(--red); }
 .fc-tbl td.contract{ max-width:320px; }
 .fc-tbl td.supplier{ max-width:210px; }
+/* 表头自带筛选（Type / Status）：漏斗钉在表头右端，点开是这两列的可选值 */
+.fc-tbl thead th.fc-hth{ padding-right:28px; }
+.fc-hflt{
+  position:absolute; right:5px; top:50%; margin-top:-9px;
+  width:18px; height:18px; padding:0; border-radius:4px;
+  border:1px solid rgba(18,39,71,.22); background:rgba(255,255,255,.60);
+  color:#122745; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+  transition:background .12s ease, border-color .12s ease, color .12s ease;
+}
+.fc-hflt svg{ display:block; }
+.fc-hflt:hover{ background:#fff; border-color:#122745; box-shadow:0 1px 2px rgba(16,28,48,.16); }
+.fc-tbl thead th.has .fc-hflt{ background:#1E3A63; border-color:#1E3A63; color:#fff; }
+.fc-pop{
+  position:fixed; z-index:90; width:196px; padding:6px;
+  background:#fff; border:1px solid #C9D4E3; box-shadow:0 8px 22px rgba(16,28,48,.20);
+  border-radius:6px;
+}
+.fc-pop[hidden]{ display:none; }
+.fc-pop-h{
+  font-size:11px; font-weight:700; color:#122745; padding:2px 6px 5px;
+  border-bottom:1px solid #E3E8F0; margin-bottom:4px;
+}
+.fc-pop-b{ max-height:238px; overflow:auto; display:flex; flex-direction:column; }
+.fc-pop-b button{
+  text-align:left; border:0; background:transparent; cursor:pointer;
+  padding:4px 7px; border-radius:3px; font-size:11.5px; color:var(--ink-2);
+}
+.fc-pop-b button:hover{ background:#F1F5FA; }
+.fc-pop-b button.on{ background:#E3ECF7; color:#0E385E; font-weight:700; }
+
 /* 列宽按百分比固定：左边名称类不再把整张表吃满，右边金额/日期/状态留够呼吸空间 */
 .fc-tbl{ table-layout:fixed; }
-.fc-tbl th:nth-child(1){ width:23%; }
-.fc-tbl th:nth-child(2){ width:16%; }
+.fc-tbl th:nth-child(1){ width:21%; }
+.fc-tbl th:nth-child(2){ width:15%; }
 .fc-tbl th:nth-child(3){ width:9.5%; }
 .fc-tbl th:nth-child(4){ width:9.5%; }
 .fc-tbl th:nth-child(5){ width:10.5%; }
 .fc-tbl th:nth-child(6){ width:9%; }
 .fc-tbl th:nth-child(7){ width:9%; }
 .fc-tbl th:nth-child(8){ width:9.5%; }
-.fc-tbl th:nth-child(9){ width:4%; }
+.fc-tbl th:nth-child(9){ width:7%; }
 .fc-tbl td{ overflow:hidden; text-overflow:ellipsis; }
 /* Usage：整格浅蓝底纹 + 深蓝数据条（长度=usage，超过 100% 转红），数字压在右侧 */
 .fc-tbl td.u-cell{ position:relative; padding:0 9px; height:26px; }
@@ -992,17 +1025,22 @@ html.boot-other #pgOverview, html.boot-other #kpis, html.boot-other .fbar{ displ
   font-size:12px; font-weight:600; text-align:left; white-space:nowrap;
 }
 .dt-tbl thead th:last-child{ border-right:0; }
-.dt-th{ display:flex; align-items:center; gap:2px; }
+.dt-th{ display:flex; align-items:center; gap:4px; }
 .dt-sort{ flex:1 1 auto; min-width:0; cursor:pointer; user-select:none;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .dt-sort:hover{ color:#0E385E; }
 .dt-arrow{ display:inline-block; width:8px; font-size:9px; color:#5B6473; }
+/* 列头筛选：18px 描边小方块 + 矢量漏斗（11-26 换掉原来那枚淡到看不见的 ▾ 字形） */
 .dt-funnel{
-  flex:0 0 auto; width:20px; height:20px; padding:0; border:0; background:transparent;
-  color:#122745; cursor:pointer; font-size:11px; line-height:20px; text-align:center;
+  flex:0 0 auto; width:18px; height:18px; padding:0; border-radius:4px;
+  border:1px solid rgba(18,39,71,.22); background:rgba(255,255,255,.60);
+  color:#122745; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+  transition:background .12s ease, border-color .12s ease, color .12s ease;
 }
-.dt-funnel:hover{ background:rgba(255,255,255,.55); }
-.dt-funnel.on{ background:#1E3A63; color:#fff; }
+.dt-funnel svg{ display:block; }
+.dt-funnel:hover{ background:#fff; border-color:#122745; box-shadow:0 1px 2px rgba(16,28,48,.16); }
+.dt-funnel.on{ background:#1E3A63; border-color:#1E3A63; color:#fff; }
 .dt-tbl td{
   position:relative; padding:5px 9px; border-bottom:1px solid #E6EAF0;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--ink-2);

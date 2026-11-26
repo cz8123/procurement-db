@@ -1217,8 +1217,8 @@
     { k: 'usage', t: 'Usage', num: 1, tip: 'PA counts framework-contract POs only' },
     { k: 'start', t: 'Start Date' },
     { k: 'expiry', t: 'Expiry Date' },
-    { k: 'remain', t: 'Remain Days', num: 1 },
-    { k: 'type', t: 'Type' }
+    { k: 'remain', t: 'Remain Days', num: 1, hf: 'status' },
+    { k: 'type', t: 'Type', hf: 'type' }
   ];
   function fcqs(extra) {
     var p = new URLSearchParams();
@@ -1231,13 +1231,62 @@
     });
     return p;
   }
+  var FUNNEL_SVG = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" ' +
+    'stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M3 5h18l-7.2 8.4V20l-3.6-2v-4.6z"/></svg>';
+  /* Type / Status 两个下拉的实际取值仍存在隐藏池里的 <select>（事件、选项来源不变），
+     表头只放一枚漏斗按钮，点开就是这两个下拉的选项 —— 与 Detail 的列头筛选同一套交互 */
+  var FC_HF = { type: { sel: '#fcType', t: 'Agreement type' },
+                status: { sel: '#fcStatus', t: 'Status' } };
   function fcHeadHtml() {
     return '<tr>' + FC_COLS.map(function (c) {
       var arr = S.fc.sort === c.k ? '<span class="arr">' + (S.fc.dir === 'asc' ? '▲' : '▼') + '</span>' : '';
+      var cls = 'fc-hth' + (c.num ? ' ta-r' : '');
+      var flt = c.hf ? '<button type="button" class="fc-hflt" data-hf="' + c.hf + '" title="' +
+        esc(FC_HF[c.hf].t) + ' — filter this column">' + FUNNEL_SVG + '</button>' : '';
       return '<th data-sort="' + c.k + '"' + (c.w ? ' style="width:' + c.w + 'px"' : '') +
-        (c.num ? ' class="ta-r"' : '') + (c.tip ? ' title="' + c.tip + '"' : '') +
-        '>' + c.t + arr + '</th>';
+        ' class="' + cls + '"' + (c.tip ? ' title="' + c.tip + '"' : '') + '>' +
+        '<span class="fc-ht">' + c.t + arr + '</span>' + flt + '</th>';
     }).join('') + '</tr>';
+  }
+  /** 表头漏斗的高亮态：这一列正在筛 */
+  function markFcHdrSel() {
+    Object.keys(FC_HF).forEach(function (k) {
+      var th = $('#fcTbl thead th[data-sort="' + k + '"]');
+      var sel = $(FC_HF[k].sel);
+      if (th) th.classList.toggle('has', !!(sel && sel.value));
+    });
+  }
+  /* -------- 表头筛选浮层：选项直接来自隐藏的 <select> -------- */
+  var fcPopEl = null;
+  function closeFcPop() {
+    if (fcPopEl) { fcPopEl.hidden = true; fcPopEl.dataset.k = ''; }
+  }
+  function openFcPop(btn, key) {
+    var sel = $(FC_HF[key].sel);
+    if (!sel) return;
+    if (!fcPopEl) {
+      fcPopEl = document.createElement('div');
+      fcPopEl.className = 'fc-pop';
+      fcPopEl.hidden = true;
+      document.body.appendChild(fcPopEl);
+    }
+    fcPopEl.dataset.k = key;
+    fcPopEl.innerHTML = '<div class="fc-pop-h">' + esc(FC_HF[key].t) + '</div>' +
+      '<div class="fc-pop-b">' + Array.prototype.map.call(sel.options, function (o) {
+        return '<button type="button" data-v="' + esc(o.value) + '"' +
+          (o.value === sel.value ? ' class="on"' : '') + '>' + esc(o.textContent) + '</button>';
+      }).join('') + '</div>';
+    fcPopEl.hidden = false;
+    var r = btn.getBoundingClientRect(), w = 196;
+    /* 贴右端时改成右边对齐按钮，浮层不会顶到视口边缘 */
+    var left = (r.left + w > innerWidth - 8) ? (r.right - w) : r.left;
+    var top = r.bottom + 4;
+    if (top + fcPopEl.offsetHeight > innerHeight - 8) {
+      top = Math.max(8, r.top - fcPopEl.offsetHeight - 4);
+    }
+    fcPopEl.style.left = Math.max(8, left) + 'px';
+    fcPopEl.style.top = top + 'px';
   }
   function fcRowsHtml(rows) {
     if (!rows.length) {
@@ -1294,7 +1343,9 @@
         return '<div class="fs"><div class="fs-l">' + x[0] + '</div>' +
           '<div class="fs-v ' + x[2] + '">' + x[1] + '</div></div>';
       }).join('');
+      closeFcPop();
       $('#fcTbl thead').innerHTML = fcHeadHtml();
+      markFcHdrSel();
       $('#fcTbl tbody').innerHTML = fcRowsHtml(d.rows || []);
       $('#fcPager').innerHTML = pagerHtml(d.total, d.page, d.size);
       fillContractMeta(d.types, d.bounds);
@@ -2002,6 +2053,13 @@
 
     // 框架协议表：排序 / 翻页 / 局部筛选
     $('#fcTbl thead').addEventListener('click', function (e) {
+      var flt = e.target.closest('.fc-hflt');
+      if (flt) {                            // 表头漏斗：开/关这一列的选项浮层
+        var key = flt.dataset.hf;
+        var sameOpen = fcPopEl && !fcPopEl.hidden && fcPopEl.dataset.k === key;
+        if (sameOpen) closeFcPop(); else openFcPop(flt, key);
+        return;
+      }
       var th = e.target.closest('th[data-sort]');
       if (!th) return;
       var k = th.dataset.sort;
@@ -2030,15 +2088,35 @@
       $(sel).addEventListener('change', function (e) {
         S.fc[{ '#fcType': 'type', '#fcStatus': 'status',
                '#fcFrom': 'df', '#fcTo': 'dt' }[sel]] = e.target.value;
+        markFcHdrSel();
         S.fc.page = 1; loadContracts();
       });
     });
+    /* 表头漏斗浮层：点选项 = 改隐藏 <select> 的值并触发它的 change（口径只有一处） */
+    document.addEventListener('click', function (e) {
+      if (!fcPopEl || fcPopEl.hidden) return;
+      var op = e.target.closest('.fc-pop button[data-v]');
+      if (op) {
+        var sel = $(FC_HF[fcPopEl.dataset.k].sel);
+        if (sel) {
+          sel.value = op.dataset.v;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        closeFcPop();
+        return;
+      }
+      if (!e.target.closest('.fc-pop') && !e.target.closest('.fc-hflt')) closeFcPop();
+    });
+    var fcw = document.querySelector('#pgFramework .tbl-wrap');
+    if (fcw) fcw.addEventListener('scroll', closeFcPop, { passive: true });
+    window.addEventListener('resize', closeFcPop);
     $('#fcReset').addEventListener('click', function () {
       S.fc = { page: 1, size: 50, sort: 'start', dir: 'desc',
                q: '', sup: '', type: '', df: '', dt: '', status: '' };
       ['#fcQ', '#fcSup', '#fcType', '#fcStatus', '#fcFrom', '#fcTo'].forEach(function (sel) {
         $(sel).value = '';
       });
+      markFcHdrSel();
       loadContracts();
       toast('Agreement filters reset');
     });
@@ -3109,7 +3187,10 @@
         '<span class="dt-sort" data-sort="' + c.k + '" title="Sort by ' + esc(c.t) + '">' +
         esc(label) + '<i class="dt-arrow">' + arrow + '</i></span>' +
         '<button type="button" class="dt-funnel' + (dtActive(c.k) ? ' on' : '') +
-        '" data-col="' + c.k + '" title="Search / filter ' + esc(c.t) + '">▾</button>' +
+        '" data-col="' + c.k + '" title="Search / filter ' + esc(c.t) + '">' +
+        '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"' +
+        ' stroke-width="2.4" stroke-linejoin="round" aria-hidden="true">' +
+        '<path d="M3 5h18l-7.2 8.4V20l-3.6-2v-4.6z"/></svg></button>' +
         '</div></th>';
     }).join('') + '</tr>';
   }

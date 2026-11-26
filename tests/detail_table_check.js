@@ -60,6 +60,15 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
        'Single Source Reason', 'Note', 'PRPO Amount (RMB)', 'PO Paid (RMB)']
         .every((t, i) => head[i].text.indexOf(t) === 0), head);
     chk('每个表头都有排序与筛选入口', head.every(h => h.sort && h.funnel), head);
+    /* 11-26：筛选入口从一枚淡到看不见的 ▾ 字形换成 18px 描边方块 + 矢量漏斗 */
+    chk('筛选入口是 18px 描边按钮 + 矢量漏斗图标', await page.evaluate(() => {
+      const a = [...document.querySelectorAll('#dtTbl thead .dt-funnel')];
+      return a.length === 9 && a.every(b => {
+        const r = b.getBoundingClientRect();
+        return !!b.querySelector('svg') && Math.round(r.width) === 18 &&
+          Math.round(r.height) === 18 && b.textContent.trim() === '';
+      });
+    }));
     chk('无分页条', await page.evaluate(() => !document.getElementById('dtPager')));
     const shown = await page.evaluate(() => ({
       meta: document.getElementById('dtMeta').textContent,

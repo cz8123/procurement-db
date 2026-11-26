@@ -265,13 +265,6 @@ window.__FY_DEFAULT = {{ default_fy|default('', true)|tojson }};
       <h2>Framework Agreements <span class="card-note">· Separate source · 190 agreements · PA counts framework-contract POs only</span></h2>
       <div class="card-tools">
         <button class="spec-btn" data-spec="contracts" title="View calculation logic">?</button>
-        <select id="fcType" class="mini-sel"><option value="">All types</option></select>
-        <select id="fcStatus" class="mini-sel">
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="expiring">Expiring ≤ 90 days</option>
-          <option value="expired">Expired</option>
-        </select>
         <span class="date-range">
           <input id="fcFrom" class="mini-inp" type="date" title="Start date from">
           <span>–</span>
@@ -287,6 +280,17 @@ window.__FY_DEFAULT = {{ default_fy|default('', true)|tojson }};
              aria-hidden="true"><path d="M3 5h18l-7.2 8.4V20l-3.6-2v-4.6z"/></svg></button>
       </div>
     </div>
+    <!-- Type / Status 两个筛选下拉不住在工具条里：渲染表头时挂进对应列的 <th>
+         （停留在这个隐藏池里只是为了让节点一直存在，事件绑定不会丢） -->
+    <span class="fc-hdr-pool" id="fcHdrPool" hidden>
+      <select id="fcType" class="mini-sel fc-hsel"><option value="">All types</option></select>
+      <select id="fcStatus" class="mini-sel fc-hsel">
+        <option value="">All statuses</option>
+        <option value="active">Active</option>
+        <option value="expiring">Expiring ≤ 90 days</option>
+        <option value="expired">Expired</option>
+      </select>
+    </span>
     <div class="fc-summary" id="fcSummary"></div>
     <div class="tbl-wrap">
       <table class="tbl fc-tbl" id="fcTbl">

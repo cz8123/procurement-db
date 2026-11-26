@@ -142,7 +142,7 @@ async function waitFor(pg, fn, timeout, label) {
     chk('柱位/柱宽不变', JSON.stringify(xw(a.bars)) === JSON.stringify(xw(b.bars)), [xw(a.bars), xw(b.bars)]);
     chk('卡片总高不变', a.card[3] === b.card[3], [a.card[3], b.card[3]]);
 
-    console.log('=== 4a. 已选条件排在切片器下方（整行） ===');
+    console.log('=== 4a. 已选条件排在切片器下方，且恒定占一行（点图不位移） ===');
     const pos = () => page.evaluate(() => {
       const t = s => Math.round(document.querySelector(s).getBoundingClientRect().top);
       const fb = document.querySelector('.fbar').getBoundingClientRect();
@@ -151,48 +151,39 @@ async function waitFor(pg, fn, timeout, label) {
       return {
         inBar: !!chips.closest('.fbar'),
         chipsDisplay: getComputedStyle(chips).display,
-        chipsTop: Math.round(cr.top),
-        chipsH: Math.round(cr.height),
+        chipsTop: Math.round(cr.top), chipsH: Math.round(cr.height),
         chipsW: Math.round(cr.width),
-        /* 切片器行底边：chips 必须落在它下面 */
         rowBottom: Math.round(Math.max.apply(null, [...document.querySelectorAll('.fdrop')]
           .map(e => e.getBoundingClientRect().bottom))),
         barW: Math.round(fb.width),
         fbarH: Math.round(fb.height),
         stickyH: Math.round(document.querySelector('.sticky-head').getBoundingClientRect().height),
-        monthly: t('#chMonthly'), donut: t('#chDonut'),
-        heat: t('#chHeat'), fc: t('#fcCard')
+        monthly: t('#chMonthly'), donut: t('#chDonut'), heat: t('#chHeat')
       };
     });
     const p0 = await pos();
     chk('chips 在筛选条内', p0.inBar === true);
-    chk('无筛选时 chips 不占位', p0.chipsDisplay === 'none', p0.chipsDisplay);
+    chk('无筛选时 chips 行仍占位（恒定预留一行）',
+      p0.chipsDisplay === 'flex' && p0.chipsH >= 18, [p0.chipsDisplay, p0.chipsH]);
+    chk('chips 行在切片器下方', p0.chipsTop >= p0.rowBottom, [p0.rowBottom, p0.chipsTop]);
 
     await page.evaluate(() => document.querySelector('#donutLegend .li').click());
     await waitFor(page, () => document.querySelectorAll('#chips .chip').length > 0, 8000, 'chip');
     await sleep(700);
     const p1 = await pos();
     console.log('    ' + JSON.stringify(p0) + ' -> ' + JSON.stringify(p1));
-    chk('有筛选时 chips 排在切片器下方', p1.chipsTop >= p0.rowBottom, [p0.rowBottom, p1.chipsTop]);
-    chk('chips 通栏（宽度≈筛选条内宽）', Math.abs(p1.chipsW - (p1.barW - 22)) <= 4,
+    chk('选出条件后筛选条高度不变', p0.fbarH === p1.fbarH, [p0.fbarH, p1.fbarH]);
+    chk('固定区高度不变', p0.stickyH === p1.stickyH, [p0.stickyH, p1.stickyH]);
+    chk('各图表 top 不变（点图时页面不动）',
+      p0.monthly === p1.monthly && p0.donut === p1.donut && p0.heat === p1.heat, [p0, p1]);
+    chk('chips 与切片器行同一位置（不另起一行）', p1.chipsTop === p0.chipsTop, [p0.chipsTop, p1.chipsTop]);
+    chk('chips 通栏（宽度≈筛选条内宽）', Math.abs(p1.chipsW - (p1.barW - 24)) <= 4,
       [p1.chipsW, p1.barW]);
-    /* chips 出现会把固定区撑高 chips 高度 + 行距，图表整体下移同一量（不重叠、不遮挡） */
-    /* 取整误差允许 1px：fbar/卡片都在半像素位置上 */
-    const dBar = p1.fbarH - p0.fbarH, dChart = p1.monthly - p0.monthly;
-    chk('筛选条高度增量 ≈ 各图表下移量', dBar > 0 && Math.abs(dBar - dChart) <= 1,
-      [dBar, dChart]);
-    chk('固定区高度增量与筛选条一致', Math.abs(p1.stickyH - p0.stickyH - dBar) <= 1,
-      [p0.stickyH, p1.stickyH, dBar]);
-    /* 只比当前页可见的视觉对象：#fcCard 属于 Framework 页，Overview 下 top=0 */
-    const dts = [p1.monthly - p0.monthly, p1.donut - p0.donut, p1.heat - p0.heat]
-      .filter((v, i) => [p0.monthly, p0.donut, p0.heat][i] > 0);
-    chk('各图表同步下移（相对位置不变）', Math.max.apply(null, dts) - Math.min.apply(null, dts) <= 1,
-      dts);
     await page.evaluate(() => document.querySelector('#chips .chip button').click());
     await waitFor(page, () => document.querySelectorAll('#chips .chip').length === 0, 8000, 'chip off');
     await sleep(600);
     const p2 = await pos();
-    chk('移除 chip 后筛选条回到原高度', p2.fbarH === p0.fbarH, [p0.fbarH, p2.fbarH]);
+    chk('移除 chip 后高度仍不变', p2.fbarH === p0.fbarH, [p0.fbarH, p2.fbarH]);
 
     console.log('=== 4. 视觉对象「返回」 ===');
     /* 本节验证 filter 模式（点扇区后本图只剩当前项）：先把突出显示关掉，
