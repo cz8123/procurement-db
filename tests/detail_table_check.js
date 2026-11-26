@@ -348,6 +348,9 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       document.getElementById('dtMeta').textContent));
     chk('日期范围生效（行数=接口同区间）', dateMeta === expect && dateMeta < base.total,
       { dateMeta, expect, all: base.total });
+    chk('设日期范围后财年自动置空', await page.evaluate(() =>
+      document.getElementById('fySel').value === ''),
+      await page.$eval('#fySel', e => e.value));
 
     const xyr = await page.evaluate(async () => {
       const a = await (await fetch('/api/board/detail?dateFrom=2026-03-01&dateTo=2026-09-30')).json();
@@ -355,16 +358,23 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       return { all: a.total, inFy: b.total };
     });
     chk('日期范围可跨财年（指定日期时不再叠加财年）', xyr.all > xyr.inFy * 1.5, xyr);
+    /* 双向联动：选财年 → 日期切片器填成该财年的实际区间 */
+    const fys = await page.$$eval('#fySel option', o => o.map(x => x.value).filter(Boolean));
     const fy0 = await page.$eval('#fySel', e => e.value);
-    const fyOther = await page.$$eval('#fySel option', o => o.map(x => x.value))
-      .then(a => a.find(v => v !== fy0));
+    const fyOther = fys.find(v => v !== fy0);
     if (fyOther) {
+      const rgr = await page.evaluate(async () => (await (await fetch('/api/board/options')).json()).fyRange);
       await page.select('#fySel', fyOther);
-      await sleep(1500);
-      chk('换财年不清空日期范围', await page.evaluate(() =>
-        document.getElementById('dtFrom').value === '2026-11-01' &&
-        document.getElementById('dtTo').value === '2026-11-15' &&
-        /~/.test(document.getElementById('dtMeta').textContent)));
+      await sleep(1800);
+      const got = await page.evaluate(() => ({
+        fy: document.getElementById('fySel').value,
+        from: document.getElementById('dtFrom').value,
+        to: document.getElementById('dtTo').value
+      }));
+      const want = rgr[fyOther] || {};
+      chk('选财年 → 日期切片器自动填该财年区间',
+        got.fy === fyOther && got.from === want.from && got.to === want.to,
+        { got, want });
       await page.select('#fySel', fy0);
       await sleep(1500);
     }
@@ -372,6 +382,11 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
     await waitFor(page, t => Number(document.getElementById('dtMeta')
       .textContent.split(' ')[0].replace(/,/g, '')) === t,
       8000, 'reset date', base.total).catch(() => {});
+    const latestFy = await page.evaluate(async () =>
+      (await (await fetch('/api/board/options')).json()).latestFy);
+    chk('Clear filters 后财年回到最新',
+      await page.$eval('#fySel', e => e.value) === latestFy,
+      await page.$eval('#fySel', e => e.value));
     chk('Clear filters 同时清空日期', await page.evaluate(() =>
       !document.getElementById('dtFrom').value && !document.getElementById('dtTo').value) &&
       metaNum(await page.evaluate(() => document.getElementById('dtMeta').textContent)) === base.total);

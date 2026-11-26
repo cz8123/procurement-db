@@ -369,6 +369,11 @@ def _build_options(regs=()):
                    'SELECT MIN("Date"),MAX("Date") FROM dash_po').fetchone())),
                "rows": c.execute('SELECT COUNT(*) FROM dash_po').fetchone()[0],
                "options": {}}
+        # 每个财年实际的日期区间：Detail 的日期切片器与财年下拉双向联动用
+        # （选财年 → 日期自动填这个区间；改日期 → 财年置空）
+        out["fyRange"] = {r[0]: {"from": r[1], "to": r[2]} for r in c.execute(
+            'SELECT FY, MIN("Date"), MAX("Date") FROM dash_po '
+            "WHERE FY IS NOT NULL AND TRIM(FY) <> '' GROUP BY FY ORDER BY FY")}
         for key, col in FILTERS.items():
             # supplier 4982 个值，前端走抽屉搜索；sub 只在帕累托下钻时点选，
             # 都不进筛选下拉，省掉一次全表 GROUP BY

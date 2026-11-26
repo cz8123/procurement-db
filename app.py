@@ -575,10 +575,26 @@ def dash_page():
         except OSError:
             return 0
 
+    # 默认财年在这里直接给出：首屏的 /data 与 /top 是并行发出的，
+    # 若等 /options 回来才知道财年，请求就不带 fy，命中不了启动预热的缓存。
+    # 口径必须与 board_api._fy_list 一致：只算命中有数据的财年（dash_calendar 覆盖到未来年度）
+    try:
+        _c = sqlite3.connect("file:" + DB_PATH.replace("\\", "/") + "?mode=ro", uri=True,
+                             timeout=4.0)
+        try:
+            _row = _c.execute('SELECT MAX("FiscalYearName") FROM dash_calendar '
+                              'WHERE "Date" IN (SELECT "Date" FROM dash_po)').fetchone()
+            default_fy = (_row[0] or "") if _row else ""
+        finally:
+            _c.close()
+    except sqlite3.Error:
+        default_fy = ""
+
     resp = make_response(render_template(
         "board.html",
         v_css=_stamp("board/board.css"),
         v_js=_stamp("board/board.js"),
+        default_fy=default_fy,
         # 地图底图走腾讯地图，Key 由部署方自己申请后从环境变量注入；
         # 代码里不预置任何有效 Key，未配置时前端只显示数据、地图区给出提示。
         tmap_key=(os.environ.get("TMAP_KEY", "") or "").strip(),

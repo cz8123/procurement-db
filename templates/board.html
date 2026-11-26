@@ -8,6 +8,9 @@
 <script>
 /* 腾讯地图 Key：由部署方通过 TMAP_KEY 环境变量注入，未配置时只显示数据与提示 */
 window.TMAP_KEY = {{ tmap_key|default('', true)|tojson }};
+/* 服务端给的最新财年：首屏 /data 与 /top 与 /options 并行发出，
+   带上它才能命中启动预热的缓存（不必等 /options 回来） */
+window.__FY_DEFAULT = {{ default_fy|default('', true)|tojson }};
 /* 刷新落在非 Overview 页时，首帧就别画 Overview（board.js 早切完成后移除 class） */
 (function () {
   var h = (location.hash || '').replace(/^#\/?/, '');

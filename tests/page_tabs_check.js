@@ -164,7 +164,7 @@ async function waitFor(page, fn, timeout, label) {
     await page.setViewport({ width: 1600, height: 1000 });
     await sleep(350);
     const fy0 = await page.$eval('#fySel', s => s.value);
-    const fyList = await page.$$eval('#fySel option', o => o.map(x => x.value));
+    const fyList = await page.$$eval('#fySel option', o => o.map(x => x.value).filter(Boolean));
     const fy1 = fyList.find(f => f !== fy0);
     await page.click('.pg-tab[data-page="detail"]');
     await sleep(500);

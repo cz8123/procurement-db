@@ -28,6 +28,13 @@ function chk(name, ok, detail) {
     await page.goto(BASE + '/dash?t=' + Date.now(), { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(
       () => document.querySelectorAll('#chHeat .hcell').length > 0, { timeout: 15000 });
+    /* 图表出现不等于 4 个请求都回来了（/top、/contracts 可能还在路上）：
+       等资源条目到齐再统计，否则冷启动第一次跑会只抓到 2 条，误判成 URL 不一致 */
+    await page.waitForFunction(
+      () => performance.getEntriesByType('resource')
+        .filter(x => /\/api\/board\//.test(x.name)).length >= 4,
+      { timeout: 15000 }).catch(() => {});
+    await sleep(120);
     const r = await page.evaluate(() => {
       const rs = performance.getEntriesByType('resource')
         .filter(x => /\/api\/board\//.test(x.name));

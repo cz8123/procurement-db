@@ -38,6 +38,8 @@
 
   var S = {
     fy: null, cur: 'RMB', rate: 1, page: 'overview',
+    fyRange: {},              // 每个财年的实际日期区间（选财年 → 自动填日期切片器）
+    latestFy: '',
     sel: {},
     options: {},
     data: null,
@@ -209,8 +211,10 @@
     var el = $('#' + id);
     if (!el) return fallback;
     var cs = window.getComputedStyle(el);
-    var w = el.clientWidth - (parseFloat(cs.paddingLeft) || 0) -
-      (parseFloat(cs.paddingRight) || 0);
+    /* 用 getBoundingClientRect 的**小数**宽度：clientWidth 会四舍五入，
+       取整后可能比真实内容宽多 1px，反而被 max-width:100% 压回去产生 0.1% 缩放 */
+    var w = el.getBoundingClientRect().width -
+      (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
     return Math.max(320, Math.floor(w) || fallback);
   }
   function emptyBox(id, msg) {
@@ -1395,15 +1399,19 @@
   function loadOptions() {
     return api('/api/board/options').then(function (d) {
       S.options = d.options || {};
+      S.fyRange = d.fyRange || {};
+      S.latestFy = d.latestFy || '';
       var sel = $('#fySel');
-      sel.innerHTML = (d.fy || []).map(function (f) {
-        return '<option value="' + esc(f) + '"' + (f === d.latestFy ? ' selected' : '') + '>' +
-          esc(f) + '</option>';
+      /* 第一项是「空财年」：设了日期范围时财年会被置空，两者不叠加 */
+      sel.innerHTML = '<option value="">—</option>' + (d.fy || []).map(function (f) {
+        return '<option value="' + esc(f) + '">' + esc(f) + '</option>';
       }).join('');
-      /* 已选财年可能是刷新前还原的：还在列表里就保留，被删了就回落最新 */
+      /* 已选财年可能是刷新前还原的：还在列表里就保留，被删了就回落最新。
+         空值只在「已经设了日期范围」时才合法（此时财年不参与筛选）。 */
       var fys = d.fy || [];
-      if (!S.fy || fys.indexOf(S.fy) < 0) S.fy = d.latestFy;
-      sel.value = S.fy;
+      var blankOk = S.fy === '' && (S.detail.from || S.detail.to);
+      if (!blankOk && (!S.fy || fys.indexOf(S.fy) < 0)) S.fy = d.latestFy;
+      sel.value = S.fy || '';
 
       // Chart5 局部筛选下拉
       $('#topCat').innerHTML = '<option value="">All categories</option>' +
@@ -1731,7 +1739,18 @@
 
     // 财年 / 货币
     $('#fySel').addEventListener('change', function (e) {
-      S.fy = e.target.value; S.fc.page = 1;
+      var v = e.target.value;
+      S.fy = v; S.fc.page = 1;
+      /* 选财年 → 日期切片器自动落成该财年的实际区间（两者表达同一个范围） */
+      var rg = v && S.fyRange && S.fyRange[v];
+      if (rg) {
+        S.detail.from = rg.from || '';
+        S.detail.to = rg.to || '';
+        S.detail.page = 1;
+        if ($('#dtFrom')) $('#dtFrom').value = S.detail.from;
+        if ($('#dtTo')) $('#dtTo').value = S.detail.to;
+      }
+      saveView();
       loadAll();
     });
     $('#curSeg').addEventListener('click', function (e) {
@@ -2901,7 +2920,7 @@
     }
     if (typeof v.geoQ === 'string') S.geo.q = v.geoQ;
     if (v.cur === 'RM' || v.cur === 'RMB') S.cur = v.cur;
-    if (v.fy) S.fy = v.fy;
+    if (typeof v.fy === 'string') S.fy = v.fy;
     if (v.expR && typeof v.expR === 'object') S.detail.expR = v.expR;
     if (v.expC && typeof v.expC === 'object') S.detail.expC = v.expC;
     if (typeof v.dFrom === 'string') S.detail.from = v.dFrom;
@@ -2909,6 +2928,7 @@
   }
   /* 顶栏 / 图内的分段控件要跟着还原后的状态点亮（否则按钮和实际视图对不上） */
   function syncControls() {
+    if ($('#fySel')) $('#fySel').value = S.fy || '';
     var cs = $('#curSeg');
     if (cs) $$('button[data-cur]', cs).forEach(function (b) {
       b.classList.toggle('on', b.dataset.cur === S.cur);
@@ -3368,8 +3388,15 @@
         S.detail.from = ($('#dtFrom').value || '').trim();
         S.detail.to = ($('#dtTo').value || '').trim();
         S.detail.page = 1;
+        /* 设了日期范围就把财年置空：日期范围自己就是范围，两者不再叠加。
+           财年一变，全局（KPI/图表）也要回落到「未指定 → 最新财年」。 */
+        var cleared = false;
+        if ((S.detail.from || S.detail.to) && S.fy) {
+          S.fy = ''; cleared = true;
+          if ($('#fySel')) $('#fySel').value = '';
+        }
         saveView();
-        loadDetail();
+        if (cleared) loadAll(); else loadDetail();
       });
     });
     $('#dtReset').addEventListener('click', function () {
@@ -3378,7 +3405,15 @@
       d.from = ''; d.to = '';
       if ($('#dtFrom')) $('#dtFrom').value = '';
       if ($('#dtTo')) $('#dtTo').value = '';
-      closeDtPop(); renderDtHead(); loadDetail();
+      /* 日期清空后财年不再有「空白」的理由：回到最新财年 */
+      var back = false;
+      if (!S.fy && S.latestFy) {
+        S.fy = S.latestFy; back = true;
+        if ($('#fySel')) $('#fySel').value = S.fy;
+      }
+      saveView();
+      closeDtPop(); renderDtHead();
+      if (back) loadAll(); else loadDetail();
     });
     pop.addEventListener('click', function (e) {
       var a = e.target.closest('[data-act]');
@@ -3413,6 +3448,9 @@
 
   /* ================================================ 启动 */
   function init() {
+    /* 服务端已给最新财年：先落一个默认值，首个 /data /top 就能带 fy（命中预热缓存）；
+       随后 restoreView 若还原了具体财年会覆盖它 */
+    if (!S.fy && window.__FY_DEFAULT) S.fy = window.__FY_DEFAULT;
     /* 先还原层级再发首个请求：筛选 / 下钻本来就要进 query，晚一步就是白跑一次全量 */
     restoreView(readView());
     renderTabs();

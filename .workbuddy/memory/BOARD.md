@@ -248,3 +248,14 @@
 - **离线导出不再内嵌地图 Key**：`board_export.py` 在拿到 `/dash` HTML 后把 `window.TMAP_KEY` 置空。理由：file:// 协议腾讯地图 SDK 明确不支持（控制台刷错误），且 Key 会随可转发文件泄漏。离线文件地图区显示配置提示，公司列表与 Zebra 表照常。
 - **测试**：`board_check` 吸顶段改稳（滚到文档底部、断言"图表位移 == 滚动距离"而非写死 600px，KPI 变矮后原断言会误报）；`page_tabs_check` 的 Top10 宽度断言改为对比"容器内宽"并校验 `rendered == attr`。回归：board 301/0、page_tabs 25/0、detail 35/0、geo 在线 45/0、离线 42/0、snapshot 64/0、visual 31/0、ui_focus 38/0、grid_sum 14/0、colfilter 34/0、perf 11/0。
 - **参考图入库**：`前端建设/microsoft官方 powerBI示例/` 新增 17 张视觉对照图（GEO/Zebra1~3/kpi/category/公司/卡片/工具提示/条图/气泡图/面积图/表格2~5，共 23MB）纳入版本库。
+
+## 46 弧线锯齿定位 / 财年↔日期切片器双向联动（11-26 上午）
+- **弧线毛边的结论（先记结论，避免以后重复排查）**：图表 SVG 现在三档 DPR（1 / 1.25 / 2）实测 `属性宽/渲染宽 = 1.0000`，没有任何缩放。剩下的锯齿是**1x 设备像素的物理极限**：Chrome 对弧边只做"1 个过渡像素"的线性混合（实测 `(129,145,166)` 单像素过渡），`shape-rendering` 三档 `auto` / `geometricPrecision` / `optimizeQuality` 渲染结果**逐像素一致**（做了 A/B 对照），所以换属性没有意义。真正能提高弧线细腻度的只有增加设备像素密度：浏览器缩放 125%~150%（Ctrl+滚轮）或系统缩放，SVG 会按更高分辨率重新栅格化。用户对比的 Power BI 参考图是 2x/3x 截屏，同尺寸比必然更细腻。
+- **最后一点残余缩放也修掉了**：`chartW()` 原来用 `clientWidth`（**整数四舍五入**），容器真实内容宽 720.5 时它给 721，超出后被 `max-width:100%` 压回 → 0.07% 缩放。改为 `getBoundingClientRect().width` 的小数宽度再 `floor`。
+- **财年 ↔ Detail 日期切片器双向联动**：
+  - `GET /api/board/options` 新增 `fyRange`（每个财年数据库里实际的最小/最大 `Date`）。实测 FY2425 `2024-07-25~2025-06-30`、FY2526 `2025-07-01~2026-06-30`、FY2627 `2026-07-01~2026-11-22`。
+  - 选财年 → 日期框自动填该财年区间，Detail 行数与该财年一致（19,686）；改日期 → 财年下拉置空（新增首项 `—`），此时 Detail 只用日期（可跨财年），全局 KPI/图表按"未指定 → 最新财年"回落。
+  - `Clear filters` 清空日期后，若财年为空则回落到最新财年，避免"空财年 + 无日期"的吊空状态。
+  - `sessionStorage` 允许存空财年（`restoreView` 由 `if (v.fy)` 改成 `typeof === 'string'`），刷新后仍停在日期模式。
+- **首屏预热命中修复**：`/data`、`/top` 与 `/options` 是并行发出的，原来 `/top` 常常还没拿到财年就不带 `fy`，命中不了 `WARMUP_URLS` 的缓存（`perf_check` 会偶发失败）。现在 `/dash` 渲染时直接注入 `window.__FY_DEFAULT`（口径同 `_fy_list`：只算命中有数据的财年；**不能**用 `MAX(FiscalYearName)`，`dash_calendar` 覆盖到未来年度会给出 FY2829，直接空页）。
+- **测试**：`detail_table_check` 扩到 37/0（新增"设日期后财年置空""选财年自动填区间""Clear filters 回最新"）；`perf_check` 增加"等 4 个资源条目到齐再统计"，连跑 3 次 11/0 稳定；board 301、page_tabs 25、geo 45/42、snapshot 64、visual 31、ui_focus 38、grid_sum 14、colfilter 34 全绿。
