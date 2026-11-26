@@ -55,10 +55,10 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       width: Math.round(th.getBoundingClientRect().width)
     })));
     console.log('    ' + JSON.stringify(head.map(h => [h.text, h.width])));
-    chk('十三列且名称正确（区域后跟城市，理由后跟财政年度，财年后跟说明）',
+    chk('十三列且表头用短名（Method / Reason / FY，避免过长被省略号截断）',
       head.length === 13 &&
-      ['Region', 'City', 'Company', 'Category', 'Sub-Category', 'Supplier', 'Procurement Method',
-       'Single Source Reason', 'Fiscal Year', 'Note', 'Date', 'PRPO Amount (RMB)', 'PO Paid (RMB)']
+      ['Region', 'City', 'Company', 'Category', 'Sub-Category', 'Supplier', 'Method',
+       'Reason', 'FY', 'Note', 'Date', 'PRPO Amount (RMB)', 'PO Paid (RMB)']
         .every((t, i) => head[i].text.indexOf(t) === 0), head);
     /* 日期列：ISO 文本（此刻表格默认全折叠，直接查 API 更干净） */
     const dCol = await page.evaluate(async () => {
@@ -96,6 +96,11 @@ const metaNum = s => Number(String(s).split(' ')[0].replace(/,/g, ''));
       fyApi.vals.every(v => /^FY\d{4}$/.test(v)) &&
       JSON.stringify(fyApi.vals) === JSON.stringify(fyApi.opts) &&
       fyApi.colIdx === 8, fyApi);
+    /* 表头短名后 1600 视口下全部完整显示，不再出现省略号截断 */
+    const clipped = await page.evaluate(() =>
+      [...document.querySelectorAll('#dtTbl thead .dt-sort')]
+        .filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent.trim()));
+    chk('13 个表头在 1600 视口下全部完整（无省略号截断）', clipped.length === 0, clipped);
     chk('每个表头都有排序与筛选入口', head.every(h => h.sort && h.funnel), head);
     /* 11-26：筛选入口从一枚淡到看不见的 ▾ 字形换成 18px 描边方块 + 矢量漏斗 */
     chk('筛选入口是 18px 描边按钮 + 矢量漏斗图标', await page.evaluate(() => {

@@ -389,3 +389,8 @@
 - **离线**：`board_export.py` 的 ROW_COLS/ROW_SQL 早已含 `fy`，无需改；`snapshot.js` 的 `DETAIL_KEYS`、行输出、排序 `field` 加 `fy`（放在 reason 后）。重导单文件 12.54 MB。
 - **测试**：`detail_table_check` 53/0（13 列断言、funnel 13、FY 值/取值筛选/columns 位置、列号后移：tfoot 10/11→11/12、说明 idx 8→9、明细金额 11→12、币种表头 11→12）；`snapshot_check` 74/0（13 列 + 离线 FY 值第 9 格）；其余 board 339、page_tabs 27、visual 31、ui_focus 41、grid_sum 14、colfilter 34、perf 11、geo 45（geo 首跑偶发地图 zoom 未就绪，单跑 45/0）全绿。
 - **坑**：改 gmeta colspan 时 Edit 的 old_string 若只匹配到 `subtotal · '` 会把后面的 `' +` 一起吃掉，导致 `missing ) after argument list` 首屏全白。**改完 JS 必须 `node --check static/board/board.js`**，别只靠浏览器测。
+
+## 61 Detail 表头改短名（11-26，用户「Fiscal Year 直接用 FY，其他过长的表头也修改下」）
+- **只改显示名 `DT_COLS[].t`**（后端 `DETAIL_TEXT` 的 value 只是语义标注、`columns` 用 key，不受影响）：`Fiscal Year → FY`、`Single Source Reason → Reason`、`Procurement Method → Method`。**列宽、列序、key、colspan 全部不动**，零连锁改动。
+- **依据**：1600 视口实测原来只有 `Single Source Reason`（sw124 > cw106）和 `Fiscal Year`（sw64 > cw49）被省略号截断，`Procurement Method` 虽完整但偏长；`Sub-Category`/`PRPO Amount (RMB)`/`PO Paid (RMB)` 都完整，保留原名。改后 13 个表头 `scrollWidth <= clientWidth` 全部为 true。
+- **测试**：`detail_table_check` 54/0（表头断言改短名 + 新增「13 个表头在 1600 视口下全部完整，无省略号截断」断言）；`snapshot_check` 74/0（离线表头短名）；其余 board 339、page_tabs 27、visual 31、ui_focus 41、grid_sum 14、colfilter 34、perf 11、geo 45 全绿。重导单文件 12.54 MB。

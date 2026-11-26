@@ -327,11 +327,11 @@ async function waitFor(pg, fn, timeout, label) {
                     ellipsis: getComputedStyle(td).textOverflow,
                     hasTipBox: !!document.querySelector('#dtTip') } : null;
     });
-    chk('离线 Detail 13 列，区域后是 City、理由后是 Fiscal Year、财年后是 Note',
+    chk('离线 Detail 13 列，表头短名 Method / Reason / FY',
       dtOff.length === 13 && dtOff[1].indexOf('City') === 0 &&
       dtOff[4].indexOf('Sub-Category') === 0 &&
-      dtOff[7].indexOf('Single Source Reason') === 0 &&
-      dtOff[8].indexOf('Fiscal Year') === 0 &&
+      dtOff[6].indexOf('Method') === 0 && dtOff[7].indexOf('Reason') === 0 &&
+      dtOff[8].indexOf('FY') === 0 &&
       dtOff[9].indexOf('Note') === 0 && dtOff[10].indexOf('Date') === 0, dtOff);
     chk('离线说明也是单行 + 省略号 + data-tip（悬停浮窗同构）',
       !!noteOff && noteOff.ellipsis === 'ellipsis' && noteOff.hasTipBox &&

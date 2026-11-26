@@ -1039,12 +1039,13 @@ def contracts_csv():
 DETAIL_TEXT = {
     "region": "Region", "city": "City", "company": "Company", "category": "Category",
     "sub": "Sub-Category",
+    # 表头短名（显示名以 board.js 的 DT_COLS 为准，这里只作语义标注）
     "supplier": "Supplier", "method": "Method",
     # 豁免理由 / 单一来源理由 两列互斥（FY2627 同时非空 0 条），合并成一列
-    "reason": "Single Source Reason",
+    "reason": "Reason",
     # 财政年度：行级字段 dash_po.FY（FY2425/FY2526/FY2627），跨财年日期范围时
     # 同一张表会同时出现多个财年，所以每行带出自己的 FY 并支持按财年筛选
-    "fy": "Fiscal Year",
+    "fy": "FY",
 }
 # 长文本列：只给「搜索」，不给取值勾选（说明有 4 万多种，勾选没意义）
 DETAIL_LONG = {"note"}

@@ -3397,11 +3397,11 @@
     /* 子类别：dim_agg 聚合名，紧跟在类别之后 */
     { k: 'sub',      t: 'Sub-Category',        w: '7.9%' },
     { k: 'supplier', t: 'Supplier',            w: '10.4%' },
-    { k: 'method',   t: 'Procurement Method',  w: '10.4%' },
+    { k: 'method',   t: 'Method',               w: '10.4%' },
     /* 豁免单一来源的理由 / 单一来源采购理由 不会同时出现，合并成一列 */
-    { k: 'reason',   t: 'Single Source Reason', w: '8.4%' },
+    { k: 'reason',   t: 'Reason',               w: '8.4%' },
     /* 财政年度：行级 dash_po.FY，跨财年日期范围时逐行显示自己的 FY */
-    { k: 'fy',       t: 'Fiscal Year',          w: '5.0%' },
+    { k: 'fy',       t: 'FY',                   w: '5.0%' },
     /* 说明：一行显示 + 省略号（全文在悬停浮窗里），夹在财年与日期之间 */
     { k: 'note',     t: 'Note',                w: '7.1%', long: 1 },
     /* 申请日期（ISO 文本）：只给搜索，不给取值勾选 */
