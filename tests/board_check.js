@@ -137,11 +137,14 @@ async function waitFor(pg, fn, timeout, label, arg) {
     });
     chk('KPI 右侧两行 Δ 指标（ΔPY / Δ%）',
       kd.length === 2 && kd[0].l === 'ΔPY' && kd[1].l === 'Δ%', kd.map(x => x.l));
+    /* 首卡是深蓝底，红/绿用调亮版本保证对比度；其余卡用标准色；两者都要求文字与圆标同色 */
+    const UP = ['rgb(27, 138, 75)', 'rgb(111, 224, 160)'];
+    const DOWN = ['rgb(198, 40, 40)', 'rgb(255, 138, 138)'];
     chk('KPI 增减色：增加绿 / 减少红，圆标同色',
       kd.every(r => (r.cls.indexOf('up') >= 0 &&
-        r.color === 'rgb(27, 138, 75)' && r.bg === 'rgb(27, 138, 75)') ||
+        r.color === r.bg && UP.indexOf(r.color) >= 0) ||
         (r.cls.indexOf('down') >= 0 &&
-        r.color === 'rgb(198, 40, 40)' && r.bg === 'rgb(198, 40, 40)')), kd);
+        r.color === r.bg && DOWN.indexOf(r.color) >= 0)), kd);
     chk('圆标里是居中箭头（SVG path）', kd.every(r => r.arrow === 'svg'), kd);
 
     console.log('=== 3. 支出类型（dash_build 字段错位修复） ===');
@@ -627,29 +630,36 @@ async function waitFor(pg, fn, timeout, label, arg) {
       .filter(t => t.split(/\s+/).some(w => w.length > 24)));
     chk('Top10 英文名无超长连写', topLong.length === 0, topLong.slice(0, 2));
 
-    /* 第二个下拉原先是支出类型，改成采购方法 */
-    const mthOpts = await page.$$eval('#topMth option', a => a.map(e => e.textContent.trim()));
-    chk('第二个筛选是采购方法（取值来自 Procurement Method）',
-      mthOpts[0] === 'All methods' && mthOpts.indexOf('Tender') > 0, mthOpts);
-    chk('不再有支出类型下拉', (await page.$('#topExp')) === null);
+    /* 11-27：用户要求去掉 Top10 图内类别/方法切片器，统一用全局筛选 */
+    chk('Top10 卡片内已无类别/方法下拉',
+      (await page.$('#topCat')) === null && (await page.$('#topMth')) === null &&
+      (await page.$('#topExp')) === null);
+    const topTools = await page.$eval('.card.g5 .card-tools', e => e.textContent.trim());
+    chk('Top10 卡片头只剩口径与筛选说明按钮',
+      !/All categories|All methods/.test(topTools), topTools);
 
+    /* 全局筛选应带动 Top10：勾一个类别后与接口同参数结果一致 */
+    const beforeTop = await page.$$eval('#chTop .trow text', a => a.map(e => e.textContent.trim()));
+    await page.evaluate(() => document.querySelector('.fdrop[data-k=category] .fd-btn').click());
+    await sleep(200);
     await page.evaluate(() => {
-      window.__prevTop = document.querySelector('#chTop .trow text').textContent;
+      const l = document.querySelector('.fdrop[data-k=category] .fpop-b label');
+      if (l) l.click();
     });
-    await page.select('#topMth', 'Tender');
-    await waitFor(page, () => {
-      const t = document.querySelector('#chTop .trow text');
-      return t && t.textContent !== window.__prevTop;
-    }, 9000, 'top by method');
-    const apiTop = await page.evaluate(() =>
-      fetch('/api/board/top?fy=FY2627&cur=RMB&method=Tender')
+    await waitFor(page, prev => {
+      const now = [...document.querySelectorAll('#chTop .trow text')].map(e => e.textContent.trim());
+      return now.length && now.join('|') !== prev.join('|');
+    }, 10000, 'top follows global filter', beforeTop);
+    const topApi = await page.evaluate(() =>
+      fetch('/api/board/top?fy=FY2627&cur=RMB&category=' +
+        encodeURIComponent(document.querySelector('.chip button[data-k=category]').dataset.v))
         .then(r => r.json()).then(d => d.rows.length));
-    chk('按采购方法筛 Top10 → 行数 = 接口返回', (await count('#chTop .trow')) === apiTop, apiTop);
-    chk('局部筛选不影响 KPI', (await num('.kpi[data-k=amount] .k-val')) === k0.amount);
-
-    await page.select('#topMth', '');
-    await waitFor(page, () => document.querySelectorAll('#chTop .trow').length === 10, 9000, 'top reset');
-    chk('清回 All methods → 恢复 10 条', (await count('#chTop .trow')) === 10);
+    chk('Top10 跟随全局类别筛选、行数与接口一致',
+      (await count('#chTop .trow')) === topApi, { shown: await count('#chTop .trow'), api: topApi });
+    chk('全局筛选当然也影响 KPI', (await num('.kpi[data-k=amount] .k-val')) !== k0.amount);
+    await page.click('#btnReset');
+    await waitFor(page, () => document.querySelectorAll('#chTop .trow').length === 10, 10000, 'top global reset');
+    chk('重置全局筛选 → Top10 恢复 10 条', (await count('#chTop .trow')) === 10);
 
     console.log('=== 8.6 类别明细表（表格 + 数据条） ===');
     chk('类别明细 11 行', await count('#chCat .cd-row') === 11,

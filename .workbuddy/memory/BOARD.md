@@ -415,3 +415,13 @@
 - **名词解释删除**：`board.js` 删 `TERMS`/`TERMS_BY_KEY` 与 `openSpec` 的 spTerms 渲染；`board.html` 删对应 `.sp-sec`；`board.css` 删 `.sp-terms`。弹窗从四段变三段。
 - **几何**：弹窗 640→720px、`.sp-frow` 第三列 148→210px，中文表名（最长「采购申请 PRPO → 采购类别映射表」）单行显示不换行。
 - **测试**：`board_check` 339/0（删「有名词解释」断言，改「已去掉名词解释区块」；新增「不含英文表名/SQL 术语」「字段对照用中文表名」断言）；`snapshot_check` 76/0，其余 page_tabs 28、geo 45、detail 54、visual 31、ui_focus 41、grid_sum 14、colfilter 34、perf 11 全绿。重导单文件 12.53 MB。
+
+## 65 Top10 去掉图内切片器 + 版型层次优化（11-27）
+- **Top10 局部筛选器（用户要求「有全局的了」）**：删 `#topCat` / `#topMth` 两个 select、`S.topLocal`、`loadTop()` 的 category/method 参数、`loadOptions()` 的填充、change 事件、`btnReset` 里的清空、`vtLocal('top')`、`specCond` 的「本图额外筛选」。`loadTop()` 现在只 `qs()`（全局筛选）；`specCond('top')` 改为一行「只用上方全局筛选，无图内独立筛选」。`top` 口径 note 的「图内两个下拉」同步改掉。
+- **测试**：`board_check` 删 8 条图内切片器断言（mthOpts/Tender/清回/不影响 KPI），改为「卡片头无下拉 + Top10 跟随全局类别筛选（行数与 `/api/board/top?category=` 一致）+ Reset 恢复 10 条」。取 category 值用 `.chip button[data-k=category].dataset.v`，**不要用 chip 文本正则**（会取到空）。
+- **版型优化（Power BI 官方 + 2026 趋势调研后，克制落地、不动信息架构）**：
+  - **首卡视觉层次**：`.kpi:first-child`（采购总额）深蓝渐变底 + 白字 + 橙色 5px 竖条，与其余 6 张浅灰辅助卡拉开主次 —— 对应「用大小/颜色差异引导视线 F 型动线」。
+  - **对比度**：深底上红/绿差额调亮为 `#FF8A8A` / `#6FE0A0`，**圆标背景同步调亮同色**（否则破坏「文字与圆标同色」的既有设计）；测试断言放宽为两组允许色，但仍要求 `color === bg`。
+  - **标题字号** `.card-h h2` 15.5→16px；`.kpi:hover` 加边框色反馈。
+  - **未采纳**：侧边图标导航替代页签（会推翻 §62 刚确认的页签居中方案）、栅格列跨度调整（测试与几何风险大于收益）、dark-first（与既有亮色令牌冲突）。
+- **测试**：board 339/0、snapshot 76/0、page_tabs 28、geo 45、detail 54、visual 31、ui_focus 41、grid_sum 14、colfilter 34、perf 11 全绿。重导单文件 12.53 MB。

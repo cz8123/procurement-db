@@ -62,7 +62,6 @@
     sel: {},
     options: {},
     data: null,
-    topLocal: { category: '', method: '' },
     catSub: {},               // 类别明细里已展开子类别的类别名（默认全部折叠）
     mMode: 'region',          // 月度图：region=区域堆叠 / pair=Total vs Framework
     methodDrill: null,        // 采购方式饼图下钻：null | SS-Exempt | SS-Non Exempt
@@ -1627,8 +1626,8 @@
   }
 
   function loadTop() {
-    var p = qs({ category: S.topLocal.category, method: S.topLocal.method });
-    return api('/api/board/top', p).then(function (d) {
+    /* Top10 只吃全局筛选（用户 11-27 要求）：图内不再有类别 / 采购方法下拉 */
+    return api('/api/board/top', qs()).then(function (d) {
       S.data.top = d.rows || [];
       S.topSpec = d.spec || {};
       renderTop();
@@ -1654,16 +1653,6 @@
       var blankOk = S.fy === '' && (S.detail.from || S.detail.to);
       if (!blankOk && (!S.fy || fys.indexOf(S.fy) < 0)) S.fy = d.latestFy;
       sel.value = S.fy || '';
-
-      // Chart5 局部筛选下拉
-      $('#topCat').innerHTML = '<option value="">All categories</option>' +
-        (S.options.category || []).map(function (o) {
-          return '<option value="' + esc(o.v) + '">' + esc(o.v) + '</option>';
-        }).join('');
-      $('#topMth').innerHTML = '<option value="">All methods</option>' +
-        (S.options.method || []).map(function (o) {
-          return '<option value="' + esc(o.v) + '">' + esc(o.v) + '</option>';
-        }).join('');
 
       renderFilters();
 
@@ -1914,10 +1903,7 @@
     }
     function vtLocal(name) {
       var out = [];
-      if (name === 'top') {
-        if (S.topLocal.category) out.push(['Category', S.topLocal.category]);
-        if (S.topLocal.method) out.push(['Procurement Method', S.topLocal.method]);
-      } else if (name === 'contracts') {
+      if (name === 'contracts') {
         if (S.fc.type) out.push(['Agreement type', S.fc.type]);
         if (S.fc.status) out.push(['Status', S.fc.status]);
         if (S.fc.df || S.fc.dt) out.push(['Start date', (S.fc.df || '…') + ' → ' + (S.fc.dt || '…')]);
@@ -1987,9 +1973,8 @@
 
     // 重置
     $('#btnReset').addEventListener('click', function () {
-      S.sel = {}; S.topLocal = { category: '', method: '' };
+      S.sel = {};
       S.methodDrill = null; S.subLevel = null; clearHl();
-      $('#topCat').value = ''; $('#topMth').value = '';
       renderFilters(); refreshCompanyOptions(); loadAll();
       toast('Filters reset');
     });
@@ -2016,14 +2001,6 @@
       S.cur = b.dataset.cur; S.rate = S.cur === 'RM' ? 1.5 : 1;
       $$('#curSeg button').forEach(function (x) { x.classList.toggle('on', x === b); });
       loadAll();
-    });
-
-    // Chart5 局部筛选
-    $('#topCat').addEventListener('change', function (e) {
-      S.topLocal.category = e.target.value; loadTop();
-    });
-    $('#topMth').addEventListener('change', function (e) {
-      S.topLocal.method = e.target.value; loadTop();
     });
 
     // 月度图图示切换（原区域堆叠 / 双柱对比）
@@ -2698,7 +2675,7 @@
       source: '数据来源：' + SRC.prpo,
       notes: [
         '按供应商汇总金额取前 10 名；列表显示归并后的英文名，悬停看全称。',
-        '图内两个下拉只管这张图；点行打开右侧抽屉，按公司汇总。'
+        '只用上方全局筛选；点行打开右侧抽屉，按公司汇总。'
       ],
       fields: [
         ['供应商', '供应商名称（归并后）', SRC.prpo],
@@ -2767,11 +2744,7 @@
       if (v.length) parts.push(names[k] + '：' + v.join('、'));
     });
     out.push(['筛选条件', parts.length ? parts.join('；') : '未设置（全量数据）']);
-    if (key === 'top') {
-      var tl = S.topLocal || {};
-      out.push(['本图额外筛选', '类别＝' + (tl.category || '全部') + '，采购方法＝' +
-        (tl.method || '全部') + '（只影响这张图）']);
-    }
+    if (key === 'top') out.push(['说明', '本图只用上方全局筛选，无图内独立筛选']);
     if (d.status) out.push(['命中单据', nf(d.status.txn, 0) + ' 笔']);
     return out;
   }

@@ -186,14 +186,31 @@ h1,h2,h3,p{ margin:0; }
   background:#F8F9FB;
   border:1px solid #D7DAE1; border-radius:var(--r); padding:7px 10px 6px 13px;
   min-height:74px; box-shadow:var(--shadow);
-  transition:box-shadow .14s ease;
+  transition:box-shadow .14s ease, border-color .14s ease;
 }
 /* 参考图样式：卡片左内缘一道品牌色竖条（随外框圆角裁切） */
 .kpi::before{
   content:''; position:absolute; left:0; top:0; bottom:0; width:4px;
   background:var(--c, #435D95);
 }
-.kpi:hover{ box-shadow:0 4px 12px rgba(16,28,48,.18); }
+/* 视觉层次：首卡（采购总额）是整页主角——深底白字 + 粗品牌色竖条，
+   与其余 6 张辅助卡拉开主次（Power BI 官方「用大小/颜色差异引导视线」） */
+.kpi:first-child{
+  background:linear-gradient(135deg,var(--navy) 0%,var(--navy-2) 100%);
+  border-color:var(--navy);
+}
+.kpi:first-child::before{ width:5px; background:#FF6B12; }
+.kpi:first-child .k-label{ color:#E7EEF7; }
+.kpi:first-child .k-fy{ color:#B9CBE0; }
+.kpi:first-child .k-val{ color:#fff; }
+.kpi:first-child .k-delta b{ color:#B9CBE0; }
+/* 深底上把红/绿差额调亮一档，保证对比度（Power BI 官方强调可访问性） */
+.kpi:first-child .k-delta.down em{ color:#FF8A8A; }
+.kpi:first-child .k-delta.up em{ color:#6FE0A0; }
+.kpi:first-child .k-delta.flat em{ color:#D6E1EF; }
+.kpi:first-child .k-delta.down .k-bd{ background:#FF8A8A; }
+.kpi:first-child .k-delta.up .k-bd{ background:#6FE0A0; }
+.kpi:hover{ box-shadow:0 4px 12px rgba(16,28,48,.18); border-color:#A9B8CB; }
 
 .kpi .k-top{ display:flex; align-items:baseline; gap:5px; padding-right:8px; }
 .kpi .k-label{
@@ -397,7 +414,7 @@ h1,h2,h3,p{ margin:0; }
    （min-width:0 让标题先让位，工具组永不换行；极端窄屏才回落到 wrap） */
 .card-h h2{
   font-family:var(--font-semi);
-  font-size:15.5px; font-weight:600; color:var(--title); letter-spacing:.1px;
+  font-size:16px; font-weight:600; color:var(--title); letter-spacing:.1px;
   flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .card-tools{ display:flex; align-items:center; gap:7px; flex-wrap:nowrap; flex:0 0 auto;
