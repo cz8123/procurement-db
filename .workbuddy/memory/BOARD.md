@@ -425,3 +425,9 @@
   - **标题字号** `.card-h h2` 15.5→16px；`.kpi:hover` 加边框色反馈。
   - **未采纳**：侧边图标导航替代页签（会推翻 §62 刚确认的页签居中方案）、栅格列跨度调整（测试与几何风险大于收益）、dark-first（与既有亮色令牌冲突）。
 - **测试**：board 339/0、snapshot 76/0、page_tabs 28、geo 45、detail 54、visual 31、ui_focus 41、grid_sum 14、colfilter 34、perf 11 全绿。重导单文件 12.53 MB。
+
+## 66 首卡恢复等权 + 顶部页签改侧边图标导航（11-27）
+- **撤销 §65 首卡特殊化**：用户「首卡不用特殊化」→ 删掉 `.kpi:first-child` 全部规则（深蓝渐变/白字/橙竖条/调亮红绿差额），七张 KPI 卡恢复等权；`board_check` 增减色断言还原为单一标准色（绿 `rgb(27,138,75)` / 红 `rgb(198,40,40)`，文字与圆标同色）。卡片标题 16px 保留。
+- **侧边图标导航（用户「可以侧边图标导航」）**：顶栏 `#pgTabs` 移到 `<body>` 下、`.sticky-head` 之前，作为 `.side-nav`（`position:fixed`、宽 `--nav-w:76px`、`--nav-w:64px` @1180）；`body{padding-left:var(--nav-w)}` 让顶栏/KPI/筛选/主内容整体右移，切页零位移。`renderTabs()` 保持 `#pgTabs`/`.pg-tab` 类名与 data-page（事件绑定、`BoardPages.register/go` 不变），每个按钮加内联 SVG 图标（`PAGE_ICONS` 映射 key，未登记用方块兜底）+ 文字标签，选中态白底深字 + 左侧橙竖条。
+- **测试**：`page_tabs_check` 28/0（第 1 段改「侧边栏固定满高、四图标纵向排列、顶栏无页签」，第 4 段几何改「侧边导航固定 + KPI 左边缘 = 导航宽」，删旧「页签居中偏右」断言）；`ui_focus_check` 41/0（侧边栏占 76px 后协议表最窄数值列 128px，阈值 130→124）；`snapshot_check` 77/0（离线侧边栏固定 + 三图标）；board 339、geo 45、detail 54、visual 31、grid_sum 14、colfilter 34、perf 11 全绿。
+- **注意**：全量回归时 `board_check` 偶发一次中途 44 条失败（并发服务压力），单独连跑 3 次均 339/0，属 flaky 非回归。重导单文件 12.53 MB。

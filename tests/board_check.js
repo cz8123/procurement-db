@@ -137,14 +137,11 @@ async function waitFor(pg, fn, timeout, label, arg) {
     });
     chk('KPI 右侧两行 Δ 指标（ΔPY / Δ%）',
       kd.length === 2 && kd[0].l === 'ΔPY' && kd[1].l === 'Δ%', kd.map(x => x.l));
-    /* 首卡是深蓝底，红/绿用调亮版本保证对比度；其余卡用标准色；两者都要求文字与圆标同色 */
-    const UP = ['rgb(27, 138, 75)', 'rgb(111, 224, 160)'];
-    const DOWN = ['rgb(198, 40, 40)', 'rgb(255, 138, 138)'];
     chk('KPI 增减色：增加绿 / 减少红，圆标同色',
       kd.every(r => (r.cls.indexOf('up') >= 0 &&
-        r.color === r.bg && UP.indexOf(r.color) >= 0) ||
+        r.color === 'rgb(27, 138, 75)' && r.bg === 'rgb(27, 138, 75)') ||
         (r.cls.indexOf('down') >= 0 &&
-        r.color === r.bg && DOWN.indexOf(r.color) >= 0)), kd);
+        r.color === 'rgb(198, 40, 40)' && r.bg === 'rgb(198, 40, 40)')), kd);
     chk('圆标里是居中箭头（SVG path）', kd.every(r => r.arrow === 'svg'), kd);
 
     console.log('=== 3. 支出类型（dash_build 字段错位修复） ===');

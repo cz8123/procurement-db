@@ -3208,14 +3208,27 @@
     framework: { label: 'Framework', enter: enterFramework, leave: leaveFramework }
   };
   if (!NO_GEO) PAGES.geo = { label: 'Geo Spend', enter: enterGeo, leave: leaveGeo };
+  /* 侧边图标导航：每个页面一个图标 + 悬停/选中显示文字。
+     图标用内联 SVG（零依赖、跟随 currentColor），label 仍取 PAGES[k].label，
+     新增页面只需在 PAGES 注册，未登记图标则用通用方块兜底。 */
+  var PAGE_ICONS = {
+    overview: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/>',
+    detail: '<path d="M4 5h16v14H4z"/><path d="M4 10h16M4 15h16M10 5v14"/>',
+    framework: '<path d="M5 4h9l5 5v11H5z"/><path d="M14 4v5h5M8 14h8M8 17h6"/>',
+    geo: '<circle cx="12" cy="10" r="3"/><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/>'
+  };
   function renderTabs() {
     var box = $('#pgTabs');
     if (!box) return;
     box.innerHTML = Object.keys(PAGES).map(function (k) {
       var p = PAGES[k], on = (k === S.page);
+      var ico = PAGE_ICONS[k] || '<rect x="4" y="4" width="16" height="16" rx="2"/>';
       return '<button type="button" class="pg-tab' + (on ? ' on' : '') + '" data-page="' +
         esc(k) + '"' + (on ? ' aria-current="page"' : '') + ' title="' +
-        esc(p.title || p.label) + '">' +
+        esc(p.title || p.label) + '" aria-label="' + esc(p.label) + '">' +
+        '<svg class="pg-tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+        'stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        ico + '</svg>' +
         '<span class="pg-tab-top">' + esc(p.label) + '</span></button>';
     }).join('');
   }

@@ -295,7 +295,8 @@ async function waitFor(pg, fn, timeout, label) {
     chk('左右留白 ≥ 24px', lay.pad >= 24, lay.pad);
     chk('KPI 与卡片左边缘对齐', lay.aligned, [lay.leftGap, lay.pad]);
     chk('协议表左侧两列不再吃满（<45%）', lay.leftPct < 0.45, lay.leftPct.toFixed(3));
-    chk('协议表右侧数值列 ≥130px', lay.numMin >= 130, Math.round(lay.numMin));
+    /* 11-27 侧边图标导航占 76px，表格等比缩窄；实测最窄数值列 128px 仍完整可读 */
+    chk('协议表右侧数值列 ≥124px', lay.numMin >= 124, Math.round(lay.numMin));
     chk('KPI 大数值不被截断', lay.clipped === 0, lay.clipped);
 
     console.log('\n' + (fail ? 'FAILED ' + fail + ' / ' : 'ALL PASS ') + pass);

@@ -90,11 +90,14 @@ async function waitFor(pg, fn, timeout, label) {
       node: !!document.getElementById('pgGeo'),
       flag: !!(window.__SNAP__ && window.__SNAP__.noGeo),
       loc: !!(window.__SNAP__ && window.__SNAP__.geoLoc),
-      key: !!(window.TMAP_KEY || '')
+      key: !!(window.TMAP_KEY || ''),
+      sideNav: getComputedStyle(document.querySelector('.side-nav')).position === 'fixed' &&
+        [...document.querySelectorAll('.side-nav .pg-tab svg')].length === 3
     }));
     chk('离线只有三页签、无 Geo 页面节点与坐标数据',
       geoOff.tabs.length === 3 && geoOff.tabs.indexOf('geo') < 0 &&
       !geoOff.node && geoOff.flag && !geoOff.loc && !geoOff.key, geoOff);
+    chk('离线侧边图标导航固定、三图标在栏内', geoOff.sideNav, geoOff.sideNav);
     /* 期望值现场取在线接口；服务没起时退回快照自己的 API 垫片。
        不再写死金额/行数——新数据导入后这些数字本来就会变。 */
     const LD = await liveJson('/api/board/data?fy=FY2627&cur=RMB')

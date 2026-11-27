@@ -39,44 +39,45 @@ async function waitFor(page, fn, timeout, label) {
     await waitFor(page, () => document.querySelectorAll('#chHeat .hcell').length > 0, 15000, 'charts');
     await sleep(400);
 
-    console.log('=== 1. 页签结构 ===');
+    console.log('=== 1. 侧边图标导航结构 ===');
     const tabs = await page.evaluate(() => [...document.querySelectorAll('.pg-tab')].map(e => {
-      const top = e.querySelector('.pg-tab-top');
       const b = e.getBoundingClientRect();
+      const nav = document.querySelector('.side-nav').getBoundingClientRect();
       return {
-        page: e.dataset.page, label: top.textContent.trim(),
+        page: e.dataset.page, label: e.querySelector('.pg-tab-top').textContent.trim(),
         on: e.classList.contains('on'), current: e.getAttribute('aria-current'),
-        topBg: getComputedStyle(top).backgroundColor,
-        topColor: getComputedStyle(top).color,
-        radius: getComputedStyle(top).borderTopLeftRadius,
-        h: Math.round(b.height), bottom: Math.round(b.bottom)
+        bg: getComputedStyle(e).backgroundColor, color: getComputedStyle(e).color,
+        hasIcon: !!e.querySelector('svg.pg-tab-ico'),
+        x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height),
+        inNav: b.left >= nav.left && b.right <= nav.right
       };
     }));
-    const subCount = await page.evaluate(() => document.querySelectorAll('.pg-tab-sub').length);
-    const headerBottom = await page.evaluate(() =>
-      Math.round(document.querySelector('.hd').getBoundingClientRect().bottom));
+    const navBox = await page.evaluate(() => {
+      const r = document.querySelector('.side-nav').getBoundingClientRect();
+      return { x: Math.round(r.x), w: Math.round(r.width), h: Math.round(r.height),
+               fixed: getComputedStyle(document.querySelector('.side-nav')).position,
+               vh: innerHeight };
+    });
     console.log('    ' + JSON.stringify(tabs.map(t => [t.page, t.label, t.on])));
     chk('四个页签且首签为 Overview',
       tabs.length === 4 && tabs[0].page === 'overview' && tabs[0].label === 'Overview', tabs);
-    chk('只保留大标题：无小标题行', subCount === 0 &&
+    chk('每页一个有文字标签的图标按钮',
+      tabs.every(t => t.hasIcon && t.label) &&
       tabs[1].label === 'Detail' && tabs[2].label === 'Framework' &&
-      tabs[3].label === 'Geo Spend', { subCount, tabs });
-    chk('选中页白底深字 + 圆角上沿',
-      tabs[0].topBg === 'rgb(255, 255, 255)' && tabs[0].topColor === 'rgb(14, 23, 32)' &&
-      tabs[0].radius !== '0px', tabs[0]);
-    chk('未选中页灰底', tabs[1].topBg === 'rgb(169, 177, 188)', tabs[1]);
+      tabs[3].label === 'Geo Spend', tabs);
+    chk('侧边栏固定左侧、满视口高',
+      navBox.fixed === 'fixed' && navBox.x === 0 && navBox.h === navBox.vh, navBox);
+    chk('四个图标纵向排列在侧边栏内',
+      tabs.every(t => t.inNav) && tabs[0].y < tabs[1].y && tabs[1].y < tabs[2].y &&
+      tabs[2].y < tabs[3].y, tabs.map(t => [t.x, t.y]));
+    chk('选中页白底深字、未选中透明底',
+      tabs[0].bg === 'rgb(255, 255, 255)' && tabs[0].color === 'rgb(30, 47, 75)' &&
+      tabs[1].bg === 'rgba(0, 0, 0, 0)', tabs);
     chk('选中页有 aria-current', tabs[0].current === 'page' && !tabs[1].current, tabs);
-    chk('页签高度 40px（比原先紧凑）', tabs.every(t => t.h === 40), tabs.map(t => t.h));
-    chk('页签下沿与顶栏下沿对齐', tabs.every(t => Math.abs(t.bottom - headerBottom) <= 1),
-      { headerBottom, bottoms: tabs.map(t => t.bottom) });
-    /* 11-26：页签与右侧控件各占一个 auto margin，均分剩余空间 → 页签居中偏右，不贴标题 */
-    const tabBox = await page.evaluate(() => {
-      const r = s => document.querySelector(s).getBoundingClientRect();
-      return { gapL: Math.round(r('.pg-tabs').left - r('.hd-l').right),
-               gapR: Math.round(r('.hd-r').left - r('.pg-tabs').right) };
-    });
-    chk('页签居中偏右（左右留白接近，不紧贴标题）',
-      tabBox.gapL > 40 && Math.abs(tabBox.gapL - tabBox.gapR) <= 12, tabBox);
+    chk('图标按钮高度 56px', tabs.every(t => t.h === 56), tabs.map(t => t.h));
+    /* 顶栏不再有页签：标题与右侧控件之间无导航占位 */
+    chk('顶栏已无页签（导航移入侧边栏）', await page.evaluate(() =>
+      !document.querySelector('.hd .pg-tabs') && !document.querySelector('.hd #pgTabs')));
 
     console.log('=== 2. 页签都能真正切换 ===');
     const before = await page.evaluate(() => {
@@ -150,24 +151,28 @@ async function waitFor(page, fn, timeout, label) {
         const right = s => document.querySelector(s).getBoundingClientRect().right;
         const left = s => document.querySelector(s).getBoundingClientRect().left;
         const pad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pad'));
+        const navW = parseFloat(getComputedStyle(document.documentElement)
+          .getPropertyValue('--nav-w'));
         return { h: Math.round(hd.getBoundingClientRect().height),
                  overflow: hd.scrollWidth > hd.clientWidth + 1,
                  cut: [...document.querySelectorAll('.pg-tab-top')]
                    .filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent),
-                 tabsLeft: Math.round(left('#pgTabs')),
+                 navLeft: Math.round(left('.side-nav')),
+                 navW: navW,
+                 kpiLeft: Math.round(left('.kpis')),
                  titleRight: Math.round(right('.hd-l')),
                  hdRight: Math.round(right('.hd')),
                  expRight: Math.round(right('#btnExport')),
                  edgeGap: Math.round(innerWidth - 15 - right('#btnExport')), // 15px 为滚动条
                  pad: pad,
-                 tabsAfterTitle: left('#pgTabs') >= right('.hd-l') - 1,
                  expInHd: !!document.querySelector('.hd #btnExport') };
       });
       console.log('    ' + w + ' ' + JSON.stringify(g));
       chk(w + 'px 顶栏仍 68px 且无溢出/截断',
         g.h === 68 && !g.overflow && g.cut.length === 0, g);
-      /* 版式（11-26）：标题 → 页签 → 右侧控件；Export View 钉在整页右上角 */
-      chk(w + 'px 页签紧跟标题（不贴右端）', g.tabsAfterTitle && g.tabsLeft < g.hdRight * 0.75, g);
+      /* 11-27：页签移入侧边栏，顶栏只剩标题 + 右侧控件 */
+      chk(w + 'px 侧边导航固定且内容区右移', g.navLeft === 0 &&
+        g.navW >= 60 && Math.abs(g.kpiLeft - g.navW) <= 1, g);
       chk(w + 'px Export View 贴页面右上角', g.expInHd &&
         Math.abs(g.edgeGap - g.pad) <= 2, g);
     }

@@ -23,6 +23,9 @@ window.__FY_DEFAULT = {{ default_fy|default('', true)|tojson }};
 </head>
 <body>
 
+<!-- 侧边图标导航：固定左侧，切换页面时所有内容零位移（页签从顶栏移来） -->
+<nav class="side-nav" id="pgTabs" aria-label="Dashboard pages"></nav>
+
 <!-- 固定区：滚动时标题栏 / KPI / 筛选框保持不动 -->
 <div class="sticky-head">
 
@@ -35,11 +38,6 @@ window.__FY_DEFAULT = {{ default_fy|default('', true)|tojson }};
       <p class="hd-sub" id="hdSub">Procurement spend analysis · Loading…</p>
     </div>
   </div>
-  <!-- 页签：多页面切换入口（Power BI 式视觉对象页头），后续新页面只需在
-       board.js 的 PAGES 里注册 label/sub/render，不用改这里。
-       顺序：标题 → 页签 → 右侧控制区，保证 Export View 钉在整页右上角 -->
-  <nav class="pg-tabs" id="pgTabs" aria-label="Dashboard pages"></nav>
-
   <div class="hd-r">
     <label class="sel">
       <span>Fiscal Year</span>

@@ -50,6 +50,7 @@
   --r-sm:4px;
   /* 页面左右留白（顶栏 / KPI / 筛选条 / 栅格共用同一个值，保证左边缘对齐） */
   --pad:44px;
+  --nav-w:76px;   /* 侧边图标导航宽度 */
   /* 表头底纹：中等钢蓝（比早期 #CFDCEE 深一档，仍保证深藏青字可读） */
   --hdr-bg:#8CAACD;
   --hdr-bg-h:#7B9BC1;
@@ -110,34 +111,36 @@ h1,h2,h3,p{ margin:0; }
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
 }
 
-/* ---------------- 页签（参考 Power BI 页头：选中页白色上翻） ----------------
-   钉在顶栏**最右侧**；FY / 币种 / Export 移到中段（.hd-r 与 .pg-tabs 各占一个
-   auto margin，均分剩余空间）。只保留大标题（用户 11-24 要求去掉小标题行），
-   高度 50px、下沿与顶栏下沿齐平；切页只换 class，不改变顶栏高度。 */
-.pg-tabs{
-  display:flex; align-items:stretch; gap:3px; height:40px;
-  /* 与 .hd-r 各占一个 auto margin，均分标题与右侧控件之间的剩余空间：
-     页签因此居中偏右，不再紧贴标题（用户 11-26 反馈「有点靠左」） */
-  margin-left:auto; flex:0 1 auto; min-width:0;
-  /* 顶栏上下各有 9px 内边距；页签高 40px，下移 19px 后下沿与顶栏下沿（= KPI 顶边）齐平。
-     relative 偏移不占布局高度，顶栏仍是 68px。 */
-  position:relative; top:14px;
+/* ---------------- 侧边图标导航（11-27 用户要求） ----------------
+   固定左侧窄条，页签从顶栏移到这里：顶栏更简洁，切页时各视觉对象零位移。
+   body 用 padding-left 预留宽度；sticky-head 与所有 main.grid 都在其右侧。 */
+.side-nav{
+  position:fixed; z-index:40; left:0; top:0; bottom:0; width:var(--nav-w);
+  display:flex; flex-direction:column; align-items:stretch; gap:6px;
+  padding:12px 8px; box-sizing:border-box;
+  background:linear-gradient(180deg,#16263E 0%,#1E2F4B 100%);
+  border-right:1px solid rgba(255,255,255,.10);
 }
 .pg-tab{
-  width:clamp(104px,7.4vw,150px); height:40px; padding:0; border:0;
-  background:transparent; cursor:pointer; flex:0 1 auto; min-width:0;
-  color:#2A3542; font-family:var(--font-semi);
+  position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:3px; width:100%; height:56px; padding:4px 0; border:0; border-radius:8px;
+  background:transparent; color:#A9BCD4; cursor:pointer; flex:0 0 auto;
+  transition:background .12s ease, color .12s ease;
 }
+.pg-tab-ico{ width:22px; height:22px; display:block; }
 .pg-tab-top{
-  display:flex; align-items:center; justify-content:center; height:40px;
-  background:#A9B1BC; border-radius:6px 6px 0 0;
-  font-size:12.5px; font-weight:700; white-space:nowrap;
-  overflow:hidden; text-overflow:ellipsis; padding:0 8px;
-  transition:background .12s ease;
+  font-family:var(--font-semi); font-size:10.5px; font-weight:600; line-height:1.2;
+  white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis;
 }
-.pg-tab:hover:not(.on) .pg-tab-top{ background:#BEC5CE; }
-.pg-tab.on .pg-tab-top{ background:#fff; color:#0E1720; }
+.pg-tab:hover:not(.on){ background:rgba(255,255,255,.10); color:#fff; }
+.pg-tab.on{ background:#fff; color:var(--navy); }
+.pg-tab.on::before{
+  content:''; position:absolute; left:-8px; top:14px; bottom:14px; width:3px;
+  background:#FF6B12; border-radius:0 2px 2px 0;
+}
 .pg-tab:focus-visible{ outline:2px solid #FF6B12; outline-offset:-2px; }
+/* 内容整体右移让出导航宽度；fixed 的弹层（抽屉/浮窗）不受影响 */
+body{ padding-left:var(--nav-w); }
 
 .hd-r{ display:flex; align-items:center; gap:8px; flex:none; margin-left:auto; }
 /* 右上角主操作：白底藏青字，与深色顶栏强对比 */
@@ -186,31 +189,14 @@ h1,h2,h3,p{ margin:0; }
   background:#F8F9FB;
   border:1px solid #D7DAE1; border-radius:var(--r); padding:7px 10px 6px 13px;
   min-height:74px; box-shadow:var(--shadow);
-  transition:box-shadow .14s ease, border-color .14s ease;
+  transition:box-shadow .14s ease;
 }
 /* 参考图样式：卡片左内缘一道品牌色竖条（随外框圆角裁切） */
 .kpi::before{
   content:''; position:absolute; left:0; top:0; bottom:0; width:4px;
   background:var(--c, #435D95);
 }
-/* 视觉层次：首卡（采购总额）是整页主角——深底白字 + 粗品牌色竖条，
-   与其余 6 张辅助卡拉开主次（Power BI 官方「用大小/颜色差异引导视线」） */
-.kpi:first-child{
-  background:linear-gradient(135deg,var(--navy) 0%,var(--navy-2) 100%);
-  border-color:var(--navy);
-}
-.kpi:first-child::before{ width:5px; background:#FF6B12; }
-.kpi:first-child .k-label{ color:#E7EEF7; }
-.kpi:first-child .k-fy{ color:#B9CBE0; }
-.kpi:first-child .k-val{ color:#fff; }
-.kpi:first-child .k-delta b{ color:#B9CBE0; }
-/* 深底上把红/绿差额调亮一档，保证对比度（Power BI 官方强调可访问性） */
-.kpi:first-child .k-delta.down em{ color:#FF8A8A; }
-.kpi:first-child .k-delta.up em{ color:#6FE0A0; }
-.kpi:first-child .k-delta.flat em{ color:#D6E1EF; }
-.kpi:first-child .k-delta.down .k-bd{ background:#FF8A8A; }
-.kpi:first-child .k-delta.up .k-bd{ background:#6FE0A0; }
-.kpi:hover{ box-shadow:0 4px 12px rgba(16,28,48,.18); border-color:#A9B8CB; }
+.kpi:hover{ box-shadow:0 4px 12px rgba(16,28,48,.18); }
 
 .kpi .k-top{ display:flex; align-items:baseline; gap:5px; padding-right:8px; }
 .kpi .k-label{
@@ -861,12 +847,10 @@ body.drawer-open{ overflow:hidden; }
   .hd-sub{ font-size:10.5px; }
   .hd-logo{ height:28px; }
 }
-/* 标题 → 页签 → 右上控件三段在 1180 以下开始挤：先收窄页签、隐掉 FY 文字标签 */
 @media (max-width:1180px){
   .hd{ gap:10px; }
-  .pg-tabs{ margin-left:10px; }
-  .pg-tab{ width:88px; }
-  .pg-tab-top{ font-size:11.5px; padding:0 5px; }
+  :root{ --nav-w:64px; }
+  .pg-tab-top{ font-size:9.5px; }
   .sel > span{ display:none; }
   .hd-r{ gap:6px; }
   .hd-r .btn{ padding:5px 10px; font-size:12px; }
@@ -882,8 +866,6 @@ body.drawer-open{ overflow:hidden; }
   :root{ --pad:24px; }
   .hd h1{ font-size:15.5px; }
   .hd-sub{ font-size:10px; }
-  .pg-tab{ width:86px; }
-  .pg-tab-top{ font-size:11.5px; }
   .kpis{ grid-template-columns:repeat(4,1fr); }
   .g9,.g8,.g7,.g6,.g5,.g4,.g3{ grid-column:span 12; }
   .fc-summary{ grid-template-columns:repeat(3,1fr); }
@@ -1149,12 +1131,10 @@ html.boot-other #pgOverview, html.boot-other #kpis, html.boot-other .fbar{ displ
 .dt-pop .dt-none{ padding:10px; font-size:11px; color:var(--note); text-align:center; }
 .dt-pop .dt-acts{ display:flex; justify-content:flex-end; gap:6px; }
 .dt-pop .btn{ font-size:11.5px; padding:3px 10px; }
-/* 标题 → 页签 → 右上控件三段在 1180 以下开始挤：先收窄页签、隐掉 FY 文字标签 */
 @media (max-width:1180px){
   .hd{ gap:10px; }
-  .pg-tabs{ margin-left:10px; }
-  .pg-tab{ width:88px; }
-  .pg-tab-top{ font-size:11.5px; padding:0 5px; }
+  :root{ --nav-w:64px; }
+  .pg-tab-top{ font-size:9.5px; }
   .sel > span{ display:none; }
   .hd-r{ gap:6px; }
   .hd-r .btn{ padding:5px 10px; font-size:12px; }
@@ -1256,12 +1236,10 @@ html.boot-other #pgOverview, html.boot-other #kpis, html.boot-other .fbar{ displ
 .z-side.neg .zb-line::after{ left:-5px; box-shadow:0 0 0 2.5px #FA2E2E; }
 .z-side.zero .zb-line{ width:0 !important; }
 .z-side.zero .zb-line::after{ right:auto; left:-4.5px; }
-/* 标题 → 页签 → 右上控件三段在 1180 以下开始挤：先收窄页签、隐掉 FY 文字标签 */
 @media (max-width:1180px){
   .hd{ gap:10px; }
-  .pg-tabs{ margin-left:10px; }
-  .pg-tab{ width:88px; }
-  .pg-tab-top{ font-size:11.5px; padding:0 5px; }
+  :root{ --nav-w:64px; }
+  .pg-tab-top{ font-size:9.5px; }
   .sel > span{ display:none; }
   .hd-r{ gap:6px; }
   .hd-r .btn{ padding:5px 10px; font-size:12px; }
