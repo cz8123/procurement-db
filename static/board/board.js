@@ -14,6 +14,9 @@
   var CAT_COLORS = ['#1E2F4B', '#3B5E96', '#5E9BB8', '#2F7D6B',
                     '#C08A2E', '#8A5A8F', '#6B7A8F', '#B5544A'];
   var PAIR_FRM = '#1E3A63', PAIR_OTHER = '#8FB3D9';
+  /* 离线单文件不带 Geo Spend 页（file:// 下腾讯地图 SDK 不可用）：
+     快照里 noGeo=true 时不注册该页签、不绑定地图事件，#geo 回退 Overview。 */
+  var NO_GEO = !!(window.__SNAP__ && window.__SNAP__.noGeo);
   /* Card 视觉对象的顶部色条：主题里所有卡片同一个 ColorId，故不按指标区分 */
   var KPI_COLORS = ['#3B5E96'];
   var FDEFS = [
@@ -3303,9 +3306,9 @@
                  },
                  leave: function () { $('#pgOverview').hidden = true; } },
     detail:    { label: 'Detail',    enter: enterDetail,   leave: leaveDetail },
-    framework: { label: 'Framework', enter: enterFramework, leave: leaveFramework },
-    geo:       { label: 'Geo Spend', enter: enterGeo,      leave: leaveGeo }
+    framework: { label: 'Framework', enter: enterFramework, leave: leaveFramework }
   };
+  if (!NO_GEO) PAGES.geo = { label: 'Geo Spend', enter: enterGeo, leave: leaveGeo };
   function renderTabs() {
     var box = $('#pgTabs');
     if (!box) return;
@@ -3936,6 +3939,12 @@
 
   /* ================================================ 启动 */
   function init() {
+    /* 离线版没有 Geo 页：<head> 里的防闪脚本仍可能因 #geo 加上 boot-other，
+       这里立刻撤掉并改回 Overview，避免白屏 3 秒 */
+    if (NO_GEO && (location.hash || '').replace(/^#\/?/, '') === 'geo') {
+      document.documentElement.classList.remove('boot-other');
+      try { history.replaceState(null, '', '#overview'); } catch (e) { /* 忽略 */ }
+    }
     /* 服务端已给最新财年：先落一个默认值，首个 /data /top 就能带 fy（命中预热缓存）；
        随后 restoreView 若还原了具体财年会覆盖它 */
     if (!S.fy && window.__FY_DEFAULT) S.fy = window.__FY_DEFAULT;
@@ -3945,7 +3954,7 @@
     bind();
     bindDetail();
     bindSpec();
-    bindGeo();
+    if (!NO_GEO) bindGeo();
     /* 首帧就落在 hash 指定的页：旧逻辑要等 data 回来才切，刷新时会先闪一下 Overview。
        这里只切可见性与页签，加载仍由下面的 loadAll / enterDetail 负责。 */
     var bootPage = pageFromHash();

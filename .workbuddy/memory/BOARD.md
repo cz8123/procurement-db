@@ -399,3 +399,10 @@
 - **财年口径（用户问）**：顶部财年筛选走 `board_api._scope()` 的 `c."FiscalYearName" = ?` —— 由 **PRPO 提交日期**关联日期表 `dash_calendar` 得出，**不是**直接读 `fct_prpo` 的「财年」字段。`_fy_list()` 也从 `dash_calendar.FiscalYearName` 取下拉值。实测 `dash_po.FY` 与 `calendar.FiscalYearName` **46,013 行 0 处不符**，两者等价。Detail 里新加的 FY 列取行级 `p."FY"`，跨财年日期范围时逐行显示；指定 `dateFrom/dateTo` 时不再叠加财年条件（`_scope` 的 `has_date` 分支）。
 - **页签位置（用户反馈「有点靠左」）**：`.pg-tabs` 原是固定 `margin-left:14px` 紧贴标题（1600 下左间距 30px、右间距 111px），与 CSS 注释「.hd-r 与 .pg-tabs 各占一个 auto margin」不符。改 `.pg-tabs{margin-left:auto}` 后两个 auto margin 均分剩余空间：1600 下页签从 x=599 移到 x=639，左右间距各 70px；1024～1600 全部顶栏 68px、无溢出、表头无截断。窄屏媒体查询里的 `margin-left:10px` 保持不变（刻意贴左防溢出）。
 - **测试**：`page_tabs_check` 28/0（新增「页签左右留白接近、不紧贴标题」断言）；board 339、ui_focus 41、detail 54、snapshot 74 全绿。
+
+## 63 离线单文件不嵌入 Geo Spend 页（11-27）
+- **用户要求**：「geo页面不要嵌入导出的离线版」。在线版保留四页签（Geo 照常用），只改导出链路。
+- **导出侧** `board_export.py`：删掉 `build_geo_loc()`，`build_snapshot()` 不再写 `geoLoc`，改打 `noGeo:true` 标记；`build()` 里用正则删整个 `<main class="page" id="pgGeo" hidden>…</main>`（含前置注释），匹配数必须为 1 否则中止。仍清空 `TMAP_KEY`，不把 Key 泄漏进可转发文件。
+- **前端** `static/board/board.js`：顶部 `NO_GEO = !!(window.__SNAP__ && window.__SNAP__.noGeo)`（在线恒 false）。`PAGES` 定义里去掉 geo 项，改为 `if (!NO_GEO) PAGES.geo = …`；`init()` 里 `bindGeo()` 同样加条件（否则离线找不到 `#geoMetric` 直接报错）。离线打开 `#geo` 锚点时，`<head>` 防闪脚本仍会加 `boot-other`（隐藏 Overview 3 秒），`init()` 开头立刻移除 class 并 `history.replaceState('#overview')`。`saveView/restoreView` 的 geo 字段留着无害。
+- **测试**：`snapshot_check` 76/0（新增「离线只有三页签、无 Geo 节点与坐标数据」+「`#geo` 回退 Overview 不白屏」；后者用新标签页打开 `file:///…#geo`，避免当前页 hash 导航不重载的坑）；`page_tabs_check` 28/0 仍断言在线 4 页签含 Geo Spend；board 339、geo 45、detail 54、visual 31、ui_focus 41、grid_sum 14、colfilter 34、perf 11 全绿。
+- **交付**：重导 `exports/采购看板_单文件_20261127.html`（12.54 MB，含 §55–§62 全部改动）。**注意测试依赖路径变了**：临时目录 `Temp/ui-probe/node_modules` 被清理，puppeteer-core 现在在 `C:/Users/CONG ZHU/.workbuddy/binaries/node/workspace/node_modules`，跑测试用这个 `NODE_PATH`。

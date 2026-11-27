@@ -158,21 +158,6 @@ def build_reason_map(con):
     }
 
 
-def build_geo_loc(con):
-    """离线地图气泡需要的公司 → 坐标 / 区域色 / 城市映射。"""
-    out = {}
-    try:
-        for r in con.execute(
-                'SELECT l."Company_cn", l.longitude, l.latitude, l."Color", l."Region", '
-                'l."市", m."CompanyAbbreviationEN" FROM fct_company_location l '
-                'LEFT JOIN dim_company_map m ON m."CompanyAbbreviation"=l."Company_cn"'):
-            out[r[0]] = {"lng": r[1], "lat": r[2], "color": r[3],
-                         "region": r[4], "city": r[5], "abbr": r[6] or r[0]}
-    except sqlite3.Error:
-        pass
-    return out
-
-
 def build_snapshot():
     con = sqlite3.connect(DB)
     try:
@@ -180,7 +165,8 @@ def build_snapshot():
         contracts = build_contracts(con)
         en_fix = build_en_fix(con)
         reason_map = build_reason_map(con)
-        geo_loc = build_geo_loc(con)
+        # 离线单文件不嵌入 Geo Spend 页：地图 SDK 在 file:// 下不可用，
+        # 连带坐标数据也不再写进快照（见 §63）
     finally:
         con.close()
 
@@ -201,7 +187,7 @@ def build_snapshot():
         "enFix": en_fix,
         "reasonMap": reason_map,
         "regionEn": REGION_EN,
-        "geoLoc": geo_loc,
+        "noGeo": True,   # 前端据此不注册 Geo 页签 / 页面
     }
 
 
@@ -232,9 +218,15 @@ def build(out_path=None):
 
     client = app.test_client()
     html = client.get("/dash").get_data(as_text=True)
-    # 离线单文件是 file:// 打开的：腾讯地图 JS SDK 明确不支持该协议，
-    # 内嵌 Key 只会让控制台刷错误、并且把 Key 泄漏进可转发的文件。统一清空，
-    # 地图区届时显示配置提示，公司列表与同比表照常可用。
+    # 离线单文件是 file:// 打开的：腾讯地图 JS SDK 明确不支持该协议。
+    # 用户要求 Geo 页不进离线版：整页节点在这里移除，页签由 noGeo 标记
+    # 让前端不注册（见 static/board/board.js 的 NO_GEO）；Key 也一并清空，
+    # 不把部署方 Key 泄漏进可转发的文件。
+    html, n_geo = re.subn(
+        r'\s*<!-- 第四页：地图气泡[^>]*-->\s*<main class="page" id="pgGeo" hidden>.*?</main>',
+        '', html, flags=re.S)
+    if n_geo != 1:
+        raise SystemExit("移除 Geo 页失败（匹配 %s 处），模板结构可能变了" % n_geo)
     html = re.sub(r'window\.TMAP_KEY\s*=\s*"[^"]*"', 'window.TMAP_KEY = ""', html)
 
     # 1) 样式内联

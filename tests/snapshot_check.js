@@ -84,6 +84,17 @@ async function waitFor(pg, fn, timeout, label) {
     chk('首屏无对外网络请求', net.length === 0, net.slice(0, 3));
     chk('数据已内嵌', await page.evaluate(() =>
       !!(window.__SNAP__ && window.__SNAP__.rows && window.__SNAP__.rows.data.length > 1000)));
+    /* 11-27：用户要求 Geo 页不进离线版；在线版仍有 4 个页签（page_tabs_check 管） */
+    const geoOff = await page.evaluate(() => ({
+      tabs: [...document.querySelectorAll('.pg-tab')].map(e => e.dataset.page),
+      node: !!document.getElementById('pgGeo'),
+      flag: !!(window.__SNAP__ && window.__SNAP__.noGeo),
+      loc: !!(window.__SNAP__ && window.__SNAP__.geoLoc),
+      key: !!(window.TMAP_KEY || '')
+    }));
+    chk('离线只有三页签、无 Geo 页面节点与坐标数据',
+      geoOff.tabs.length === 3 && geoOff.tabs.indexOf('geo') < 0 &&
+      !geoOff.node && geoOff.flag && !geoOff.loc && !geoOff.key, geoOff);
     /* 期望值现场取在线接口；服务没起时退回快照自己的 API 垫片。
        不再写死金额/行数——新数据导入后这些数字本来就会变。 */
     const LD = await liveJson('/api/board/data?fy=FY2627&cur=RMB')
@@ -424,6 +435,23 @@ async function waitFor(pg, fn, timeout, label) {
     await sleep(250);
     chk('离线：全部 ? 都能弹出说明', offSweep.length === 0, offSweep);
     chk('离线：无 missing definition 兜底警告', specWarns.length === 0, specWarns);
+
+    /* #geo 锚点：离线页既无该页也不该白屏（head 防闪脚本会加 boot-other） */
+    const geoPg = await browser.newPage();
+    await geoPg.setViewport({ width: 1600, height: 1000 });
+    await geoPg.goto('file:///' + file.replace(/\\/g, '/') + '#geo', { waitUntil: 'load' });
+    await waitFor(geoPg, () => document.querySelectorAll('#fcTbl tbody tr').length > 0,
+      15000, 'offline #geo fallback');
+    const fb = await geoPg.evaluate(() => ({
+      overflow: document.documentElement.classList.contains('boot-other'),
+      overview: !document.getElementById('pgOverview').hidden,
+      hash: location.hash.replace(/^#\/?/, ''),
+      tabs: document.querySelectorAll('.pg-tab').length
+    }));
+    chk('离线打开 #geo 时回退 Overview、不白屏',
+      !fb.overflow && fb.overview && fb.hash === 'overview' && fb.tabs === 3, fb);
+    await geoPg.close();
+    await page.bringToFront();
 
     console.log('=== 6. 运行期错误 ===');
     chk('全程 0 JS 报错', errs.length === 0, errs.slice(0, 3));
