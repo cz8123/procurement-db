@@ -1107,6 +1107,8 @@ async function waitFor(pg, fn, timeout, label, arg) {
           params: document.querySelectorAll('#spParams .k').length,
           fields: document.querySelectorAll('#spFields .sp-frow').length,
           terms: document.querySelectorAll('#spTerms .sp-term').length,
+          termBlock: !!document.querySelector('.sp-sec-t') &&
+            [...document.querySelectorAll('.sp-sec-t')].some(e => /名词解释/.test(e.textContent)),
           body,
           /* 视口高度随测试配置变，别写死 720 */
           inView: r.left >= -1 && r.top >= -1 &&
@@ -1116,7 +1118,7 @@ async function waitFor(pg, fn, timeout, label, arg) {
       chk(key + ' 说明有口径条目', sp.notes > 0, sp.notes);
       chk(key + ' 说明有当前生效条件', sp.params > 0, sp.params);
       chk(key + ' 说明有字段对照', sp.fields > 1, sp.fields);
-      chk(key + ' 说明有名词解释', sp.terms > 0, sp.terms);
+      chk(key + ' 说明已去掉名词解释区块', !sp.termBlock && sp.terms === 0, sp.termBlock);
       /* 不该再出现 SQL 语法 */
       chk(key + ' 说明不含 SQL 语句',
         !/\bSELECT\b|\bFROM\b|\bJOIN\b|\bGROUP BY\b|\bSUM\(|COUNT\(/i.test(sp.body),
@@ -1128,22 +1130,23 @@ async function waitFor(pg, fn, timeout, label, arg) {
         document.querySelector('#specPop').classList.contains('on'))));
     }
 
-    /* 口径说明里应解释 WHERE 是什么意思 */
+    /* 口径说明里不应再出现英文表名 / 术语 */
     await page.evaluate(() => document.querySelector('.spec-btn[data-spec=global]').click());
     await sleep(300);
-    const termsTxt = await page.evaluate(() =>
-      document.querySelector('#spTerms').textContent || '');
-    chk('名词解释里讲清 WHERE', /WHERE/.test(termsTxt) && /筛选条件/.test(termsTxt),
-      termsTxt.slice(0, 120));
+    const allTxt = await page.evaluate(() =>
+      document.querySelector('#specPop .sp-body').textContent || '');
+    chk('口径说明不含英文表名与 SQL 术语',
+      !/\b(fct_|dash_|dim_|vw_|WHERE|SELECT|JOIN)\b/i.test(allTxt), allTxt.slice(0, 160));
     await page.evaluate(() => document.querySelector('#spClose').click());
     await sleep(180);
 
-    /* 数据库字段用中文名 */
+    /* 字段对照用数据库中文表名 */
     await page.evaluate(() => document.querySelector('.spec-btn[data-spec=kpi_amount]').click());
     await sleep(300);
     const fldTxt = await page.evaluate(() =>
       document.querySelector('#spFields').textContent || '');
-    chk('字段对照用数据库中文列名', /含增值税总价/.test(fldTxt) && /采购申请单/.test(fldTxt),
+    chk('字段对照用数据库中文列名与中文表名',
+      /含增值税总价/.test(fldTxt) && /采购申请 PRPO/.test(fldTxt),
       fldTxt.slice(0, 120));
     await page.evaluate(() => document.querySelector('#spClose').click());
     await sleep(180);

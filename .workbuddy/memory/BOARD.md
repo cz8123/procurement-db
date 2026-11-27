@@ -406,3 +406,12 @@
 - **前端** `static/board/board.js`：顶部 `NO_GEO = !!(window.__SNAP__ && window.__SNAP__.noGeo)`（在线恒 false）。`PAGES` 定义里去掉 geo 项，改为 `if (!NO_GEO) PAGES.geo = …`；`init()` 里 `bindGeo()` 同样加条件（否则离线找不到 `#geoMetric` 直接报错）。离线打开 `#geo` 锚点时，`<head>` 防闪脚本仍会加 `boot-other`（隐藏 Overview 3 秒），`init()` 开头立刻移除 class 并 `history.replaceState('#overview')`。`saveView/restoreView` 的 geo 字段留着无害。
 - **测试**：`snapshot_check` 76/0（新增「离线只有三页签、无 Geo 节点与坐标数据」+「`#geo` 回退 Overview 不白屏」；后者用新标签页打开 `file:///…#geo`，避免当前页 hash 导航不重载的坑）；`page_tabs_check` 28/0 仍断言在线 4 页签含 Geo Spend；board 339、geo 45、detail 54、visual 31、ui_focus 41、grid_sum 14、colfilter 34、perf 11 全绿。
 - **交付**：重导 `exports/采购看板_单文件_20261127.html`（12.54 MB，含 §55–§62 全部改动）。**注意测试依赖路径变了**：临时目录 `Temp/ui-probe/node_modules` 被清理，puppeteer-core 现在在 `C:/Users/CONG ZHU/.workbuddy/binaries/node/workspace/node_modules`，跑测试用这个 `NODE_PATH`。
+
+## 64 口径弹窗核查与简化（11-27）
+- **背景**：用户「检查所有对象的？弹窗备注是否更新 + 稍微简化 + 去掉名词解释 + 来自哪张表用数据库中文名」。
+- **核查结果**：23 个口径定义键与页面全部 `?`（10 静态 + KPI/筛选动态）一一对应，无漏定义、无 missing 兜底警告。发现并修正 4 处过时说法：① `global` 还说「最下面的框架协议统计」→ 改成独立页签；② `methodDonut` 还说「点理由扇区即按该理由筛选」→ 改为「理由筛选入口在上方采购方式下拉第二段」（§56 已改图内为切片器）；③ `kpi_suppliers` 还说「取供应商名中文部分」→ 改为归并后规范名；④ `top` 还说「只显示中文部分」→ 改为归并后英文名。另修正 `filter_brand/region` 的来源描述（实际从 dash_po 取）。
+- **简化**：每条 `notes` 从 4–8 条压到 2–4 条；字段名去掉英文字段/技术写法（`Procurement Method`→`选择采购方法 → 标准取值`、`Sub-Category`→`子类别`、`Table - 采购子类别`→`采购子类别`）；`spHint` 去掉英文 WHERE。
+- **中文表名**：`SRC` 常量改为数据库登记中文名（采购申请 PRPO / 采购订单 PO / 公司对照表 / 各类映射表 / 框架协议分析），新增 `reasonEx`/`reasonSs`；`contracts.fields` 第三列「框架协议表/前置审批表/算出来的」改为「框架协议/集采前置审批/计算字段」。
+- **名词解释删除**：`board.js` 删 `TERMS`/`TERMS_BY_KEY` 与 `openSpec` 的 spTerms 渲染；`board.html` 删对应 `.sp-sec`；`board.css` 删 `.sp-terms`。弹窗从四段变三段。
+- **几何**：弹窗 640→720px、`.sp-frow` 第三列 148→210px，中文表名（最长「采购申请 PRPO → 采购类别映射表」）单行显示不换行。
+- **测试**：`board_check` 339/0（删「有名词解释」断言，改「已去掉名词解释区块」；新增「不含英文表名/SQL 术语」「字段对照用中文表名」断言）；`snapshot_check` 76/0，其余 page_tabs 28、geo 45、detail 54、visual 31、ui_focus 41、grid_sum 14、colfilter 34、perf 11 全绿。重导单文件 12.53 MB。
